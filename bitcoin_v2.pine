@@ -1,0 +1,46 @@
+//@version=5
+strategy("Bitcoin v2 (fresh)", overlay=true, pyramiding=0, max_bars_back=500)
+
+// ───────── Inputs ─────────
+useLongs  = input.bool(true, "Enable longs")
+useShorts = input.bool(true, "Enable shorts")
+
+// Example MA (you can change later)
+maLen = input.int(50, "MA length", minval=1)
+ma = ta.ema(close, maLen)
+plot(ma, "EMA", color=color.new(color.blue, 0), linewidth=2)
+
+// ───────── Entry conditions (PLACEHOLDERS) ─────────
+// Replace these with your new rules.
+longSignal  = useLongs  and ta.crossover(close, ma)
+shortSignal = useShorts and ta.crossunder(close, ma)
+
+// ───────── Entries ─────────
+if strategy.position_size == 0
+    if longSignal
+        strategy.entry("L", strategy.long)
+    if shortSignal
+        strategy.entry("S", strategy.short)
+
+// ───────── Exits (PLACEHOLDERS) ─────────
+// Simple stop/target example (turn off if you want different exits)
+useStopsTargets = input.bool(true, "Use stop/target")
+stopATRLen = input.int(14, "ATR length", minval=1)
+stopATRMult = input.float(2.0, "Stop ATR mult", minval=0.1, step=0.1)
+targetRR = input.float(2.0, "Target R multiple", minval=0.1, step=0.1)
+
+atr = ta.atr(stopATRLen)
+
+if useStopsTargets and strategy.position_size > 0
+    stop = strategy.position_avg_price - stopATRMult * atr
+    limit = strategy.position_avg_price + targetRR * (strategy.position_avg_price - stop)
+    strategy.exit("L-exit", from_entry="L", stop=stop, limit=limit)
+
+if useStopsTargets and strategy.position_size < 0
+    stop = strategy.position_avg_price + stopATRMult * atr
+    limit = strategy.position_avg_price - targetRR * (stop - strategy.position_avg_price)
+    strategy.exit("S-exit", from_entry="S", stop=stop, limit=limit)
+
+// ───────── Plot signals ─────────
+plotshape(longSignal, title="BUY", style=shape.labelup, text="BUY", location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
+plotshape(shortSignal, title="SELL", style=shape.labeldown, text="SELL", location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, size=size.tiny)
