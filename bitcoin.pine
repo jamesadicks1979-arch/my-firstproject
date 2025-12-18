@@ -1,43 +1,182 @@
 //@version=5
-strategy("Outside 2D Timeframe -> Buy/Sell Next Open", overlay=true, pyramiding=0, process_orders_on_close=false, max_bars_back=500)
+indicator("Outside AnyTimeframe (levels only)", overlay=true, max_labels_count=500)
 
 // ───────── Inputs ─────────
-tradeWhenFlatOnly = input.bool(true, "Trade only when flat")
-signalSide = input.string("Auto", "Signal side", options=["Auto", "Buy", "Sell"])
+count = input.int(1, "Number of Outside Bars", minval=1, maxval=10, step=1)
 
-highlight2DOutside = input.bool(true, "Highlight 2D outside bar")
-highlightColor = input.color(color.new(color.orange, 85), "Highlight color")
+highlightOutsideBar = input.bool(true, "Highlight outside bars")
+outsideBarColor = input.color(color.new(color.orange, 85), "Outside bar highlight")
 
-plotLabels = input.bool(true, "Plot labels")
+showOutsideHighLow = input.bool(false, "Show outside bar high/low lines")
+lineExtension = input.int(5, "Outside bar line extension (bars)")
+lineColor = input.color(color.new(color.blue, 0), title="Outside bar line color")
 
-// ───────── 2D outside-bar detection (confirmed bars only) ─────────
-// Outside bar on 2D: high > prior high AND low < prior low
-isOutside2D = request.security(syminfo.tickerid, "2D", high > high[1] and low < low[1], lookahead=barmerge.lookahead_off)
+// Levels
+entryPct1 = input.float(0.40, "Entry 1 %", minval=0.0, maxval=1.0, step=0.01, group="Levels")
+entryPct2 = input.float(0.61, "Entry 2 %", minval=0.0, maxval=1.0, step=0.01, group="Levels")
+stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=1.0, step=0.01, group="Levels")
 
-// Bullish/bearish for direction
-bull2D = request.security(syminfo.tickerid, "2D", close >= open, lookahead=barmerge.lookahead_off)
+cancelAfterBars = input.int(20, "Disable levels after N bars", minval=1, maxval=500, group="Levels")
+showCrosses = input.bool(true, "Show crosses on hit bars", group="Levels")
 
-// True only on the chart bar that closes the 2D candle
-confirmed2D = request.security(syminfo.tickerid, "2D", barstate.isconfirmed, lookahead=barmerge.lookahead_off)
+showLevelLines = input.bool(false, "Show level lines (limited length)", group="Levels")
+levelLineBars = input.int(20, "Level line length (bars)", minval=1, maxval=500, group="Levels")
 
-signal2D = confirmed2D and isOutside2D
+// Direction
+enableSell = input.bool(true, "Enable SELL levels (bearish outside)", group="Direction")
+enableBuy  = input.bool(true, "Enable BUY levels (bullish outside)", group="Direction")
 
-// ───────── Highlight ─────────
-// Highlight the chart bars that correspond to the closing bar of an outside 2D candle
-bgcolor(highlight2DOutside and signal2D ? highlightColor : na)
+// Wick projection
+enableWickProjection = input.bool(true, "Wick projection (cross)", group="Wick projection")
 
-// ───────── Entries (execute next candle open) ─────────
-flat = strategy.position_size == 0
-canEnter = not tradeWhenFlatOnly or flat
+// ───────── Outside bar detection (supports count consecutive) ─────────
+outsideCount = 0
+previousBar = 1
+for i = 0 to count - 1
+    if high[previousBar - 1 + i] > high[previousBar + i] and low[previousBar - 1 + i] < low[previousBar + i]
+        outsideCount += 1
 
-int dir = signalSide == "Buy" ? 1 : signalSide == "Sell" ? -1 : bull2D ? 1 : -1
+isOutsideUp = outsideCount >= count and close >= open
+isOutsideDown = outsideCount >= count and open > close
+isOutside = isOutsideUp or isOutsideDown
 
-if canEnter and signal2D
-    if dir == 1
-        strategy.entry("L", strategy.long)
-    else
-        strategy.entry("S", strategy.short)
+bgcolor(highlightOutsideBar and isOutside ? outsideBarColor : na)
 
-// ───────── Labels ─────────
-plotshape(plotLabels and signal2D and dir == 1, title="BUY", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny, text="BUY\n(2D outside)\nnext open")
-plotshape(plotLabels and signal2D and dir == -1, title="SELL", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, size=size.tiny, text="SELL\n(2D outside)\nnext open")
+// Optional: draw outside-bar high/low short lines
+if isOutside and showOutsideHighLow
+    line.new(bar_index, high, bar_index + lineExtension, high, xloc=xloc.bar_index, color=lineColor, width=1)
+    line.new(bar_index, low,  bar_index + lineExtension, low,  xloc=xloc.bar_index, color=lineColor, width=1)
+
+// ───────── Helpers ─────────
+f_x(_y, _col) =>
+    label.new(x=bar_index, y=_y, text="X", style=label.style_label_center, color=color.new(_col, 100), textcolor=_col, size=size.tiny)
+
+// ───────── SELL setup state ─────────
+var int lastSellSetupBar = na
+var float sellObHigh = na
+var float sellObLow = na
+var float sellObOpen = na
+var float sellEntry1 = na
+var float sellEntry2 = na
+var float sellStop = na
+var float sellWick = na
+var float sellWickProj = na
+var bool sellX40 = false
+var bool sellX61 = false
+var bool sellX80 = false
+var bool sellXWick = false
+
+newSellSetup = enableSell and isOutsideDown
+if newSellSetup
+    lastSellSetupBar := bar_index
+    sellObHigh := high
+    sellObLow := low
+    sellObOpen := open
+    rng = sellObHigh - sellObLow
+    sellEntry1 := sellObLow + entryPct1 * rng
+    sellEntry2 := sellObLow + entryPct2 * rng
+    sellStop := sellObLow + stopPct * rng
+    sellWick := sellObHigh - sellObOpen
+    sellWickProj := na
+    sellX40 := false
+    sellX61 := false
+    sellX80 := false
+    sellXWick := false
+
+// compute wick projection on the NEXT candle only
+if enableWickProjection and not na(lastSellSetupBar) and bar_index == lastSellSetupBar + 1 and not na(sellWick)
+    sellWickProj := open + sellWick
+
+// disable sell levels after N bars
+if not na(lastSellSetupBar) and bar_index > lastSellSetupBar + cancelAfterBars
+    lastSellSetupBar := na
+    sellEntry1 := na
+    sellEntry2 := na
+    sellStop := na
+    sellWickProj := na
+
+// plot SELL crosses on hit bars (starting NEXT bar)
+if showCrosses and not na(lastSellSetupBar) and bar_index > lastSellSetupBar
+    if not sellX40 and not na(sellEntry1) and high >= sellEntry1
+        sellX40 := true
+        f_x(sellEntry1, color.red)
+    if not sellX61 and not na(sellEntry2) and high >= sellEntry2
+        sellX61 := true
+        f_x(sellEntry2, color.red)
+    if not sellX80 and not na(sellStop) and high >= sellStop
+        sellX80 := true
+        f_x(sellStop, color.orange)
+    if enableWickProjection and not sellXWick and not na(sellWickProj) and high >= sellWickProj
+        sellXWick := true
+        f_x(sellWickProj, color.purple)
+
+// ───────── BUY setup state ─────────
+var int lastBuySetupBar = na
+var float buyObHigh = na
+var float buyObLow = na
+var float buyObOpen = na
+var float buyEntry1 = na
+var float buyEntry2 = na
+var float buyStop = na
+var float buyWick = na
+var float buyWickProj = na
+var bool buyX40 = false
+var bool buyX61 = false
+var bool buyX80 = false
+var bool buyXWick = false
+
+newBuySetup = enableBuy and isOutsideUp
+if newBuySetup
+    lastBuySetupBar := bar_index
+    buyObHigh := high
+    buyObLow := low
+    buyObOpen := open
+    rng = buyObHigh - buyObLow
+    // For BUY: retrace down from high
+    buyEntry1 := buyObHigh - entryPct1 * rng
+    buyEntry2 := buyObHigh - entryPct2 * rng
+    buyStop := buyObHigh - stopPct * rng
+    buyWick := buyObOpen - buyObLow
+    buyWickProj := na
+    buyX40 := false
+    buyX61 := false
+    buyX80 := false
+    buyXWick := false
+
+if enableWickProjection and not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1 and not na(buyWick)
+    buyWickProj := open - buyWick
+
+if not na(lastBuySetupBar) and bar_index > lastBuySetupBar + cancelAfterBars
+    lastBuySetupBar := na
+    buyEntry1 := na
+    buyEntry2 := na
+    buyStop := na
+    buyWickProj := na
+
+if showCrosses and not na(lastBuySetupBar) and bar_index > lastBuySetupBar
+    if not buyX40 and not na(buyEntry1) and low <= buyEntry1
+        buyX40 := true
+        f_x(buyEntry1, color.green)
+    if not buyX61 and not na(buyEntry2) and low <= buyEntry2
+        buyX61 := true
+        f_x(buyEntry2, color.green)
+    if not buyX80 and not na(buyStop) and low <= buyStop
+        buyX80 := true
+        f_x(buyStop, color.orange)
+    if enableWickProjection and not buyXWick and not na(buyWickProj) and low <= buyWickProj
+        buyXWick := true
+        f_x(buyWickProj, color.purple)
+
+// ───────── Optional level lines (limited length) ─────────
+sellLinesActive = showLevelLines and not na(lastSellSetupBar) and bar_index >= lastSellSetupBar and bar_index <= lastSellSetupBar + levelLineBars
+buyLinesActive  = showLevelLines and not na(lastBuySetupBar)  and bar_index >= lastBuySetupBar  and bar_index <= lastBuySetupBar + levelLineBars
+
+plot(sellLinesActive ? sellEntry1 : na, "Sell 40% (line)", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
+plot(sellLinesActive ? sellEntry2 : na, "Sell 61% (line)", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
+plot(sellLinesActive ? sellStop   : na, "Sell 80% (line)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
+plot(sellLinesActive ? sellWickProj : na, "Sell wick (line)", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
+
+plot(buyLinesActive ? buyEntry1 : na, "Buy 40% (line)", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
+plot(buyLinesActive ? buyEntry2 : na, "Buy 61% (line)", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
+plot(buyLinesActive ? buyStop   : na, "Buy 80% (line)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
+plot(buyLinesActive ? buyWickProj : na, "Buy wick (line)", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
