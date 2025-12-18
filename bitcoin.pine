@@ -1,336 +1,107 @@
-// This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) https://creativecommons.org/licenses/by-nc-sa/4.0/
-// © LuxAlgo
-// Modified: added strategy entries/exits + stop/target plotting
+//Created by dko
+//Current Timeframe, Daily, Weekly, Monthly Pivot Bands
+//Special Thanks to Michael S. For Providing Original Code.
 
 //@version=5
-strategy("Nadaraya-Watson Envelope [LuxAlgo] + R:R Trades", "LuxAlgo - Nadaraya-Watson Envelope + Trades", overlay = true, format=format.price, precision=2,
-     max_lines_count = 500, max_labels_count = 500, max_boxes_count = 500, max_bars_back=500, pyramiding=0)
+indicator(title="4BAND", shorttitle="BAND", overlay=true)
 
-// ───────── Trade inputs ─────────
-enableLongs  = input.bool(true,  "Enable Longs",  group="Trades")
-enableShorts = input.bool(true,  "Enable Shorts", group="Trades")
-tpPips       = input.int(300,    "Take profit (pips)", minval=1, group="Trades")
-tpOnOtherBand = input.bool(true, "Take profit on opposite band touch", group="Trades")
-stopMode = input.string("70% retracement", "Stop mode", options=["Lock +pips after +pips", "70% retracement"], group="Trades")
-trailTriggerPips = input.int(100, "Move stop after profit (pips)", minval=1, group="Trades", tooltip="For 'Lock +pips after +pips' mode.")
-trailLockPips    = input.int(30,  "Lock-in profit (pips)", minval=1, group="Trades", tooltip="For 'Lock +pips after +pips' mode.")
-retraceTriggerPips = input.int(100, "Retracement activates after (pips)", minval=1, group="Trades", tooltip="For '70% retracement' mode. Minimum max profit before trailing starts.")
-retracePct = input.float(0.70, "Retracement % (0-1)", minval=0.0, maxval=0.99, step=0.01, group="Trades", tooltip="0.70 = allow 70% giveback (keep 30% of max profit).")
-// (entries are same-bar; no arming/confirm window)
-plotSignals  = input.bool(true, "Plot BUY/SELL markers", group="Trades")
-plotBoxes    = input.bool(false, "Plot signal box", group="Trades")
-boxLookback  = input.int(10, "Box lookback bars", minval=1, group="Trades", tooltip="Box will cover the high/low range of the last N bars ending on the signal bar.")
-boxOpacity   = input.int(85, "Box fill opacity (0-100)", minval=0, maxval=100, group="Trades")
-maxSigBoxes  = input.int(50, "Max signal boxes to keep", minval=0, group="Trades")
-maExit       = input.bool(true, "Exit when close crosses MA (market)", group="Trades", tooltip="If in a trade, exit when price CLOSES back on the other side of the MA.")
-markPnL      = input.bool(true, "Mark PROFIT/STOP on exits", group="Trades")
+lengthMA   = input.int(3, title="EMA Length To Calculate Bands")
+lengthMA1  = input.int(1, title="EMA Length To Calculate Bands")
+lengthMA11 = input.int(1, title="EMA Length To Calculate Bands")
+sd = input.bool(true, title="Show Daily Pivot Bands?")
 
-// ───────── Original inputs ─────────
-coeff = input.float(1, 'Multiplier', step=0.1)
-AP = input.int(14, 'Common Period')
-ATR = ta.sma(ta.tr, AP)
-// Match original LuxAlgo input style
-src = input(close)
-showsignalsk = input.bool(title='Show Signals?', defval=true)
-novolumedata = input.bool(title='Change calculation (no volume data)?', defval=false)
-upT = low - ATR * coeff
-downT = high + ATR * coeff
+// ───────── Hull MA (from previous code) ─────────
+showMA = input.bool(true, "Show Hull MA", group="MA")
+maLen = input.int(9, "Hull MA Length", minval=1, group="MA")
+maSrc = input.source(close, "Source", group="MA")
 
-//------------------------------------------------------------------------------
-//Settings
-//-----------------------------------------------------------------------------{
-h = input.float(8.,'Bandwidth', minval = 0)
-mult = input.float(3., minval = 0)
+lenHalf = math.max(1, int(math.floor(maLen / 2.0)))
+lenSqrt = math.max(1, int(math.floor(math.sqrt(maLen))))
+hullma = ta.wma(2 * ta.wma(maSrc, lenHalf) - ta.wma(maSrc, maLen), lenSqrt)
+plot(showMA ? hullma : na, "Hull MA", color=color.new(color.blue, 0), linewidth=2)
 
-repaint = input.bool(true, 'Repainting Smoothing', tooltip = 'Repainting is an effect where the indicators historical output is subject to change over time. Disabling repainting will cause the indicator to output the endpoints of the calculations')
+PP = (high + low + close) / 3.0
+PPEMA   = ta.ema(PP, lengthMA)
+PPEMA1  = ta.ema(PP, lengthMA1)
+PPEMA11 = ta.ema(PP, lengthMA11)
 
-//Style
-upCss = input.color(color.teal, 'Colors', inline = 'inline1', group = 'Style')
-dnCss = input.color(color.red, '', inline = 'inline1', group = 'Style')
-bandHistoryBars = input.int(2000, "Repaint band history (bars)", minval=200, maxval=5000, group="Style", tooltip="How far back the repainting bands draw. Larger values are heavier.")
-showSignalBands = input.bool(false, "Show signal bands (non-repainting)", group="Style", tooltip="Signals/trades use these non-repainting bands. Turn ON to visually verify every BUY/SELL condition.")
-sigBandOpacity  = input.int(35, "Signal band opacity (0-100)", minval=0, maxval=100, group="Style")
+HP1 = (PP + (PP - low))
+LP1 = (PP - (high - PP))
+HP2 = (PP + 2 * (PP - low))
+LP2 = (PP - 2 * (high - PP))
 
-//-----------------------------------------------------------------------------}
-//Functions
-//-----------------------------------------------------------------------------{
-//Gaussian window
-gauss(x, h) => math.exp(-(math.pow(x, 2) / (h * h * 2)))
+// PPD71 = Difference from HP1 and LP1 for the last 7 bars
+PPD71 = ((HP1 - LP1) + (HP1[1] - LP1[1]) + (HP1[2] - LP1[2]) + (HP1[3] - LP1[3]) + (HP1[4] - LP1[4]) + (HP1[5] - LP1[5]) + (HP1[6] - LP1[6])) / 7.0
+// PPD72 = Difference from HP2 and LP2 for the last 7 bars
+PPD72 = ((HP2 - LP2) + (HP2[1] - LP2[1]) + (HP2[2] - LP2[2]) + (HP2[3] - LP2[3]) + (HP2[4] - LP2[4]) + (HP2[5] - LP2[5]) + (HP2[6] - LP2[6])) / 7.0
 
-//-----------------------------------------------------------------------------}
-//Append lines
-//-----------------------------------------------------------------------------{
-n = bar_index
+r1 = PPEMA + PPD71
+s1 = PPEMA - PPD71
+r2 = PPEMA1 + PPD71
+s2 = PPEMA1 - PPD71
 
-// (kept to match original LuxAlgo structure)
-var ln = array.new_line(0)
-if barstate.isfirst and repaint
-    for _ = 0 to 499
-        array.push(ln, line.new(na, na, na, na))
+//Daily Pivot Bands
+//(kept for compatibility; not all series are plotted)
+ddd_PPEMA = request.security(syminfo.tickerid, "D", PPEMA)
+ddd_r1111 = request.security(syminfo.tickerid, "D", r1)
+ddd_s1111 = request.security(syminfo.tickerid, "D", s1)
 
-//-----------------------------------------------------------------------------}
-//End point method (NON-repainting series for trading/signals)
-//-----------------------------------------------------------------------------{
-var coefs = array.new_float(0)
-var float den = na
+p1111 = plot(sd and not na(ddd_r1111) ? ddd_r1111 : na, title="D R1", style=plot.style_line, linewidth=5, color=color.blue)
+p1222 = plot(sd and not na(ddd_s1111) ? ddd_s1111 : na, title="D S1", style=plot.style_line, linewidth=5, color=color.blue)
 
-if barstate.isfirst
-    for i = 0 to 499
-        w = gauss(i, h)
-        coefs.push(w)
-    den := coefs.sum()
+//240 Pivot Bands
+p240_PPEMA = request.security(syminfo.tickerid, "240", PPEMA)
+d_r1 = request.security(syminfo.tickerid, "240", r1)
+d_s1 = request.security(syminfo.tickerid, "240", s1)
+d_r2 = request.security(syminfo.tickerid, "240", r2)
+d_s2 = request.security(syminfo.tickerid, "240", s2)
 
-float outNR = na
-if not na(den)
-    float acc = 0.0
-    for i = 0 to 499
-        acc += src[i] * coefs.get(i)
-    outNR := acc / den
+p11 = plot(sd and not na(d_r1) ? d_r1 : na, title="4 R1", style=plot.style_line, linewidth=5, color=color.black)
+p12 = plot(sd and not na(d_s1) ? d_s1 : na, title="4 S1", style=plot.style_line, linewidth=5, color=color.black)
 
-maeNR = ta.sma(math.abs(src - outNR), 499) * mult
+s1hit = low <= d_s1
+s2hit = low <= d_s2
 
-upperNR = outNR + maeNR
-lowerNR = outNR - maeNR
+//480 Pivot Bands
+p480_PPEMA1 = request.security(syminfo.tickerid, "480", PPEMA)
+dd_r11 = request.security(syminfo.tickerid, "480", r1)
+dd_s11 = request.security(syminfo.tickerid, "480", s1)
+dd_r22 = request.security(syminfo.tickerid, "480", r2)
+dd_s22 = request.security(syminfo.tickerid, "480", s2)
 
-//-----------------------------------------------------------------------------}
-//Crossing Arrows (from non-repainting values)
-plotshape(showsignalsk and ta.crossunder(close, outNR - maeNR) ? low : na, "Crossunder", shape.labelup, location.absolute, color(na), 0, text='▲', textcolor=upCss, size=size.tiny)
-plotshape(showsignalsk and ta.crossover(close, outNR + maeNR) ? high : na, "Crossover", shape.labeldown, location.absolute, color(na), 0, text='▼', textcolor=dnCss, size=size.tiny)
+p111 = plot(sd and not na(dd_r11) ? dd_r11 : na, title="8 R1", style=plot.style_line, linewidth=4, color=color.new(#DC143C, 0))
+p122 = plot(sd and not na(dd_s11) ? dd_s11 : na, title="8 S1", style=plot.style_line, linewidth=4, color=color.lime)
+p133 = plot(sd and not na(dd_r22) ? dd_r22 : na, title="8 R2", style=plot.style_line, linewidth=4, color=color.maroon)
+p144 = plot(sd and not na(dd_s22) ? dd_s22 : na, title="8 S2", style=plot.style_line, linewidth=4, color=color.new(#228B22, 0))
+fill(p111, p133, color=color.new(color.red, 80))
+fill(p122, p144, color=color.new(color.lime, 80))
 
-// ───────── Moving Average (make it visible) ─────────
-length = input.int(9, minval=1, group="MA")
-src1 = input(close, title="Source", group="MA")
-lenHalf = math.max(1, int(math.floor(length / 2.0)))
-lenSqrt = math.max(1, int(math.floor(math.sqrt(length))))
-hullma = ta.wma(2 * ta.wma(src1, lenHalf) - ta.wma(src1, length), lenSqrt)
-plot(hullma, title="Hull MA", color=color.new(color.blue, 0), linewidth=2)
+//10 min Pivot Bands
+p10_PPEMA11 = request.security(syminfo.tickerid, "10", PPEMA)
+ddd_r1 = request.security(syminfo.tickerid, "10", r1)
+ddd_s1 = request.security(syminfo.tickerid, "10", s1)
+ddd_s2 = request.security(syminfo.tickerid, "10", s2)
 
-//-----------------------------------------------------------------------------}
-//Compute and display NWE (repainting visual mode) — matches original LuxAlgo
-//-----------------------------------------------------------------------------{
-float y2 = na
-float y1 = na
+// In v4 this used security(tickerid, '', high[1]/low[1]); on v5 we can just use the local series.
+h = high[1]
+l = low[1]
 
-nwe = array.new<float>(0)
-if barstate.islast and repaint
-    sae = 0.
-    //Compute and set NWE point
-    // NOTE: TradingView limits history lookbacks; keep this <= 499 to avoid runtime errors.
-    hist = math.min(499, n - 1)
-    for i = 0 to hist
-        sum = 0.
-        sumw = 0.
-        //Compute weighted mean
-        for j = 0 to math.min(499, n - 1)
-            w = gauss(i - j, h)
-            sum += src[j] * w
-            sumw += w
+hh = h >= ddd_r1
+ll = l <= ddd_s1
 
-        y2 := sum / sumw
-        sae += math.abs(src[i] - y2)
-        nwe.push(y2)
+alertcondition(hh, title='Alert Bearish', message='Short signal!')
+alertcondition(ll, title='Alert Bullish', message='Long signal!')
 
-    sae := sae / math.max(1, hist) * mult
-    for i = 0 to hist
-        if i % 2
-            line.new(n - i + 1, y1 + sae, n - i, nwe.get(i) + sae, color=upCss)
-            line.new(n - i + 1, y1 - sae, n - i, nwe.get(i) - sae, color=dnCss)
+plot(sd and not na(ddd_r1) ? ddd_r1 : na, title="10 R1", style=plot.style_line, linewidth=2, color=color.new(#DC143C, 0))
+plot(sd and not na(ddd_s1) ? ddd_s1 : na, title="10 S1", style=plot.style_line, linewidth=2, color=color.lime)
 
-        // Labels (visual only)
-        if i < hist and src[i] > nwe.get(i) + sae and src[i + 1] < nwe.get(i) + sae
-            label.new(n - i, src[i], '▼', color=color(na), style=label.style_label_down, textcolor=dnCss, textalign=text.align_center)
-        if i < hist and src[i] < nwe.get(i) - sae and src[i + 1] > nwe.get(i) - sae
-            label.new(n - i, src[i], '▲', color=color(na), style=label.style_label_up, textcolor=upCss, textalign=text.align_center)
+plotshape(s2hit, style=shape.triangleup, color=color.green, location=location.belowbar)
+plotchar(s2hit, text="S2", char="", color=color.black, location=location.belowbar)
+alertcondition(s2hit, title='Alert S2', message='S2 hit!')
 
-        y1 := nwe.get(i)
+r1hit = high >= d_r1
+r2hit = high >= d_r2
 
-//-----------------------------------------------------------------------------}
-//Dashboard
-//-----------------------------------------------------------------------------{
-var tb = table.new(position.top_right, 1, 1
-  , bgcolor = #1e222d
-  , border_color = #373a46
-  , border_width = 1
-  , frame_color = #373a46
-  , frame_width = 1)
-
-if repaint
-    tb.cell(0, 0, 'Repainting Mode Enabled', text_color=color.white, text_size=size.small)
-
-//-----------------------------------------------------------------------------}
-//Plot (match original: hide plots in repaint mode)
-//-----------------------------------------------------------------------------}
-plot(repaint ? na : upperNR, 'Upper', upCss)
-plot(repaint ? na : lowerNR, 'Lower', dnCss)
-
-// Always show the NON-repainting bands used for signals (optional)
-plot(showSignalBands ? upperNR : na, 'Signal Upper (NR)', color=color.new(upCss, sigBandOpacity), linewidth=1)
-plot(showSignalBands ? lowerNR : na, 'Signal Lower (NR)', color=color.new(dnCss, sigBandOpacity), linewidth=1)
-
-// ───────── Trading rules (use NON-repainting bands) ─────────
-// Simple rules (as requested):
-// - SELL when candle CLOSES above the upper band AND CLOSES below the MA
-// - BUY  when candle CLOSES below the lower band AND CLOSES above the MA
-shortSignal = enableShorts and (close > upperNR) and (close < hullma)
-longSignal  = enableLongs  and (close < lowerNR) and (close > hullma)
-
-// ───────── Signal box helper ─────────
-var sigBoxes = array.new_box(0)
-f_addSignalBox(_isShort) =>
-    if plotBoxes and bar_index >= boxLookback
-        top = ta.highest(high, boxLookback)
-        bot = ta.lowest(low, boxLookback)
-        if not na(top) and not na(bot)
-            c = _isShort ? dnCss : upCss
-            b = box.new(left=bar_index - boxLookback + 1, top=top, right=bar_index, bottom=bot, xloc=xloc.bar_index,
-                 border_color=c, bgcolor=color.new(c, boxOpacity))
-            array.push(sigBoxes, b)
-            if array.size(sigBoxes) > maxSigBoxes
-                old = array.shift(sigBoxes)
-                box.delete(old)
-
-// If boxes are turned off, remove any previously drawn ones
-if not plotBoxes and array.size(sigBoxes) > 0
-    for i = 0 to array.size(sigBoxes) - 1
-        box.delete(array.get(sigBoxes, i))
-    array.clear(sigBoxes)
-
-// (Signal mode/confirm window inputs are kept for now, but trading is enforced as STRICT same-bar.)
-
-// Draw boxes on signal bars
-if shortSignal
-    f_addSignalBox(true)
-if longSignal
-    f_addSignalBox(false)
-
-// ───────── Orders / exits ─────────
-flat = strategy.position_size == 0
-
-cooldownBars = input.int(1, "Cooldown bars after exit", minval=0, group="Trades", tooltip="Prevents immediate re-entries right after a close/stop.")
-var int lastExitBar = na
-justExited = strategy.position_size == 0 and strategy.position_size[1] != 0
-if justExited
-    lastExitBar := bar_index
-canEnter = flat and (na(lastExitBar) or bar_index > lastExitBar + cooldownBars)
-
-exitMode = input.string(defval="Current", title="Exit mode", options=["Current", "MA stop only (no TP)", "TP only (no MA stop)"], group="Trades")
-
-if canEnter and shortSignal
-    strategy.entry("S", strategy.short)
-
-if canEnter and longSignal
-    strategy.entry("L", strategy.long)
-
-// Pip size (TradingView-style pip approximation)
-pipSize = syminfo.currency == "JPY" ? syminfo.mintick : syminfo.mintick * 10
-tpDist = tpPips * pipSize
-trailTrigDist = trailTriggerPips * pipSize
-trailLockDist = trailLockPips * pipSize
-retraceTrigDist = retraceTriggerPips * pipSize
-
-entryPrice = strategy.position_avg_price
-shortTpPrice = entryPrice - tpDist
-longTpPrice  = entryPrice + tpDist
-shortLockStop = entryPrice - trailLockDist
-longLockStop  = entryPrice + trailLockDist
-
-var bool shortLocked = false
-var bool longLocked  = false
-var float longPeak = na
-var float shortTrough = na
-var float longRetraceStop = na
-var float shortRetraceStop = na
-
-// Reset lock flags when flat
-if flat
-    shortLocked := false
-    longLocked := false
-    longPeak := na
-    shortTrough := na
-    longRetraceStop := na
-    shortRetraceStop := na
-
-// Arm trailing lock once price moves in favor by trailTriggerPips
-if stopMode == "Lock +pips after +pips"
-    if strategy.position_size < 0 and not shortLocked and (entryPrice - low) >= trailTrigDist
-        shortLocked := true
-    if strategy.position_size > 0 and not longLocked and (high - entryPrice) >= trailTrigDist
-        longLocked := true
-
-// 70% retracement stop (trail stop that gives back retracePct of max profit)
-if stopMode == "70% retracement"
-    if strategy.position_size > 0
-        longPeak := na(longPeak) ? high : math.max(longPeak, high)
-        mfe = longPeak - entryPrice
-        if mfe >= retraceTrigDist
-            // keep (1 - retracePct) of max profit
-            longRetraceStop := entryPrice + (1.0 - retracePct) * mfe
-    else
-        longPeak := na
-        longRetraceStop := na
-
-    if strategy.position_size < 0
-        shortTrough := na(shortTrough) ? low : math.min(shortTrough, low)
-        mfe = entryPrice - shortTrough
-        if mfe >= retraceTrigDist
-            shortRetraceStop := entryPrice - (1.0 - retracePct) * mfe
-    else
-        shortTrough := na
-        shortRetraceStop := na
-
-// Take profit at fixed 300 pips (limit order)
-if exitMode != "MA stop only (no TP)" and strategy.position_size < 0 and tpDist > 0
-    strategy.exit("S-TP", from_entry="S", limit=shortTpPrice)
-if exitMode != "MA stop only (no TP)" and strategy.position_size > 0 and tpDist > 0
-    strategy.exit("L-TP", from_entry="L", limit=longTpPrice)
-
-// After +100 pips, move stop to +30 pips profit (stop order)
-if stopMode == "Lock +pips after +pips"
-    if strategy.position_size < 0 and shortLocked and trailLockDist > 0
-        strategy.exit("S-LockStop", from_entry="S", stop=shortLockStop)
-    if strategy.position_size > 0 and longLocked and trailLockDist > 0
-        strategy.exit("L-LockStop", from_entry="L", stop=longLockStop)
-
-if stopMode == "70% retracement"
-    if strategy.position_size < 0 and not na(shortRetraceStop)
-        strategy.exit("S-RetraceStop", from_entry="S", stop=shortRetraceStop)
-    if strategy.position_size > 0 and not na(longRetraceStop)
-        strategy.exit("L-RetraceStop", from_entry="L", stop=longRetraceStop)
-
-// Take profit when touching opposite band
-if exitMode != "MA stop only (no TP)" and tpOnOtherBand and strategy.position_size < 0 and low <= lowerNR
-    strategy.close("S", comment="TP band")
-if exitMode != "MA stop only (no TP)" and tpOnOtherBand and strategy.position_size > 0 and high >= upperNR
-    strategy.close("L", comment="TP band")
-
-// Stop (market): close across MA AND beyond entry price
-if exitMode != "TP only (no MA stop)" and maExit and strategy.position_size < 0 and close > hullma and close > entryPrice
-    strategy.close("S", comment="STOP MA")
-if exitMode != "TP only (no MA stop)" and maExit and strategy.position_size > 0 and close < hullma and close < entryPrice
-    strategy.close("L", comment="STOP MA")
-
-// Plot markers on every signal bar (not only when flat)
-plotshape(plotSignals and shortSignal, title="SELL", style=shape.labeldown, text="SELL", location=location.abovebar, color=dnCss, textcolor=color.white, size=size.tiny)
-plotshape(plotSignals and longSignal,  title="BUY",  style=shape.labelup,   text="BUY",  location=location.belowbar, color=upCss, textcolor=color.white, size=size.tiny)
-
-plot(strategy.position_size != 0 ? entryPrice : na, "Entry", color=color.new(color.gray, 0), linewidth=1, style=plot.style_linebr)
-plot(strategy.position_size < 0 ? shortTpPrice : na, "Short TP (pips)", color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
-plot(strategy.position_size > 0 ? longTpPrice  : na, "Long TP (pips)",  color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
-plot(stopMode == "Lock +pips after +pips" and strategy.position_size < 0 and shortLocked ? shortLockStop : na, "Short Stop (locked +pips)", color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
-plot(stopMode == "Lock +pips after +pips" and strategy.position_size > 0 and longLocked  ? longLockStop  : na, "Long Stop (locked +pips)",  color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
-plot(stopMode == "70% retracement" and strategy.position_size < 0 ? shortRetraceStop : na, "Short Stop (70% retrace)", color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
-plot(stopMode == "70% retracement" and strategy.position_size > 0 ? longRetraceStop  : na, "Long Stop (70% retrace)",  color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
-
-// Mark PROFIT / STOP on the chart when trades close
-var int lastClosed = 0
-if markPnL and strategy.closedtrades > lastClosed
-    for t = lastClosed to strategy.closedtrades - 1
-        xb = strategy.closedtrades.exit_bar_index(t)
-        yp = strategy.closedtrades.exit_price(t)
-        pr = strategy.closedtrades.profit(t)
-        isWin = pr > 0
-        txt = isWin ? "PROFIT" : "STOP"
-        col = isWin ? color.new(color.green, 0) : color.new(color.red, 0)
-        style = isWin ? label.style_label_up : label.style_label_down
-        label.new(x=xb, y=yp, xloc=xloc.bar_index, text=txt, style=style, color=color.new(col, 75), textcolor=col, size=size.tiny)
-    lastClosed := strategy.closedtrades
+plotshape(r2hit, style=shape.triangledown, color=color.orange, location=location.abovebar)
+plotchar(r2hit, text="R2", char="", color=color.orange, location=location.abovebar)
+alertcondition(r2hit, title='Alert R2', message='R2 hit!')
