@@ -3,13 +3,10 @@ strategy("Outside Bar Finder (45%/61% entries + 80% stop)", overlay=true, pyrami
      default_qty_type=strategy.percent_of_equity, default_qty_value=100)
 
 count = input.int(1, "Number of Outside Bars", minval=1, maxval=10, step=1, tooltip="The number of consecutive outside bars")
-showArrow = input.bool(true, "Show Arrow", tooltip="Show an arrow indicating whether the outside bar is bullish or bearish")
 showLine = input.bool(false, "Show Signal Lines", tooltip="Show horizontal lines at the high and low of the outside bar")
 lineExtension = input.int(5, "Signal Line Extension Length", tooltip="The number of bars to extend the signal lines beyond the outside bar")
 lineColor = input.color(color.new(color.blue, 0), title="Signal Line Color")
 tradeWhenFlatOnly = input.bool(true, "Trade only when flat")
-showBuySellLabels = input.bool(true, "Show BUY/SELL labels")
-labelDelayBars = input.int(1, "Label delay (bars)", minval=0, maxval=5, tooltip="1 = show BUY/SELL label on the candle AFTER the outside bar")
 highlightOutsideBar = input.bool(true, "Highlight outside bars")
 outsideBarColor = input.color(color.new(color.orange, 85), "Outside bar highlight")
 
@@ -20,8 +17,13 @@ entryPct2 = input.float(0.61, "Entry 2 %", minval=0.0, maxval=1.0, step=0.01, gr
 stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
 qtyPct1 = input.float(50, "Order 1 size (%)", minval=0.0, maxval=100.0, step=1, group="Sell setup")
 qtyPct2 = input.float(50, "Order 2 size (%)", minval=0.0, maxval=100.0, step=1, group="Sell setup")
+tpPips = input.int(10000, "Take profit (pips)", minval=1, group="Sell setup")
 cancelAfterBars = input.int(20, "Cancel unfilled after N bars", minval=1, maxval=500, group="Sell setup")
 plotLevels = input.bool(true, "Plot entry/stop levels", group="Sell setup")
+plotLevelCrosses = input.bool(true, "Put crosses on 45% / 61% / 80%", group="Sell setup")
+
+enableWickProjection = input.bool(true, "Wick projection level (circle)", group="Wick projection")
+wickOrderPct = input.float(0, "Optional extra sell size at wick level (%)", minval=0.0, maxval=100.0, step=1, group="Wick projection", tooltip="0 = no order, only plot a circle.")
 
 outsideCount = 0
 previousBar = 1
@@ -41,15 +43,6 @@ if isOutside and showLine
     line.new(x1=time, y1=high, x2=time + dt * lineExtension, y2=high, color=lineColor, style=line.style_solid, width=1, xloc=xloc.bar_time)
     line.new(x1=time, y1=low, x2=time + dt * lineExtension, y2=low, color=lineColor, style=line.style_solid, width=1, xloc=xloc.bar_time)
 
-plotshape(showArrow and isOutsideUp, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.normal)
-plotshape(showArrow and isOutsideDown, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.normal)
-
-// Show BUY/SELL labels on the next candle after the outside bar (default)
-buyLabel = showBuySellLabels and isOutsideUp[labelDelayBars]
-sellLabel = showBuySellLabels and isOutsideDown[labelDelayBars]
-plotshape(buyLabel, title="BUY label", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, text="BUY", size=size.tiny)
-plotshape(sellLabel, title="SELL label", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, text="SELL", size=size.tiny)
-
 // ───────── Sell setup: place limit sells at 45% & 61% retracement ─────────
 flat = strategy.position_size == 0
 canEnter = not tradeWhenFlatOnly or flat
@@ -60,6 +53,7 @@ var float obLow = na
 var float sellEntry1 = na
 var float sellEntry2 = na
 var float sellStop = na
+var float wickProj = na
 var bool hitE1 = false
 var bool hitE2 = false
 
@@ -72,6 +66,7 @@ if newSellSetup
     sellEntry1 := obLow + entryPct1 * rng
     sellEntry2 := obLow + entryPct2 * rng
     sellStop := obLow + stopPct * rng
+    wickProj := na
     hitE1 := false
     hitE2 := false
 
@@ -81,27 +76,41 @@ if newSellSetup
     if qtyPct2 > 0
         strategy.entry("S61", strategy.short, qty=qtyPct2, limit=sellEntry2)
 
+// Compute wick projection on the candle AFTER the outside bar:
+// wick = (outside high - outside open); projection = (next candle open + wick)
+if enableWickProjection and not na(lastSetupBar) and bar_index == lastSetupBar + 1 and not na(obHigh)
+    wick = obHigh - open[1]  // outside bar open is previous bar's open
+    wickProj := open + wick
+    if wickOrderPct > 0
+        strategy.entry("SWick", strategy.short, qty=wickOrderPct, limit=wickProj)
+
 // Cancel unfilled orders after N bars
 if not na(lastSetupBar) and bar_index > lastSetupBar + cancelAfterBars
     strategy.cancel("S45")
     strategy.cancel("S61")
+    strategy.cancel("SWick")
     lastSetupBar := na
 
-// Stop at 80% of outside bar range (applies to filled positions)
-if strategy.position_size < 0 and not na(sellStop)
-    strategy.exit("S45-exit", from_entry="S45", stop=sellStop)
-    strategy.exit("S61-exit", from_entry="S61", stop=sellStop)
+// Take-profit (10,000 pips) and stop at 80% of outside bar range (applies to filled positions)
+pipSize = syminfo.currency == "JPY" ? syminfo.mintick : syminfo.mintick * 10
+tpDist = tpPips * pipSize
 
-// Mark sells above when the entry levels are hit (price trades at/through)
-if plotLevels and not na(lastSetupBar)
-    if not hitE1 and high >= sellEntry1
-        hitE1 := true
-        label.new(bar_index, high, "SELL 45% HIT", style=label.style_label_down, color=color.new(color.red, 75), textcolor=color.red)
-    if not hitE2 and high >= sellEntry2
-        hitE2 := true
-        label.new(bar_index, high, "SELL 61% HIT", style=label.style_label_down, color=color.new(color.red, 75), textcolor=color.red)
+if strategy.position_size < 0 and not na(sellStop)
+    strategy.exit("S45-exit", from_entry="S45", stop=sellStop, limit=sellEntry1 - tpDist)
+    strategy.exit("S61-exit", from_entry="S61", stop=sellStop, limit=sellEntry2 - tpDist)
+    if not na(wickProj)
+        strategy.exit("SWick-exit", from_entry="SWick", stop=sellStop, limit=wickProj - tpDist)
+
+// Put crosses on levels on setup bar
+plotshape(plotLevelCrosses and newSellSetup, title="45% cross", style=shape.xcross, location=location.absolute, y=sellEntry1, color=color.new(color.red, 0), size=size.tiny)
+plotshape(plotLevelCrosses and newSellSetup, title="61% cross", style=shape.xcross, location=location.absolute, y=sellEntry2, color=color.new(color.red, 0), size=size.tiny)
+plotshape(plotLevelCrosses and newSellSetup, title="80% cross", style=shape.xcross, location=location.absolute, y=sellStop, color=color.new(color.orange, 0), size=size.tiny)
+
+// Circle marker for wick projection level (on the candle after the outside bar)
+plotshape(enableWickProjection and not na(wickProj) and bar_index == lastSetupBar + 1, title="Wick projection", style=shape.circle, location=location.absolute, y=wickProj, color=color.new(color.purple, 0), size=size.tiny)
 
 // Plot levels
 plot(plotLevels ? sellEntry1 : na, "Sell 45%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
 plot(plotLevels ? sellEntry2 : na, "Sell 61%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
 plot(plotLevels ? sellStop : na, "Sell Stop (80%)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
+plot(plotLevels ? wickProj : na, "Wick projection", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
