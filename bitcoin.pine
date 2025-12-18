@@ -14,8 +14,6 @@ stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=
 
 disableAfterBars = input.int(20, "Disable levels after N bars", minval=1, maxval=500, group="Levels")
 showCrosses = input.bool(true, "Show crosses on hit bars", group="Levels")
-showLevelLines = input.bool(true, "Show 40/61/80 + wick levels", group="Levels")
-levelLineBars = input.int(50, "Level line length (bars)", minval=1, maxval=500, group="Levels")
 showBuySellLabels = input.bool(true, "Show BUY/SELL label on entry hit", group="Levels")
 
 // Direction
@@ -53,10 +51,8 @@ var float sellEntry2 = na
 var float sellStop = na
 var float sellWick = na
 var float sellWickProj = na
-var bool sellX40 = false
 var bool sellX61 = false
 var bool sellX80 = false
-var bool sellXWick = false
 var bool sellEntryLabelPrinted = false
 
 newSellSetup = enableSell and isOutsideDown
@@ -71,10 +67,8 @@ if newSellSetup
     sellStop := sellObLow + stopPct * rng
     sellWick := sellObHigh - sellObOpen
     sellWickProj := na
-    sellX40 := false
     sellX61 := false
     sellX80 := false
-    sellXWick := false
     sellEntryLabelPrinted := false
 
 // compute wick projection on the NEXT candle only
@@ -91,28 +85,20 @@ if not na(lastSellSetupBar) and bar_index > lastSellSetupBar + disableAfterBars
 
 // plot SELL crosses on hit bars (starting NEXT bar)
 if showCrosses and not na(lastSellSetupBar) and bar_index > lastSellSetupBar
-    hitSell40 = not sellX40 and not na(sellEntry1) and high >= sellEntry1
     hitSell61 = not sellX61 and not na(sellEntry2) and high >= sellEntry2
     hitSell80 = not sellX80 and not na(sellStop) and high >= sellStop
-    hitSellWk = enableWickProjection and not sellXWick and not na(sellWickProj) and high >= sellWickProj
 
     // Print a single SELL label above the entry candle (first entry-level hit)
-    if showBuySellLabels and not sellEntryLabelPrinted and (hitSell40 or hitSell61 or hitSellWk)
+    if showBuySellLabels and not sellEntryLabelPrinted and hitSell61
         sellEntryLabelPrinted := true
         label.new(x=bar_index, y=high, text="SELL", style=label.style_label_down, color=color.new(color.red, 70), textcolor=color.red, size=size.tiny)
 
-    if hitSell40
-        sellX40 := true
-        f_x(sellEntry1, color.red)
     if hitSell61
         sellX61 := true
         f_x(sellEntry2, color.red)
     if hitSell80
         sellX80 := true
         f_x(sellStop, color.orange)
-    if hitSellWk
-        sellXWick := true
-        f_x(sellWickProj, color.purple)
 
 // ───────── BUY state (bullish outside) ─────────
 var int lastBuySetupBar = na
@@ -124,10 +110,8 @@ var float buyEntry2 = na
 var float buyStop = na
 var float buyWick = na
 var float buyWickProj = na
-var bool buyX40 = false
 var bool buyX61 = false
 var bool buyX80 = false
-var bool buyXWick = false
 var bool buyEntryLabelPrinted = false
 
 newBuySetup = enableBuy and isOutsideUp
@@ -143,10 +127,8 @@ if newBuySetup
     buyStop := buyObHigh - stopPct * rng
     buyWick := buyObOpen - buyObLow
     buyWickProj := na
-    buyX40 := false
     buyX61 := false
     buyX80 := false
-    buyXWick := false
     buyEntryLabelPrinted := false
 
 if enableWickProjection and not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1 and not na(buyWick)
@@ -160,40 +142,16 @@ if not na(lastBuySetupBar) and bar_index > lastBuySetupBar + disableAfterBars
     buyWickProj := na
 
 if showCrosses and not na(lastBuySetupBar) and bar_index > lastBuySetupBar
-    hitBuy40 = not buyX40 and not na(buyEntry1) and low <= buyEntry1
     hitBuy61 = not buyX61 and not na(buyEntry2) and low <= buyEntry2
     hitBuy80 = not buyX80 and not na(buyStop) and low <= buyStop
-    hitBuyWk = enableWickProjection and not buyXWick and not na(buyWickProj) and low <= buyWickProj
 
-    if showBuySellLabels and not buyEntryLabelPrinted and (hitBuy40 or hitBuy61 or hitBuyWk)
+    if showBuySellLabels and not buyEntryLabelPrinted and hitBuy61
         buyEntryLabelPrinted := true
         label.new(x=bar_index, y=low, text="BUY", style=label.style_label_up, color=color.new(color.green, 70), textcolor=color.green, size=size.tiny)
 
-    if hitBuy40
-        buyX40 := true
-        f_x(buyEntry1, color.green)
     if hitBuy61
         buyX61 := true
         f_x(buyEntry2, color.green)
     if hitBuy80
         buyX80 := true
         f_x(buyStop, color.orange)
-    if hitBuyWk
-        buyXWick := true
-        f_x(buyWickProj, color.purple)
-
-// ───────── Optional: plot the levels as short segments (so you can see them even before hit) ─────────
-sellLinesActive = showLevelLines and not na(lastSellSetupBar) and bar_index >= lastSellSetupBar and bar_index <= lastSellSetupBar + levelLineBars
-sellWickActive = showLevelLines and not na(lastSellSetupBar) and bar_index >= lastSellSetupBar + 1 and bar_index <= lastSellSetupBar + levelLineBars
-buyLinesActive  = showLevelLines and not na(lastBuySetupBar)  and bar_index >= lastBuySetupBar  and bar_index <= lastBuySetupBar + levelLineBars
-buyWickActive  = showLevelLines and not na(lastBuySetupBar)  and bar_index >= lastBuySetupBar + 1 and bar_index <= lastBuySetupBar + levelLineBars
-
-plot(sellLinesActive ? sellEntry1 : na, "Sell 40% level", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
-plot(sellLinesActive ? sellEntry2 : na, "Sell 61% level", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
-plot(sellLinesActive ? sellStop   : na, "Sell 80% level", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
-plot(sellWickActive ? sellWickProj : na, "Sell wick level", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
-
-plot(buyLinesActive ? buyEntry1 : na, "Buy 40% level", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
-plot(buyLinesActive ? buyEntry2 : na, "Buy 61% level", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
-plot(buyLinesActive ? buyStop   : na, "Buy 80% level", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
-plot(buyWickActive ? buyWickProj : na, "Buy wick level", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
