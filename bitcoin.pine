@@ -12,7 +12,7 @@ outsideBarColor = input.color(color.new(color.orange, 85), "Outside bar highligh
 
 // ───────── Fib entry/stop settings (bearish outside bars) ─────────
 enableSellFib = input.bool(true, "Sell using 45% & 61% retracement (bearish outside)", group="Sell setup")
-entryPct1 = input.float(0.45, "Entry 1 %", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
+entryPct1 = input.float(0.40, "Entry 1 %", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
 entryPct2 = input.float(0.61, "Entry 2 %", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
 stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
 qtyPct1 = input.float(50, "Order 1 size (%)", minval=0.0, maxval=100.0, step=1, group="Sell setup")
