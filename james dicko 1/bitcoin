@@ -16,7 +16,6 @@ trailTriggerPips = input.int(100, "Move stop after profit (pips)", minval=1, gro
 trailLockPips    = input.int(30,  "Lock-in profit (pips)", minval=1, group="Trades", tooltip="For 'Lock +pips after +pips' mode.")
 retraceTriggerPips = input.int(100, "Retracement activates after (pips)", minval=1, group="Trades", tooltip="For '70% retracement' mode. Minimum max profit before trailing starts.")
 retracePct = input.float(0.70, "Retracement % (0-1)", minval=0.0, maxval=0.99, step=0.01, group="Trades", tooltip="0.70 = allow 70% giveback (keep 30% of max profit).")
-signalMode   = input.string("Within window", "Signal mode", options=["Same bar", "Within window"], group="Trades")
 confirmBars  = input.int(5, "MA confirm window (bars)", minval=1, group="Trades", tooltip="In 'Within window' mode: after price closes beyond the band, a BUY/SELL can trigger within this many bars once price closes back across the MA.")
 plotSignals  = input.bool(true, "Plot BUY/SELL markers", group="Trades")
 plotBoxes    = input.bool(false, "Plot signal box", group="Trades")
@@ -169,12 +168,9 @@ plot(showSignalBands ? upperNR : na, 'Signal Upper (NR)', color=color.new(upCss,
 plot(showSignalBands ? lowerNR : na, 'Signal Lower (NR)', color=color.new(dnCss, sigBandOpacity), linewidth=1)
 
 // ───────── Trading rules (use NON-repainting bands) ─────────
-// Two modes:
-// - Same bar: SELL/BUY must be true on the same candle.
-// - Within window: a CLOSE outside the band ARMS the setup; within N bars, a qualifying candle can trigger.
-//
-// IMPORTANT: per your request, signals must be on a candle that OPENS outside the band
-// (above upper for SELL / below lower for BUY).
+entryLogic = input.string(defval="Arm close outside band -> Confirm by MA cross", title="Entry logic", options=["Same bar only", "Arm close outside band -> Confirm by MA cross", "Arm close outside band -> Confirm by MA side (no cross)", "Arm close outside band -> Strict confirm (outside band)"], group="Trades")
+
+// Arm conditions (close outside band)
 shortBreak = close > upperNR
 longBreak  = close < lowerNR
 
@@ -195,51 +191,50 @@ if longBreak
 else
     longArmed := math.max(longArmed - 1, 0)
 
-// Same-bar entries (rare, requires MA outside band):
-// SELL: close ABOVE upper band AND close BELOW MA (still above band)
-// BUY : close BELOW lower band AND close ABOVE MA (still below band)
+// Confirm filters
+confirmMustStayOutside   = input.bool(true, "Confirm must stay outside band", group="Trades")
+confirmRequireOpenOutside = input.bool(true, "Confirm candle must OPEN outside band", group="Trades")
+
+// Same-bar signals (kept for completeness)
 shortSignalSame = enableShorts and (close > upperNR) and (close < hullma)
 longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
 
-// Window mode (your described behavior):
-// 1) Arm when CLOSE is outside the band (above upper / below lower)
-// 2) Trigger when a later candle CLOSES on the other side of the MA,
-//    while still remaining outside the band.
-confirmMustStayOutside   = input.bool(true, "Confirm must stay outside band", group="Trades", tooltip="If ON: confirm candle must still close outside the band. If OFF: after arming, confirmation is based only on MA close (won't miss boxed setups).")
-confirmRequireOpenOutside = input.bool(true, "Confirm candle must OPEN outside band", group="Trades", tooltip="If ON: SELL confirm requires open > upper band; BUY confirm requires open < lower band. Helps prevent signals after price returns inside the bands.")
-allowMAConfirmInside = input.bool(true, "Allow MA-only confirm (inside band)", group="Trades", tooltip="If ON: after arming, a cross of the MA can confirm even if price is back inside the band (helps prevent missed sells/buys).")
+// Armed confirms
+inArmWindowShort = shortArmed > 0
+inArmWindowLong  = longArmed > 0
+
+shortConfirmMAcross = ta.crossunder(close, hullma)
+longConfirmMAcross  = ta.crossover(close, hullma)
+
+shortConfirmMAside = close < hullma
+longConfirmMAside  = close > hullma
+
 shortConfirmStrict = (close < hullma) and (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
 longConfirmStrict  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
-shortConfirmMAOnly = allowMAConfirmInside and ta.crossunder(close, hullma) and not na(lastShortArmBar) and (bar_index - lastShortArmBar <= confirmBars)
-longConfirmMAOnly  = allowMAConfirmInside and ta.crossover(close, hullma)  and not na(lastLongArmBar)  and (bar_index - lastLongArmBar  <= confirmBars)
-shortConfirmOk = shortConfirmStrict or shortConfirmMAOnly
-longConfirmOk  = longConfirmStrict  or longConfirmMAOnly
 
-entryMode = input.string(defval="Armed window (current)", title="Entry mode", options=["Armed window (current)", "Same bar only", "Arm close outside band; confirm MA side (anywhere)"], group="Trades", tooltip="Use this if entries are missed or too frequent.")
+shortConfirmOk =
+     entryLogic == "Arm close outside band -> Confirm by MA cross" ? shortConfirmMAcross :
+     entryLogic == "Arm close outside band -> Confirm by MA side (no cross)" ? shortConfirmMAside :
+     entryLogic == "Arm close outside band -> Strict confirm (outside band)" ? shortConfirmStrict :
+     false
 
-shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
-longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
+longConfirmOk =
+     entryLogic == "Arm close outside band -> Confirm by MA cross" ? longConfirmMAcross :
+     entryLogic == "Arm close outside band -> Confirm by MA side (no cross)" ? longConfirmMAside :
+     entryLogic == "Arm close outside band -> Strict confirm (outside band)" ? longConfirmStrict :
+     false
 
-// Alternate entry modes
-shortSignalArmAny = enableShorts and (shortArmed > 0) and (close < hullma)
-longSignalArmAny  = enableLongs  and (longArmed  > 0) and (close > hullma)
+shortSignalArmed = enableShorts and inArmWindowShort and shortConfirmOk
+longSignalArmed  = enableLongs  and inArmWindowLong  and longConfirmOk
 
-shortSignal =
-     entryMode == "Same bar only" ? shortSignalSame :
-     entryMode == "Arm close outside band; confirm MA side (anywhere)" ? shortSignalArmAny :
-     (signalMode == "Same bar" ? shortSignalSame : shortSignalWindow)
+shortSignal = entryLogic == "Same bar only" ? shortSignalSame : shortSignalArmed
+longSignal  = entryLogic == "Same bar only" ? longSignalSame  : longSignalArmed
 
-longSignal =
-     entryMode == "Same bar only" ? longSignalSame :
-     entryMode == "Arm close outside band; confirm MA side (anywhere)" ? longSignalArmAny :
-     (signalMode == "Same bar" ? longSignalSame : longSignalWindow)
-
-// Avoid repeated signals in window mode after first trigger
-if signalMode == "Within window"
-    if shortSignalWindow or shortSignalArmAny
-        shortArmed := 0
-    if longSignalWindow or longSignalArmAny
-        longArmed := 0
+// Avoid repeated signals after trigger
+if shortSignalArmed
+    shortArmed := 0
+if longSignalArmed
+    longArmed := 0
 
 // ───────── Signal box helper ─────────
 var sigBoxes = array.new_box(0)
