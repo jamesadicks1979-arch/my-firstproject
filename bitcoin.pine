@@ -20,41 +20,37 @@ lenSqrt = math.max(1, int(math.floor(math.sqrt(maLen))))
 hullma = ta.wma(2 * ta.wma(maSrc, lenHalf) - ta.wma(maSrc, maLen), lenSqrt)
 plot(showMA ? hullma : na, "Hull MA", color=color.new(color.blue, 0), linewidth=2)
 
-PP = (high + low + close) / 3.0
-PPEMA   = ta.ema(PP, lengthMA)
-PPEMA1  = ta.ema(PP, lengthMA1)
-PPEMA11 = ta.ema(PP, lengthMA11)
+// ───────── Core band calc (must run INSIDE request.security) ─────────
+f_bands(_emaLen, _emaLen1) =>
+    PP = (high + low + close) / 3.0
+    PPEMA  = ta.ema(PP, _emaLen)
+    PPEMA1 = ta.ema(PP, _emaLen1)
 
-HP1 = (PP + (PP - low))
-LP1 = (PP - (high - PP))
-HP2 = (PP + 2 * (PP - low))
-LP2 = (PP - 2 * (high - PP))
+    HP1 = (PP + (PP - low))
+    LP1 = (PP - (high - PP))
+    HP2 = (PP + 2 * (PP - low))
+    LP2 = (PP - 2 * (high - PP))
 
-// PPD71 = Difference from HP1 and LP1 for the last 7 bars
-PPD71 = ((HP1 - LP1) + (HP1[1] - LP1[1]) + (HP1[2] - LP1[2]) + (HP1[3] - LP1[3]) + (HP1[4] - LP1[4]) + (HP1[5] - LP1[5]) + (HP1[6] - LP1[6])) / 7.0
-// PPD72 = Difference from HP2 and LP2 for the last 7 bars
-PPD72 = ((HP2 - LP2) + (HP2[1] - LP2[1]) + (HP2[2] - LP2[2]) + (HP2[3] - LP2[3]) + (HP2[4] - LP2[4]) + (HP2[5] - LP2[5]) + (HP2[6] - LP2[6])) / 7.0
+    // PPD71 = Difference from HP1 and LP1 for the last 7 bars
+    PPD71 = ((HP1 - LP1) + (HP1[1] - LP1[1]) + (HP1[2] - LP1[2]) + (HP1[3] - LP1[3]) + (HP1[4] - LP1[4]) + (HP1[5] - LP1[5]) + (HP1[6] - LP1[6])) / 7.0
+    // PPD72 kept for parity (not used in plots)
+    _PPD72 = ((HP2 - LP2) + (HP2[1] - LP2[1]) + (HP2[2] - LP2[2]) + (HP2[3] - LP2[3]) + (HP2[4] - LP2[4]) + (HP2[5] - LP2[5]) + (HP2[6] - LP2[6])) / 7.0
 
-r1 = PPEMA + PPD71
-s1 = PPEMA - PPD71
-r2 = PPEMA1 + PPD71
-s2 = PPEMA1 - PPD71
+    r1 = PPEMA + PPD71
+    s1 = PPEMA - PPD71
+    r2 = PPEMA1 + PPD71
+    s2 = PPEMA1 - PPD71
+    [r1, s1, r2, s2]
 
 //Daily Pivot Bands
 //(kept for compatibility; not all series are plotted)
-ddd_PPEMA = request.security(syminfo.tickerid, "D", PPEMA)
-ddd_r1111 = request.security(syminfo.tickerid, "D", r1)
-ddd_s1111 = request.security(syminfo.tickerid, "D", s1)
+[ddd_r1111, ddd_s1111, _d_r2_unused, _d_s2_unused] = request.security(syminfo.tickerid, "D", f_bands(lengthMA, lengthMA1))
 
 p1111 = plot(sd and not na(ddd_r1111) ? ddd_r1111 : na, title="D R1", style=plot.style_line, linewidth=5, color=color.blue)
 p1222 = plot(sd and not na(ddd_s1111) ? ddd_s1111 : na, title="D S1", style=plot.style_line, linewidth=5, color=color.blue)
 
 //240 Pivot Bands
-p240_PPEMA = request.security(syminfo.tickerid, "240", PPEMA)
-d_r1 = request.security(syminfo.tickerid, "240", r1)
-d_s1 = request.security(syminfo.tickerid, "240", s1)
-d_r2 = request.security(syminfo.tickerid, "240", r2)
-d_s2 = request.security(syminfo.tickerid, "240", s2)
+[d_r1, d_s1, d_r2, d_s2] = request.security(syminfo.tickerid, "240", f_bands(lengthMA, lengthMA1))
 
 p11 = plot(sd and not na(d_r1) ? d_r1 : na, title="4 R1", style=plot.style_line, linewidth=5, color=color.black)
 p12 = plot(sd and not na(d_s1) ? d_s1 : na, title="4 S1", style=plot.style_line, linewidth=5, color=color.black)
@@ -63,11 +59,7 @@ s1hit = low <= d_s1
 s2hit = low <= d_s2
 
 //480 Pivot Bands
-p480_PPEMA1 = request.security(syminfo.tickerid, "480", PPEMA)
-dd_r11 = request.security(syminfo.tickerid, "480", r1)
-dd_s11 = request.security(syminfo.tickerid, "480", s1)
-dd_r22 = request.security(syminfo.tickerid, "480", r2)
-dd_s22 = request.security(syminfo.tickerid, "480", s2)
+[dd_r11, dd_s11, dd_r22, dd_s22] = request.security(syminfo.tickerid, "480", f_bands(lengthMA, lengthMA1))
 
 p111 = plot(sd and not na(dd_r11) ? dd_r11 : na, title="8 R1", style=plot.style_line, linewidth=4, color=color.new(#DC143C, 0))
 p122 = plot(sd and not na(dd_s11) ? dd_s11 : na, title="8 S1", style=plot.style_line, linewidth=4, color=color.lime)
@@ -77,10 +69,7 @@ fill(p111, p133, color=color.new(color.red, 80))
 fill(p122, p144, color=color.new(color.lime, 80))
 
 //10 min Pivot Bands
-p10_PPEMA11 = request.security(syminfo.tickerid, "10", PPEMA)
-ddd_r1 = request.security(syminfo.tickerid, "10", r1)
-ddd_s1 = request.security(syminfo.tickerid, "10", s1)
-ddd_s2 = request.security(syminfo.tickerid, "10", s2)
+[ddd_r1, ddd_s1, _10_r2_unused, ddd_s2] = request.security(syminfo.tickerid, "10", f_bands(lengthMA, lengthMA1))
 
 // In v4 this used security(tickerid, '', high[1]/low[1]); on v5 we can just use the local series.
 h = high[1]
