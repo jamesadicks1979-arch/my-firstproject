@@ -1,11 +1,14 @@
 //@version=5
-indicator("Outside Bar Finder", overlay=true)
+strategy("Outside Bar Finder (Buy/Sell next candle)", overlay=true, pyramiding=0, process_orders_on_close=false, max_bars_back=500)
 
 count = input.int(1, "Number of Outside Bars", minval=1, maxval=10, step=1, tooltip="The number of consecutive outside bars")
 showArrow = input.bool(true, "Show Arrow", tooltip="Show an arrow indicating whether the outside bar is bullish or bearish")
 showLine = input.bool(false, "Show Signal Lines", tooltip="Show horizontal lines at the high and low of the outside bar")
 lineExtension = input.int(5, "Signal Line Extension Length", tooltip="The number of bars to extend the signal lines beyond the outside bar")
 lineColor = input.color(color.new(color.blue, 0), title="Signal Line Color")
+tradeWhenFlatOnly = input.bool(true, "Trade only when flat")
+highlightOutsideBar = input.bool(true, "Highlight outside bars")
+outsideBarColor = input.color(color.new(color.orange, 85), "Outside bar highlight")
 
 outsideCount = 0
 previousBar = 1
@@ -18,6 +21,8 @@ isOutsideUp = outsideCount >= count and close >= open
 isOutsideDown = outsideCount >= count and open > close
 isOutside = isOutsideUp or isOutsideDown
 
+bgcolor(highlightOutsideBar and isOutside ? outsideBarColor : na)
+
 if isOutside and showLine
     dt = time - time[1]
     line.new(x1=time, y1=high, x2=time + dt * lineExtension, y2=high, color=lineColor, style=line.style_solid, width=1, xloc=xloc.bar_time)
@@ -25,3 +30,12 @@ if isOutside and showLine
 
 plotshape(showArrow and isOutsideUp, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.normal)
 plotshape(showArrow and isOutsideDown, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.normal)
+
+// Entries (executed on next candle open because process_orders_on_close=false)
+flat = strategy.position_size == 0
+canEnter = not tradeWhenFlatOnly or flat
+
+if canEnter and isOutsideUp
+    strategy.entry("L", strategy.long)
+if canEnter and isOutsideDown
+    strategy.entry("S", strategy.short)
