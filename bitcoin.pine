@@ -17,6 +17,8 @@ stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=
 qtyPct1 = input.float(50, "Order 1 size (%)", minval=0.0, maxval=100.0, step=1, group="Setup")
 qtyPct2 = input.float(50, "Order 2 size (%)", minval=0.0, maxval=100.0, step=1, group="Setup")
 tpTicks = input.int(1000, "Take profit (ticks)", minval=1, group="Setup", tooltip="1000 ticks = 1000 * syminfo.mintick price distance")
+trailActivatePips = input.int(300, "Trail activates after profit (pips)", minval=1, group="Setup")
+trailPullbackPct = input.float(0.80, "Trail pullback %", minval=0.01, maxval=0.99, step=0.01, group="Setup", tooltip="0.80 = allow 80% giveback (keep 20% of max profit).")
 cancelAfterBars = input.int(20, "Cancel unfilled after N bars", minval=1, maxval=500, group="Setup")
 plotLevels = input.bool(true, "Plot entry/stop levels", group="Setup")
 plotLevelCrosses = input.bool(true, "Put crosses on entry/stop", group="Setup")
@@ -51,6 +53,35 @@ canEnter = not tradeWhenFlatOnly or flat
 
 tick = syminfo.mintick
 tpDist = tpTicks * tick
+pipSize = syminfo.currency == "JPY" ? syminfo.mintick : syminfo.mintick * 10
+trailActivateDist = trailActivatePips * pipSize
+trailKeepPct = 1.0 - trailPullbackPct
+
+// ───────── Position-level 80% pullback stop after +300 pips ─────────
+var float posLongPeak = na
+var float posShortTrough = na
+var float posTrailStopLong = na
+var float posTrailStopShort = na
+
+if strategy.position_size == 0
+    posLongPeak := na
+    posShortTrough := na
+    posTrailStopLong := na
+    posTrailStopShort := na
+
+if strategy.position_size > 0
+    avg = strategy.position_avg_price
+    posLongPeak := na(posLongPeak) ? high : math.max(posLongPeak, high)
+    mfe = posLongPeak - avg
+    if mfe >= trailActivateDist
+        posTrailStopLong := avg + trailKeepPct * mfe
+
+if strategy.position_size < 0
+    avg = strategy.position_avg_price
+    posShortTrough := na(posShortTrough) ? low : math.min(posShortTrough, low)
+    mfe = avg - posShortTrough
+    if mfe >= trailActivateDist
+        posTrailStopShort := avg - trailKeepPct * mfe
 
 // SELL setup state
 var int lastSellSetupBar = na
@@ -92,10 +123,11 @@ if not na(lastSellSetupBar) and bar_index > lastSellSetupBar + cancelAfterBars
 
 // Attach SELL exits when position exists
 if strategy.position_size < 0 and not na(sellStop)
-    strategy.exit("S40-exit", from_entry="S40", stop=sellStop, limit=sellEntry1 - tpDist)
-    strategy.exit("S61-exit", from_entry="S61", stop=sellStop, limit=sellEntry2 - tpDist)
+    stopFinal = na(posTrailStopShort) ? sellStop : math.min(sellStop, posTrailStopShort)
+    strategy.exit("S40-exit", from_entry="S40", stop=stopFinal, limit=sellEntry1 - tpDist)
+    strategy.exit("S61-exit", from_entry="S61", stop=stopFinal, limit=sellEntry2 - tpDist)
     if not na(sellWickProj)
-        strategy.exit("SWick-exit", from_entry="SWick", stop=sellStop, limit=sellWickProj - tpDist)
+        strategy.exit("SWick-exit", from_entry="SWick", stop=stopFinal, limit=sellWickProj - tpDist)
 
 // BUY setup state
 var int lastBuySetupBar = na
@@ -138,10 +170,11 @@ if not na(lastBuySetupBar) and bar_index > lastBuySetupBar + cancelAfterBars
 
 // Attach BUY exits when position exists
 if strategy.position_size > 0 and not na(buyStop)
-    strategy.exit("B40-exit", from_entry="B40", stop=buyStop, limit=buyEntry1 + tpDist)
-    strategy.exit("B61-exit", from_entry="B61", stop=buyStop, limit=buyEntry2 + tpDist)
+    stopFinal = na(posTrailStopLong) ? buyStop : math.max(buyStop, posTrailStopLong)
+    strategy.exit("B40-exit", from_entry="B40", stop=stopFinal, limit=buyEntry1 + tpDist)
+    strategy.exit("B61-exit", from_entry="B61", stop=stopFinal, limit=buyEntry2 + tpDist)
     if not na(buyWickProj)
-        strategy.exit("BWick-exit", from_entry="BWick", stop=buyStop, limit=buyWickProj + tpDist)
+        strategy.exit("BWick-exit", from_entry="BWick", stop=stopFinal, limit=buyWickProj + tpDist)
 
 // Mark crosses/circles
 plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="SELL Entry 40% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
