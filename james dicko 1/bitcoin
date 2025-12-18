@@ -180,14 +180,18 @@ longBreak  = close < lowerNR
 
 var int shortArmed = 0
 var int longArmed  = 0
+var int lastShortArmBar = na
+var int lastLongArmBar  = na
 
 if shortBreak
     shortArmed := confirmBars
+    lastShortArmBar := bar_index
 else
     shortArmed := math.max(shortArmed - 1, 0)
 
 if longBreak
     longArmed := confirmBars
+    lastLongArmBar := bar_index
 else
     longArmed := math.max(longArmed - 1, 0)
 
@@ -203,8 +207,13 @@ longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
 //    while still remaining outside the band.
 confirmMustStayOutside   = input.bool(true, "Confirm must stay outside band", group="Trades", tooltip="If ON: confirm candle must still close outside the band. If OFF: after arming, confirmation is based only on MA close (won't miss boxed setups).")
 confirmRequireOpenOutside = input.bool(true, "Confirm candle must OPEN outside band", group="Trades", tooltip="If ON: SELL confirm requires open > upper band; BUY confirm requires open < lower band. Helps prevent signals after price returns inside the bands.")
-shortConfirmOk = (close < hullma) and (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
-longConfirmOk  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
+allowMAConfirmInside = input.bool(true, "Allow MA-only confirm (inside band)", group="Trades", tooltip="If ON: after arming, a cross of the MA can confirm even if price is back inside the band (helps prevent missed sells/buys).")
+shortConfirmStrict = (close < hullma) and (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
+longConfirmStrict  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
+shortConfirmMAOnly = allowMAConfirmInside and ta.crossunder(close, hullma) and not na(lastShortArmBar) and (bar_index - lastShortArmBar <= confirmBars)
+longConfirmMAOnly  = allowMAConfirmInside and ta.crossover(close, hullma)  and not na(lastLongArmBar)  and (bar_index - lastLongArmBar  <= confirmBars)
+shortConfirmOk = shortConfirmStrict or shortConfirmMAOnly
+longConfirmOk  = longConfirmStrict  or longConfirmMAOnly
 
 entryMode = input.string(defval="Armed window (current)", title="Entry mode", options=["Armed window (current)", "Same bar only", "Arm close outside band; confirm MA side (anywhere)"], group="Trades", tooltip="Use this if entries are missed or too frequent.")
 
