@@ -196,9 +196,10 @@ longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
 // 1) Arm when CLOSE is outside the band (above upper / below lower)
 // 2) Trigger when a later candle CLOSES on the other side of the MA,
 //    while still remaining outside the band.
-confirmMustStayOutside = input.bool(false, "Confirm must stay outside band", group="Trades", tooltip="If ON: confirm candle must still close outside the band. If OFF: after arming, confirmation is based only on MA close (won't miss boxed setups).")
-shortConfirmOk = (close < hullma) and (not confirmMustStayOutside or close > upperNR)
-longConfirmOk  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR)
+confirmMustStayOutside   = input.bool(false, "Confirm must stay outside band", group="Trades", tooltip="If ON: confirm candle must still close outside the band. If OFF: after arming, confirmation is based only on MA close (won't miss boxed setups).")
+confirmRequireOpenOutside = input.bool(true, "Confirm candle must OPEN outside band", group="Trades", tooltip="If ON: SELL confirm requires open > upper band; BUY confirm requires open < lower band. Helps prevent signals after price returns inside the bands.")
+shortConfirmOk = (close < hullma) and (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
+longConfirmOk  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
 
 shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
 longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
