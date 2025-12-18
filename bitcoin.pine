@@ -212,15 +212,19 @@ longConfirmMAside  = close > hullma
 shortConfirmStrict = (close < hullma) and (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
 longConfirmStrict  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
 
+// Apply the same band/open filters to all confirmation modes
+shortBandOk = (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
+longBandOk  = (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
+
 shortConfirmOk =
-     entryLogic == "Arm close outside band -> Confirm by MA cross" ? shortConfirmMAcross :
-     entryLogic == "Arm close outside band -> Confirm by MA side (no cross)" ? shortConfirmMAside :
+     entryLogic == "Arm close outside band -> Confirm by MA cross" ? (shortConfirmMAcross and shortBandOk) :
+     entryLogic == "Arm close outside band -> Confirm by MA side (no cross)" ? (shortConfirmMAside and shortBandOk) :
      entryLogic == "Arm close outside band -> Strict confirm (outside band)" ? shortConfirmStrict :
      false
 
 longConfirmOk =
-     entryLogic == "Arm close outside band -> Confirm by MA cross" ? longConfirmMAcross :
-     entryLogic == "Arm close outside band -> Confirm by MA side (no cross)" ? longConfirmMAside :
+     entryLogic == "Arm close outside band -> Confirm by MA cross" ? (longConfirmMAcross and longBandOk) :
+     entryLogic == "Arm close outside band -> Confirm by MA side (no cross)" ? (longConfirmMAside and longBandOk) :
      entryLogic == "Arm close outside band -> Strict confirm (outside band)" ? longConfirmStrict :
      false
 
