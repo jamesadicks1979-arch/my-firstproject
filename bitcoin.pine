@@ -40,7 +40,8 @@ bgcolor(highlightOutsideBar and isOutside ? outsideBarColor : na)
 
 // ───────── Helper: draw a single X label at price ─────────
 f_x(_y, _col) =>
-    label.new(x=bar_index, y=_y, text="X", style=label.style_label_center, color=color.new(_col, 100), textcolor=_col, size=size.tiny)
+    // Single, larger cross marker at exact price
+    label.new(x=bar_index, y=_y, text="X", style=label.style_label_center, color=color.new(_col, 100), textcolor=_col, size=size.normal)
 
 // ───────── SELL state (bearish outside) ─────────
 var int lastSellSetupBar = na
