@@ -10,6 +10,16 @@ lengthMA1  = input.int(1, title="EMA Length To Calculate Bands")
 lengthMA11 = input.int(1, title="EMA Length To Calculate Bands")
 sd = input.bool(true, title="Show Daily Pivot Bands?")
 
+// ───────── Hull MA (from previous code) ─────────
+showMA = input.bool(true, "Show Hull MA", group="MA")
+maLen = input.int(9, "Hull MA Length", minval=1, group="MA")
+maSrc = input.source(close, "Source", group="MA")
+
+lenHalf = math.max(1, int(math.floor(maLen / 2.0)))
+lenSqrt = math.max(1, int(math.floor(math.sqrt(maLen))))
+hullma = ta.wma(2 * ta.wma(maSrc, lenHalf) - ta.wma(maSrc, maLen), lenSqrt)
+plot(showMA ? hullma : na, "Hull MA", color=color.new(color.blue, 0), linewidth=2)
+
 PP = (high + low + close) / 3.0
 PPEMA   = ta.ema(PP, lengthMA)
 PPEMA1  = ta.ema(PP, lengthMA1)
