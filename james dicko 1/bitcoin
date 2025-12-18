@@ -165,16 +165,12 @@ plot(showSignalBands ? lowerNR : na, 'Signal Lower (NR)', color=color.new(dnCss,
 
 // ───────── Trading rules (use NON-repainting bands) ─────────
 // Two modes:
-// - Same bar: both conditions must be true on the same candle.
-// - Within window: a close outside the band ARMS the setup; within N bars, a close across the MA triggers.
-bandTouch = input.string("Wick", "Band check type", options=["Wick", "Close"], group="Trades", tooltip="Wick = HIGH/LOW crosses band. Close = CLOSE crosses band.")
-requireBandOnConfirm = input.bool(true, "Require band check on SELL/BUY bar", group="Trades", tooltip="If ON, the SELL/BUY candle must also touch the band (per Band check type).")
-
-shortBandTouch = bandTouch == "Close" ? (close > upperNR) : (high > upperNR)
-longBandTouch  = bandTouch == "Close" ? (close < lowerNR) : (low < lowerNR)
-
-shortBreak = shortBandTouch
-longBreak  = longBandTouch
+// - Same bar: SELL/BUY must be true on the same candle.
+// - Within window: a CLOSE outside the band ARMS the setup; within N bars, a qualifying candle can trigger.
+//
+// IMPORTANT: per your request, we ONLY use CLOSE vs the bands (no wick-touch logic).
+shortBreak = close > upperNR
+longBreak  = close < lowerNR
 
 plotArms = input.bool(true, "Plot ARM markers", group="Trades", tooltip="Shows the candle that CLOSED outside the band (arms the setup).")
 plotshape(plotArms and shortBreak, title="ARM SELL", style=shape.triangledown, location=location.abovebar, color=color.new(dnCss, 0), size=size.tiny, text="ARM")
@@ -193,11 +189,15 @@ if longBreak
 else
     longArmed := math.max(longArmed - 1, 0)
 
-shortSignalSame   = enableShorts and shortBandTouch and (close < hullma)
-longSignalSame    = enableLongs  and longBandTouch  and (close > hullma)
+// STRICT same-bar entries:
+// SELL: close above upper band AND close below MA
+// BUY : close below lower band AND close above MA
+shortSignalSame = enableShorts and (close > upperNR) and (close < hullma)
+longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
 
-shortConfirmOk = (close < hullma) and (not requireBandOnConfirm or shortBandTouch)
-longConfirmOk  = (close > hullma) and (not requireBandOnConfirm or longBandTouch)
+// Window mode still requires CLOSE beyond band on the trigger candle too (prevents “wrong price” triggers).
+shortConfirmOk = (close > upperNR) and (close < hullma)
+longConfirmOk  = (close < lowerNR) and (close > hullma)
 
 shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
 longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
