@@ -183,8 +183,10 @@ if flat
     longStop := na
     longTarget := na
 
-plotshape(shortSignal and flat, title="SELL", style=shape.labeldown, text="SELL", location=location.abovebar, color=dnCss, textcolor=color.white, size=size.tiny)
-plotshape(longSignal and flat,  title="BUY",  style=shape.labelup,   text="BUY",  location=location.belowbar, color=upCss, textcolor=color.white, size=size.tiny)
+plotSignals = input.bool(true, "Plot BUY/SELL markers", group="Trades")
+// Plot markers on every signal bar (not only when flat)
+plotshape(plotSignals and shortSignal, title="SELL", style=shape.labeldown, text="SELL", location=location.abovebar, color=dnCss, textcolor=color.white, size=size.tiny)
+plotshape(plotSignals and longSignal,  title="BUY",  style=shape.labelup,   text="BUY",  location=location.belowbar, color=upCss, textcolor=color.white, size=size.tiny)
 
 plot(strategy.position_size < 0 ? shortStop   : na, "Short Stop",   color=color.new(color.red, 0),   linewidth=2, style=plot.style_linebr)
 plot(strategy.position_size < 0 ? shortTarget : na, "Short Target", color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
