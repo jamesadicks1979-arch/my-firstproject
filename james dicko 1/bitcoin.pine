@@ -16,7 +16,7 @@ trailTriggerPips = input.int(100, "Move stop after profit (pips)", minval=1, gro
 trailLockPips    = input.int(30,  "Lock-in profit (pips)", minval=1, group="Trades", tooltip="For 'Lock +pips after +pips' mode.")
 retraceTriggerPips = input.int(100, "Retracement activates after (pips)", minval=1, group="Trades", tooltip="For '70% retracement' mode. Minimum max profit before trailing starts.")
 retracePct = input.float(0.70, "Retracement % (0-1)", minval=0.0, maxval=0.99, step=0.01, group="Trades", tooltip="0.70 = allow 70% giveback (keep 30% of max profit).")
-confirmBars  = input.int(5, "MA confirm window (bars)", minval=1, group="Trades", tooltip="In 'Within window' mode: after price closes beyond the band, a BUY/SELL can trigger within this many bars once price closes back across the MA.")
+// (entries are same-bar; no arming/confirm window)
 plotSignals  = input.bool(true, "Plot BUY/SELL markers", group="Trades")
 plotBoxes    = input.bool(false, "Plot signal box", group="Trades")
 boxLookback  = input.int(10, "Box lookback bars", minval=1, group="Trades", tooltip="Box will cover the high/low range of the last N bars ending on the signal bar.")
@@ -168,77 +168,11 @@ plot(showSignalBands ? upperNR : na, 'Signal Upper (NR)', color=color.new(upCss,
 plot(showSignalBands ? lowerNR : na, 'Signal Lower (NR)', color=color.new(dnCss, sigBandOpacity), linewidth=1)
 
 // ───────── Trading rules (use NON-repainting bands) ─────────
-entryLogic = input.string(defval="Arm close outside band -> Confirm by MA cross", title="Entry logic", options=["Same bar only", "Arm close outside band -> Confirm by MA cross", "Arm close outside band -> Confirm by MA side (no cross)", "Arm close outside band -> Strict confirm (outside band)"], group="Trades")
-
-// Arm conditions (close outside band)
-shortBreak = close > upperNR
-longBreak  = close < lowerNR
-
-var int shortArmed = 0
-var int longArmed  = 0
-var int lastShortArmBar = na
-var int lastLongArmBar  = na
-
-if shortBreak
-    shortArmed := confirmBars
-    lastShortArmBar := bar_index
-else
-    shortArmed := math.max(shortArmed - 1, 0)
-
-if longBreak
-    longArmed := confirmBars
-    lastLongArmBar := bar_index
-else
-    longArmed := math.max(longArmed - 1, 0)
-
-// Confirm filters
-confirmMustStayOutside   = input.bool(true, "Confirm must stay outside band", group="Trades")
-confirmRequireOpenOutside = input.bool(true, "Confirm candle must OPEN outside band", group="Trades")
-
-// Same-bar signals (kept for completeness)
-shortSignalSame = enableShorts and (close > upperNR) and (close < hullma)
-longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
-
-// Armed confirms
-inArmWindowShort = shortArmed > 0
-inArmWindowLong  = longArmed > 0
-
-shortConfirmMAcross = ta.crossunder(close, hullma)
-longConfirmMAcross  = ta.crossover(close, hullma)
-
-shortConfirmMAside = close < hullma
-longConfirmMAside  = close > hullma
-
-shortConfirmStrict = (close < hullma) and (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
-longConfirmStrict  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
-
-// Apply the same band/open filters to all confirmation modes
-shortBandOk = (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
-longBandOk  = (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
-
-shortConfirmOk =
-     entryLogic == "Arm close outside band -> Confirm by MA cross" ? (shortConfirmMAcross and shortBandOk) :
-     entryLogic == "Arm close outside band -> Confirm by MA side (no cross)" ? (shortConfirmMAside and shortBandOk) :
-     entryLogic == "Arm close outside band -> Strict confirm (outside band)" ? shortConfirmStrict :
-     false
-
-longConfirmOk =
-     entryLogic == "Arm close outside band -> Confirm by MA cross" ? (longConfirmMAcross and longBandOk) :
-     entryLogic == "Arm close outside band -> Confirm by MA side (no cross)" ? (longConfirmMAside and longBandOk) :
-     entryLogic == "Arm close outside band -> Strict confirm (outside band)" ? longConfirmStrict :
-     false
-
-shortSignalArmed = enableShorts and inArmWindowShort and shortConfirmOk
-longSignalArmed  = enableLongs  and inArmWindowLong  and longConfirmOk
-
-shortSignal = entryLogic == "Same bar only" ? shortSignalSame : shortSignalArmed
-longSignal  = entryLogic == "Same bar only" ? longSignalSame  : longSignalArmed
-
-// Avoid repeated signals after trigger
-if shortSignalArmed
-    shortArmed := 0
-if longSignalArmed
-    longArmed := 0
+// Simple rules (as requested):
+// - SELL when candle CLOSES above the upper band AND CLOSES below the MA
+// - BUY  when candle CLOSES below the lower band AND CLOSES above the MA
+shortSignal = enableShorts and (close > upperNR) and (close < hullma)
+longSignal  = enableLongs  and (close < lowerNR) and (close > hullma)
 
 // ───────── Signal box helper ─────────
 var sigBoxes = array.new_box(0)
@@ -272,7 +206,7 @@ if longSignal
 // ───────── Orders / exits ─────────
 flat = strategy.position_size == 0
 
-cooldownBars = input.int(1, "Cooldown bars after exit", minval=0, group="Trades", tooltip="Prevents immediate re-entries right after a close/stop on the same or next bar.")
+cooldownBars = input.int(1, "Cooldown bars after exit", minval=0, group="Trades", tooltip="Prevents immediate re-entries right after a close/stop.")
 var int lastExitBar = na
 justExited = strategy.position_size == 0 and strategy.position_size[1] != 0
 if justExited
