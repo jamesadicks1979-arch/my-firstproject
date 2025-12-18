@@ -43,6 +43,8 @@ repaint = input.bool(true, 'Repainting Smoothing', tooltip = 'Repainting is an e
 upCss = input.color(color.teal, 'Colors', inline = 'inline1', group = 'Style')
 dnCss = input.color(color.red, '', inline = 'inline1', group = 'Style')
 bandHistoryBars = input.int(2000, "Repaint band history (bars)", minval=200, maxval=5000, group="Style", tooltip="How far back the repainting bands draw. Larger values are heavier.")
+showSignalBands = input.bool(true, "Show signal bands (non-repainting)", group="Style", tooltip="Signals/trades use these non-repainting bands. Turn ON to visually verify every BUY/SELL condition.")
+sigBandOpacity  = input.int(35, "Signal band opacity (0-100)", minval=0, maxval=100, group="Style")
 
 //-----------------------------------------------------------------------------}
 //Functions
@@ -122,9 +124,11 @@ if barstate.islast and repaint
     cntAbs = 0
 
     // Inner calc window (LuxAlgo uses 0..499)
-    calcN = math.min(499, n - 1)
+    // IMPORTANT: keep all historical indexing within 0..499 to avoid runtime buffer errors.
+    calcN = 499
     for p = 0 to points - 1
-        i = p * step
+        // cap i so we never reference src[i] > 499 anywhere
+        i = math.min(p * step, 499)
         sum = 0.0
         sumw = 0.0
         for j = 0 to calcN
