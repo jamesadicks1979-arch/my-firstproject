@@ -1,6 +1,6 @@
 //@version=5
 strategy("Outside Bar Finder (45%/61% entries + 80% stop)", overlay=true, pyramiding=2, process_orders_on_close=false, max_bars_back=500,
-     default_qty_type=strategy.percent_of_equity, default_qty_value=100)
+     default_qty_type=strategy.percent_of_equity, default_qty_value=100, max_labels_count=500)
 
 count = input.int(1, "Number of Outside Bars", minval=1, maxval=10, step=1, tooltip="The number of consecutive outside bars")
 showLine = input.bool(false, "Show Signal Lines", tooltip="Show horizontal lines at the high and low of the outside bar")
@@ -20,7 +20,7 @@ tpTicks = input.int(1000, "Take profit (ticks)", minval=1, group="Setup", toolti
 trailActivatePips = input.int(300, "Trail activates after profit (pips)", minval=1, group="Setup")
 trailPullbackPct = input.float(0.80, "Trail pullback %", minval=0.01, maxval=0.99, step=0.01, group="Setup", tooltip="0.80 = allow 80% giveback (keep 20% of max profit).")
 cancelAfterBars = input.int(20, "Cancel unfilled after N bars", minval=1, maxval=500, group="Setup")
-plotLevelCrosses = input.bool(true, "Put cross at entry (single bar)", group="Setup")
+plotLevelCrosses = input.bool(true, "Show crosses (on hit/fill bar)", group="Setup")
 showLevelLines = input.bool(false, "Show level lines (limited length)", group="Setup")
 levelLineBars = input.int(20, "Level line length (bars)", minval=1, maxval=500, group="Setup")
 
@@ -92,6 +92,10 @@ var float sellEntry1 = na
 var float sellEntry2 = na
 var float sellStop = na
 var float sellWickProj = na
+var bool sellX40 = false
+var bool sellX61 = false
+var bool sellX80 = false
+var bool sellXWick = false
 newSellSetup = enableSellFib and canEnter and isOutsideDown
 if newSellSetup
     lastSellSetupBar := bar_index
@@ -102,6 +106,10 @@ if newSellSetup
     sellEntry2 := sellObLow + entryPct2 * rng
     sellStop := sellObLow + stopPct * rng
     sellWickProj := na
+    sellX40 := false
+    sellX61 := false
+    sellX80 := false
+    sellXWick := false
 
     if qtyPct1 > 0
         strategy.entry("S40", strategy.short, qty=qtyPct1, limit=sellEntry1)
@@ -121,6 +129,7 @@ if not na(lastSellSetupBar) and bar_index > lastSellSetupBar + cancelAfterBars
     strategy.cancel("S61")
     strategy.cancel("SWick")
     lastSellSetupBar := na
+    sellWickProj := na
 
 // Attach SELL exits when position exists
 if strategy.position_size < 0 and not na(sellStop)
@@ -138,6 +147,10 @@ var float buyEntry1 = na
 var float buyEntry2 = na
 var float buyStop = na
 var float buyWickProj = na
+var bool buyX40 = false
+var bool buyX61 = false
+var bool buyX80 = false
+var bool buyXWick = false
 newBuySetup = enableBuyFib and canEnter and isOutsideUp
 if newBuySetup
     lastBuySetupBar := bar_index
@@ -149,6 +162,10 @@ if newBuySetup
     buyEntry2 := buyObHigh - entryPct2 * rng
     buyStop := buyObHigh - stopPct * rng
     buyWickProj := na
+    buyX40 := false
+    buyX61 := false
+    buyX80 := false
+    buyXWick := false
 
     if qtyPct1 > 0
         strategy.entry("B40", strategy.long, qty=qtyPct1, limit=buyEntry1)
@@ -168,6 +185,7 @@ if not na(lastBuySetupBar) and bar_index > lastBuySetupBar + cancelAfterBars
     strategy.cancel("B61")
     strategy.cancel("BWick")
     lastBuySetupBar := na
+    buyWickProj := na
 
 // Attach BUY exits when position exists
 if strategy.position_size > 0 and not na(buyStop)
@@ -177,18 +195,37 @@ if strategy.position_size > 0 and not na(buyStop)
     if not na(buyWickProj)
         strategy.exit("BWick-exit", from_entry="BWick", stop=stopFinal, limit=buyWickProj + tpDist)
 
-// Mark crosses (single bar only)
-plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="SELL 40% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newSellSetup ? sellEntry2 : na, title="SELL 61% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newSellSetup ? sellStop   : na, title="SELL 80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
-sellWickCross = enableWickProjection and not na(lastSellSetupBar) and bar_index == lastSellSetupBar + 1 ? sellWickProj : na
-plot(plotLevelCrosses ? sellWickCross : na, title="SELL wick cross", color=color.new(color.purple, 0), style=plot.style_cross, linewidth=2)
+// Crosses should appear on the SELL/BUY candle (the bar that hits the level), not the outside bar.
+f_x(_y, _col) =>
+    label.new(x=bar_index, y=_y, text="X", style=label.style_label_center, color=color.new(_col, 100), textcolor=_col, size=size.tiny)
 
-plot(plotLevelCrosses and newBuySetup ? buyEntry1 : na, title="BUY 40% cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newBuySetup ? buyEntry2 : na, title="BUY 61% cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newBuySetup ? buyStop   : na, title="BUY 80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
-buyWickCross = enableWickProjection and not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1 ? buyWickProj : na
-plot(plotLevelCrosses ? buyWickCross : na, title="BUY wick cross", color=color.new(color.purple, 0), style=plot.style_cross, linewidth=2)
+if plotLevelCrosses and not na(lastSellSetupBar)
+    if not sellX40 and not na(sellEntry1) and high >= sellEntry1
+        sellX40 := true
+        f_x(sellEntry1, color.red)
+    if not sellX61 and not na(sellEntry2) and high >= sellEntry2
+        sellX61 := true
+        f_x(sellEntry2, color.red)
+    if not sellX80 and not na(sellStop) and high >= sellStop
+        sellX80 := true
+        f_x(sellStop, color.orange)
+    if enableWickProjection and not sellXWick and not na(sellWickProj) and high >= sellWickProj
+        sellXWick := true
+        f_x(sellWickProj, color.purple)
+
+if plotLevelCrosses and not na(lastBuySetupBar)
+    if not buyX40 and not na(buyEntry1) and low <= buyEntry1
+        buyX40 := true
+        f_x(buyEntry1, color.green)
+    if not buyX61 and not na(buyEntry2) and low <= buyEntry2
+        buyX61 := true
+        f_x(buyEntry2, color.green)
+    if not buyX80 and not na(buyStop) and low <= buyStop
+        buyX80 := true
+        f_x(buyStop, color.orange)
+    if enableWickProjection and not buyXWick and not na(buyWickProj) and low <= buyWickProj
+        buyXWick := true
+        f_x(buyWickProj, color.purple)
 
 // Optional level lines (limited to N bars so they don't span the whole chart)
 sellLinesActive = showLevelLines and not na(lastSellSetupBar) and bar_index >= lastSellSetupBar and bar_index <= lastSellSetupBar + levelLineBars
