@@ -206,17 +206,7 @@ confirmRequireOpenOutside = input.bool(true, "Confirm candle must OPEN outside b
 shortConfirmOk = (close < hullma) and (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
 longConfirmOk  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
 
-entryMode = input.string(
-    "Armed window (current)",
-    "Entry mode",
-    options=[
-        "Armed window (current)",
-        "Same bar only",
-        "Arm close outside band; confirm MA side (anywhere)"
-    ],
-    group="Trades",
-    tooltip="Use this if entries are missed or too frequent."
-)
+entryMode = input.string(defval="Armed window (current)", title="Entry mode", options=["Armed window (current)", "Same bar only", "Arm close outside band; confirm MA side (anywhere)"], group="Trades", tooltip="Use this if entries are missed or too frequent.")
 
 shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
 longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
@@ -281,16 +271,7 @@ if justExited
     lastExitBar := bar_index
 canEnter = flat and (na(lastExitBar) or bar_index > lastExitBar + cooldownBars)
 
-exitMode = input.string(
-    "Current",
-    "Exit mode",
-    options=[
-        "Current",
-        "MA stop only (no TP)",
-        "TP only (no MA stop)"
-    ],
-    group="Trades"
-)
+exitMode = input.string(defval="Current", title="Exit mode", options=["Current", "MA stop only (no TP)", "TP only (no MA stop)"], group="Trades")
 
 if canEnter and shortSignal
     strategy.entry("S", strategy.short)
