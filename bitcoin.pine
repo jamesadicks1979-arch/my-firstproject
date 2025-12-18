@@ -1,5 +1,6 @@
 //@version=5
-strategy("Outside Bar Finder (45%/61% entries + 80% stop)", overlay=true, pyramiding=2, process_orders_on_close=false, max_bars_back=500)
+strategy("Outside Bar Finder (45%/61% entries + 80% stop)", overlay=true, pyramiding=2, process_orders_on_close=false, max_bars_back=500,
+     default_qty_type=strategy.percent_of_equity, default_qty_value=100)
 
 count = input.int(1, "Number of Outside Bars", minval=1, maxval=10, step=1, tooltip="The number of consecutive outside bars")
 showArrow = input.bool(true, "Show Arrow", tooltip="Show an arrow indicating whether the outside bar is bullish or bearish")
@@ -76,9 +77,9 @@ if newSellSetup
 
     // Place limit orders (active starting next bar)
     if qtyPct1 > 0
-        strategy.entry("S45", strategy.short, qty_percent=qtyPct1, limit=sellEntry1)
+        strategy.entry("S45", strategy.short, qty=qtyPct1, limit=sellEntry1)
     if qtyPct2 > 0
-        strategy.entry("S61", strategy.short, qty_percent=qtyPct2, limit=sellEntry2)
+        strategy.entry("S61", strategy.short, qty=qtyPct2, limit=sellEntry2)
 
 // Cancel unfilled orders after N bars
 if not na(lastSetupBar) and bar_index > lastSetupBar + cancelAfterBars
