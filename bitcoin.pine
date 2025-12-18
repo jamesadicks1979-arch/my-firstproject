@@ -25,7 +25,8 @@ markPnL      = input.bool(true, "Mark PROFIT/STOP on exits", group="Trades")
 coeff = input.float(1, 'Multiplier', step=0.1)
 AP = input.int(14, 'Common Period')
 ATR = ta.sma(ta.tr, AP)
-src = input.source(close)
+// Match original LuxAlgo input style
+src = input(close)
 showsignalsk = input.bool(title='Show Signals?', defval=true)
 novolumedata = input.bool(title='Change calculation (no volume data)?', defval=false)
 upT = low - ATR * coeff
@@ -43,7 +44,7 @@ repaint = input.bool(true, 'Repainting Smoothing', tooltip = 'Repainting is an e
 upCss = input.color(color.teal, 'Colors', inline = 'inline1', group = 'Style')
 dnCss = input.color(color.red, '', inline = 'inline1', group = 'Style')
 bandHistoryBars = input.int(2000, "Repaint band history (bars)", minval=200, maxval=5000, group="Style", tooltip="How far back the repainting bands draw. Larger values are heavier.")
-showSignalBands = input.bool(true, "Show signal bands (non-repainting)", group="Style", tooltip="Signals/trades use these non-repainting bands. Turn ON to visually verify every BUY/SELL condition.")
+showSignalBands = input.bool(false, "Show signal bands (non-repainting)", group="Style", tooltip="Signals/trades use these non-repainting bands. Turn ON to visually verify every BUY/SELL condition.")
 sigBandOpacity  = input.int(35, "Signal band opacity (0-100)", minval=0, maxval=100, group="Style")
 
 //-----------------------------------------------------------------------------}
@@ -94,7 +95,7 @@ plotshape(showsignalsk and ta.crossover(close, outNR + maeNR) ? high : na, "Cros
 
 // ───────── Moving Average (make it visible) ─────────
 length = input.int(9, minval=1, group="MA")
-src1 = input.source(close, title="MA Source", group="MA")
+src1 = input(close, title="Source", group="MA")
 lenHalf = math.max(1, int(math.floor(length / 2.0)))
 lenSqrt = math.max(1, int(math.floor(math.sqrt(length))))
 hullma = ta.wma(2 * ta.wma(src1, lenHalf) - ta.wma(src1, length), lenSqrt)
