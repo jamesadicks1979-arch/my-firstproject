@@ -13,8 +13,8 @@ entryPct2 = input.float(0.61, "Entry 2 %", minval=0.0, maxval=1.0, step=0.01, gr
 stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=1.0, step=0.01, group="Levels")
 
 disableAfterBars = input.int(20, "Disable levels after N bars", minval=1, maxval=500, group="Levels")
-showCrosses = input.bool(true, "Show crosses on hit bars", group="Levels")
-showBuySellLabels = input.bool(true, "Show BUY/SELL label on entry hit", group="Levels")
+showCrosses = input.bool(true, "Show crosses on NEXT candle", group="Levels", tooltip="Draws the 40/61/80/wick crosses on the candle AFTER the outside bar.")
+showBuySellLabels = input.bool(true, "Show BUY/SELL label on NEXT candle", group="Levels")
 
 // Direction
 enableSell = input.bool(true, "Enable SELL levels (bearish outside)", group="Direction")
@@ -51,9 +51,7 @@ var float sellEntry2 = na
 var float sellStop = na
 var float sellWick = na
 var float sellWickProj = na
-var bool sellX61 = false
-var bool sellX80 = false
-var bool sellEntryLabelPrinted = false
+var bool sellNextPrinted = false
 
 newSellSetup = enableSell and isOutsideDown
 if newSellSetup
@@ -67,9 +65,7 @@ if newSellSetup
     sellStop := sellObLow + stopPct * rng
     sellWick := sellObHigh - sellObOpen
     sellWickProj := na
-    sellX61 := false
-    sellX80 := false
-    sellEntryLabelPrinted := false
+    sellNextPrinted := false
 
 // compute wick projection on the NEXT candle only
 if enableWickProjection and not na(lastSellSetupBar) and bar_index == lastSellSetupBar + 1 and not na(sellWick)
@@ -82,23 +78,24 @@ if not na(lastSellSetupBar) and bar_index > lastSellSetupBar + disableAfterBars
     sellEntry2 := na
     sellStop := na
     sellWickProj := na
+    sellNextPrinted := false
 
-// plot SELL crosses on hit bars (starting NEXT bar)
-if showCrosses and not na(lastSellSetupBar) and bar_index > lastSellSetupBar
-    hitSell61 = not sellX61 and not na(sellEntry2) and high >= sellEntry2
-    hitSell80 = not sellX80 and not na(sellStop) and high >= sellStop
-
-    // Print a single SELL label above the entry candle (first entry-level hit)
-    if showBuySellLabels and not sellEntryLabelPrinted and hitSell61
-        sellEntryLabelPrinted := true
-        label.new(x=bar_index, y=high, text="SELL", style=label.style_label_down, color=color.new(color.red, 70), textcolor=color.red, size=size.tiny)
-
-    if hitSell61
-        sellX61 := true
+// Plot SELL crosses + SELL label on the NEXT candle after the outside bar
+sellNextBar = not na(lastSellSetupBar) and bar_index == lastSellSetupBar + 1
+if sellNextBar and showCrosses and not sellNextPrinted
+    // 40 / 61 / 80 / wick
+    if not na(sellEntry1)
+        f_x(sellEntry1, color.red)
+    if not na(sellEntry2)
         f_x(sellEntry2, color.red)
-    if hitSell80
-        sellX80 := true
+    if not na(sellStop)
         f_x(sellStop, color.orange)
+    if enableWickProjection and not na(sellWickProj)
+        f_x(sellWickProj, color.purple)
+    sellNextPrinted := true
+
+if sellNextBar and showBuySellLabels and enableSell
+    label.new(x=bar_index, y=high, text="SELL", style=label.style_label_down, color=color.new(color.red, 70), textcolor=color.red, size=size.tiny)
 
 // ───────── BUY state (bullish outside) ─────────
 var int lastBuySetupBar = na
@@ -110,9 +107,7 @@ var float buyEntry2 = na
 var float buyStop = na
 var float buyWick = na
 var float buyWickProj = na
-var bool buyX61 = false
-var bool buyX80 = false
-var bool buyEntryLabelPrinted = false
+var bool buyNextPrinted = false
 
 newBuySetup = enableBuy and isOutsideUp
 if newBuySetup
@@ -127,9 +122,7 @@ if newBuySetup
     buyStop := buyObHigh - stopPct * rng
     buyWick := buyObOpen - buyObLow
     buyWickProj := na
-    buyX61 := false
-    buyX80 := false
-    buyEntryLabelPrinted := false
+    buyNextPrinted := false
 
 if enableWickProjection and not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1 and not na(buyWick)
     buyWickProj := open - buyWick
@@ -140,18 +133,19 @@ if not na(lastBuySetupBar) and bar_index > lastBuySetupBar + disableAfterBars
     buyEntry2 := na
     buyStop := na
     buyWickProj := na
+    buyNextPrinted := false
 
-if showCrosses and not na(lastBuySetupBar) and bar_index > lastBuySetupBar
-    hitBuy61 = not buyX61 and not na(buyEntry2) and low <= buyEntry2
-    hitBuy80 = not buyX80 and not na(buyStop) and low <= buyStop
-
-    if showBuySellLabels and not buyEntryLabelPrinted and hitBuy61
-        buyEntryLabelPrinted := true
-        label.new(x=bar_index, y=low, text="BUY", style=label.style_label_up, color=color.new(color.green, 70), textcolor=color.green, size=size.tiny)
-
-    if hitBuy61
-        buyX61 := true
+buyNextBar = not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1
+if buyNextBar and showCrosses and not buyNextPrinted
+    if not na(buyEntry1)
+        f_x(buyEntry1, color.green)
+    if not na(buyEntry2)
         f_x(buyEntry2, color.green)
-    if hitBuy80
-        buyX80 := true
+    if not na(buyStop)
         f_x(buyStop, color.orange)
+    if enableWickProjection and not na(buyWickProj)
+        f_x(buyWickProj, color.purple)
+    buyNextPrinted := true
+
+if buyNextBar and showBuySellLabels and enableBuy
+    label.new(x=bar_index, y=low, text="BUY", style=label.style_label_up, color=color.new(color.green, 70), textcolor=color.green, size=size.tiny)
