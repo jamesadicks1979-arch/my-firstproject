@@ -9,8 +9,8 @@ strategy("Nadaraya-Watson Envelope [LuxAlgo] + R:R Trades", "LuxAlgo - Nadaraya-
 // ───────── Trade inputs ─────────
 enableLongs  = input.bool(true,  "Enable Longs",  group="Trades")
 enableShorts = input.bool(true,  "Enable Shorts", group="Trades")
-stopLen      = input.int(5,      "Stop lookback bars", minval=1, group="Trades")
-rr           = input.float(2.0,  "Profit target (R multiple)", minval=0.1, step=0.1, group="Trades")
+tpPips       = input.int(300,    "Take profit (pips)", minval=1, group="Trades")
+tpOnOtherBand = input.bool(true, "Take profit on opposite band touch", group="Trades")
 signalMode   = input.string("Within window", "Signal mode", options=["Same bar", "Within window"], group="Trades")
 confirmBars  = input.int(5, "MA confirm window (bars)", minval=1, group="Trades", tooltip="In 'Within window' mode: after price closes beyond the band, a BUY/SELL can trigger within this many bars once price closes back across the MA.")
 plotSignals  = input.bool(true, "Plot BUY/SELL markers", group="Trades")
@@ -243,54 +243,48 @@ if shortSignal
 if longSignal
     f_addSignalBox(false)
 
-var float shortStop   = na
-var float shortTarget = na
-var float longStop    = na
-var float longTarget  = na
-
+// ───────── Orders / exits ─────────
 flat = strategy.position_size == 0
 
 if flat and shortSignal
-    shortStop := ta.highest(high, stopLen)
-    risk = shortStop - close
-    shortTarget := risk > syminfo.mintick ? (close - rr * risk) : na
-    if not na(shortTarget)
-        strategy.entry("S", strategy.short)
+    strategy.entry("S", strategy.short)
 
 if flat and longSignal
-    longStop := ta.lowest(low, stopLen)
-    risk = close - longStop
-    longTarget := risk > syminfo.mintick ? (close + rr * risk) : na
-    if not na(longTarget)
-        strategy.entry("L", strategy.long)
+    strategy.entry("L", strategy.long)
 
-if strategy.position_size < 0 and not na(shortStop) and not na(shortTarget)
-    strategy.exit("S-exit", from_entry="S", stop=shortStop, limit=shortTarget)
+// Pip size (TradingView-style pip approximation)
+pipSize = syminfo.currency == "JPY" ? syminfo.mintick : syminfo.mintick * 10
+tpDist = tpPips * pipSize
 
-if strategy.position_size > 0 and not na(longStop) and not na(longTarget)
-    strategy.exit("L-exit", from_entry="L", stop=longStop, limit=longTarget)
+entryPrice = strategy.position_avg_price
+shortTpPrice = entryPrice - tpDist
+longTpPrice  = entryPrice + tpDist
 
-// Exit when price CLOSES back across the MA (market exit)
-if maExit and strategy.position_size < 0 and close > hullma
-    strategy.close("S")
-if maExit and strategy.position_size > 0 and close < hullma
-    strategy.close("L")
+// Take profit at fixed 300 pips (limit order)
+if strategy.position_size < 0 and tpDist > 0
+    strategy.exit("S-TP", from_entry="S", limit=shortTpPrice)
+if strategy.position_size > 0 and tpDist > 0
+    strategy.exit("L-TP", from_entry="L", limit=longTpPrice)
 
-if flat
-    shortStop := na
-    shortTarget := na
-    longStop := na
-    longTarget := na
+// Take profit when touching opposite band
+if tpOnOtherBand and strategy.position_size < 0 and low <= lowerNR
+    strategy.close("S", comment="TP band")
+if tpOnOtherBand and strategy.position_size > 0 and high >= upperNR
+    strategy.close("L", comment="TP band")
+
+// Stop (market): close across MA AND beyond entry price
+if maExit and strategy.position_size < 0 and close > hullma and close > entryPrice
+    strategy.close("S", comment="STOP MA")
+if maExit and strategy.position_size > 0 and close < hullma and close < entryPrice
+    strategy.close("L", comment="STOP MA")
 
 // Plot markers on every signal bar (not only when flat)
 plotshape(plotSignals and shortSignal, title="SELL", style=shape.labeldown, text="SELL", location=location.abovebar, color=dnCss, textcolor=color.white, size=size.tiny)
 plotshape(plotSignals and longSignal,  title="BUY",  style=shape.labelup,   text="BUY",  location=location.belowbar, color=upCss, textcolor=color.white, size=size.tiny)
 
-plot(strategy.position_size < 0 ? shortStop   : na, "Short Stop",   color=color.new(color.red, 0),   linewidth=2, style=plot.style_linebr)
-plot(strategy.position_size < 0 ? shortTarget : na, "Short Target", color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
-
-plot(strategy.position_size > 0 ? longStop    : na, "Long Stop",    color=color.new(color.red, 0),   linewidth=2, style=plot.style_linebr)
-plot(strategy.position_size > 0 ? longTarget  : na, "Long Target",  color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
+plot(strategy.position_size != 0 ? entryPrice : na, "Entry", color=color.new(color.gray, 0), linewidth=1, style=plot.style_linebr)
+plot(strategy.position_size < 0 ? shortTpPrice : na, "Short TP (pips)", color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
+plot(strategy.position_size > 0 ? longTpPrice  : na, "Long TP (pips)",  color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
 
 // Mark PROFIT / STOP on the chart when trades close
 var int lastClosed = 0
