@@ -124,9 +124,11 @@ if barstate.islast and repaint
     cntAbs = 0
 
     // Inner calc window (LuxAlgo uses 0..499)
-    calcN = math.min(499, n - 1)
+    // IMPORTANT: keep all historical indexing within 0..499 to avoid runtime buffer errors.
+    calcN = 499
     for p = 0 to points - 1
-        i = p * step
+        // cap i so we never reference src[i] > 499 anywhere
+        i = math.min(p * step, 499)
         sum = 0.0
         sumw = 0.0
         for j = 0 to calcN
