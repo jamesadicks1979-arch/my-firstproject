@@ -1,5 +1,5 @@
 //@version=5
-strategy("Outside Bar Finder (Buy/Sell next candle)", overlay=true, pyramiding=0, process_orders_on_close=false, max_bars_back=500)
+strategy("Outside Bar Finder (45%/61% entries + 80% stop)", overlay=true, pyramiding=2, process_orders_on_close=false, max_bars_back=500)
 
 count = input.int(1, "Number of Outside Bars", minval=1, maxval=10, step=1, tooltip="The number of consecutive outside bars")
 showArrow = input.bool(true, "Show Arrow", tooltip="Show an arrow indicating whether the outside bar is bullish or bearish")
@@ -11,6 +11,16 @@ showBuySellLabels = input.bool(true, "Show BUY/SELL labels")
 labelDelayBars = input.int(1, "Label delay (bars)", minval=0, maxval=5, tooltip="1 = show BUY/SELL label on the candle AFTER the outside bar")
 highlightOutsideBar = input.bool(true, "Highlight outside bars")
 outsideBarColor = input.color(color.new(color.orange, 85), "Outside bar highlight")
+
+// ───────── Fib entry/stop settings (bearish outside bars) ─────────
+enableSellFib = input.bool(true, "Sell using 45% & 61% retracement (bearish outside)", group="Sell setup")
+entryPct1 = input.float(0.45, "Entry 1 %", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
+entryPct2 = input.float(0.61, "Entry 2 %", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
+stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
+qtyPct1 = input.float(50, "Order 1 size (%)", minval=0.0, maxval=100.0, step=1, group="Sell setup")
+qtyPct2 = input.float(50, "Order 2 size (%)", minval=0.0, maxval=100.0, step=1, group="Sell setup")
+cancelAfterBars = input.int(20, "Cancel unfilled after N bars", minval=1, maxval=500, group="Sell setup")
+plotLevels = input.bool(true, "Plot entry/stop levels", group="Sell setup")
 
 outsideCount = 0
 previousBar = 1
@@ -39,11 +49,58 @@ sellLabel = showBuySellLabels and isOutsideDown[labelDelayBars]
 plotshape(buyLabel, title="BUY label", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, text="BUY", size=size.tiny)
 plotshape(sellLabel, title="SELL label", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, text="SELL", size=size.tiny)
 
-// Entries (executed on next candle open because process_orders_on_close=false)
+// ───────── Sell setup: place limit sells at 45% & 61% retracement ─────────
 flat = strategy.position_size == 0
 canEnter = not tradeWhenFlatOnly or flat
 
-if canEnter and isOutsideUp
-    strategy.entry("L", strategy.long)
-if canEnter and isOutsideDown
-    strategy.entry("S", strategy.short)
+var int lastSetupBar = na
+var float obHigh = na
+var float obLow = na
+var float sellEntry1 = na
+var float sellEntry2 = na
+var float sellStop = na
+var bool hitE1 = false
+var bool hitE2 = false
+
+newSellSetup = enableSellFib and canEnter and isOutsideDown
+if newSellSetup
+    lastSetupBar := bar_index
+    obHigh := high
+    obLow := low
+    rng = obHigh - obLow
+    sellEntry1 := obLow + entryPct1 * rng
+    sellEntry2 := obLow + entryPct2 * rng
+    sellStop := obLow + stopPct * rng
+    hitE1 := false
+    hitE2 := false
+
+    // Place limit orders (active starting next bar)
+    if qtyPct1 > 0
+        strategy.entry("S45", strategy.short, qty_percent=qtyPct1, limit=sellEntry1)
+    if qtyPct2 > 0
+        strategy.entry("S61", strategy.short, qty_percent=qtyPct2, limit=sellEntry2)
+
+// Cancel unfilled orders after N bars
+if not na(lastSetupBar) and bar_index > lastSetupBar + cancelAfterBars
+    strategy.cancel("S45")
+    strategy.cancel("S61")
+    lastSetupBar := na
+
+// Stop at 80% of outside bar range (applies to filled positions)
+if strategy.position_size < 0 and not na(sellStop)
+    strategy.exit("S45-exit", from_entry="S45", stop=sellStop)
+    strategy.exit("S61-exit", from_entry="S61", stop=sellStop)
+
+// Mark sells above when the entry levels are hit (price trades at/through)
+if plotLevels and not na(lastSetupBar)
+    if not hitE1 and high >= sellEntry1
+        hitE1 := true
+        label.new(bar_index, high, "SELL 45% HIT", style=label.style_label_down, color=color.new(color.red, 75), textcolor=color.red)
+    if not hitE2 and high >= sellEntry2
+        hitE2 := true
+        label.new(bar_index, high, "SELL 61% HIT", style=label.style_label_down, color=color.new(color.red, 75), textcolor=color.red)
+
+// Plot levels
+plot(plotLevels ? sellEntry1 : na, "Sell 45%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
+plot(plotLevels ? sellEntry2 : na, "Sell 61%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
+plot(plotLevels ? sellStop : na, "Sell Stop (80%)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
