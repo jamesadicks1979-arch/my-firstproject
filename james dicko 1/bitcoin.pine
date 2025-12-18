@@ -194,12 +194,16 @@ if repaint
 plot(repaint ? na : upperNR, 'Upper', upCss)
 plot(repaint ? na : lowerNR, 'Lower', dnCss)
 
+// Always show the NON-repainting bands used for signals (optional)
+plot(showSignalBands ? upperNR : na, 'Signal Upper (NR)', color=color.new(upCss, sigBandOpacity), linewidth=1)
+plot(showSignalBands ? lowerNR : na, 'Signal Lower (NR)', color=color.new(dnCss, sigBandOpacity), linewidth=1)
+
 // ───────── Trading rules (use NON-repainting bands) ─────────
-// Two options:
-// - Same bar: both conditions must be true on the same candle.
-// - Within window: a band break "arms" the setup; within N bars, a close across the MA triggers.
-shortBreak = close > upperNR
-longBreak  = close < lowerNR
+// STRICT rules (same bar):
+// - SELL when candle CLOSES above upper band AND CLOSES below MA
+// - BUY  when candle CLOSES below lower band AND CLOSES above MA
+shortSignal = enableShorts and (close > upperNR) and (close < hullma)
+longSignal  = enableLongs  and (close < lowerNR) and (close > hullma)
 
 // ───────── Signal box helper ─────────
 var sigBoxes = array.new_box(0)
@@ -222,33 +226,7 @@ if not plotBoxes and array.size(sigBoxes) > 0
         box.delete(array.get(sigBoxes, i))
     array.clear(sigBoxes)
 
-var int shortArmed = 0
-var int longArmed  = 0
-
-if shortBreak
-    shortArmed := confirmBars
-else
-    shortArmed := math.max(shortArmed - 1, 0)
-
-if longBreak
-    longArmed := confirmBars
-else
-    longArmed := math.max(longArmed - 1, 0)
-
-shortSignalSame   = enableShorts and shortBreak and (close < hullma)
-longSignalSame    = enableLongs  and longBreak  and (close > hullma)
-shortSignalWindow = enableShorts and (shortArmed > 0) and (close < hullma)
-longSignalWindow  = enableLongs  and (longArmed  > 0) and (close > hullma)
-
-shortSignal = signalMode == "Same bar" ? shortSignalSame : shortSignalWindow
-longSignal  = signalMode == "Same bar" ? longSignalSame  : longSignalWindow
-
-// Avoid repeated signals in window mode after first trigger
-if signalMode == "Within window"
-    if shortSignalWindow
-        shortArmed := 0
-    if longSignalWindow
-        longArmed := 0
+// (Signal mode/confirm window inputs are kept for now, but trading is enforced as STRICT same-bar.)
 
 // Draw boxes on signal bars
 if shortSignal
