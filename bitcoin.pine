@@ -177,15 +177,18 @@ if strategy.position_size > 0 and not na(buyStop)
     if not na(buyWickProj)
         strategy.exit("BWick-exit", from_entry="BWick", stop=stopFinal, limit=buyWickProj + tpDist)
 
-// Mark crosses/circles
-// Only one cross marker for entries (Entry 1)
-plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="SELL Entry cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
-sellWickCircle = enableWickProjection and not na(lastSellSetupBar) and bar_index == lastSellSetupBar + 1 ? sellWickProj : na
-plot(sellWickCircle, title="SELL Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
+// Mark crosses (single bar only)
+plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="SELL 40% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newSellSetup ? sellEntry2 : na, title="SELL 61% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newSellSetup ? sellStop   : na, title="SELL 80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
+sellWickCross = enableWickProjection and not na(lastSellSetupBar) and bar_index == lastSellSetupBar + 1 ? sellWickProj : na
+plot(plotLevelCrosses ? sellWickCross : na, title="SELL wick cross", color=color.new(color.purple, 0), style=plot.style_cross, linewidth=2)
 
-plot(plotLevelCrosses and newBuySetup ? buyEntry1 : na, title="BUY Entry cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
-buyWickCircle = enableWickProjection and not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1 ? buyWickProj : na
-plot(buyWickCircle, title="BUY Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
+plot(plotLevelCrosses and newBuySetup ? buyEntry1 : na, title="BUY 40% cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newBuySetup ? buyEntry2 : na, title="BUY 61% cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newBuySetup ? buyStop   : na, title="BUY 80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
+buyWickCross = enableWickProjection and not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1 ? buyWickProj : na
+plot(plotLevelCrosses ? buyWickCross : na, title="BUY wick cross", color=color.new(color.purple, 0), style=plot.style_cross, linewidth=2)
 
 // Optional level lines (limited to N bars so they don't span the whole chart)
 sellLinesActive = showLevelLines and not na(lastSellSetupBar) and bar_index >= lastSellSetupBar and bar_index <= lastSellSetupBar + levelLineBars
