@@ -177,14 +177,11 @@ if strategy.position_size > 0 and not na(buyStop)
         strategy.exit("BWick-exit", from_entry="BWick", stop=stopFinal, limit=buyWickProj + tpDist)
 
 // Mark crosses/circles
-plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="SELL Entry 40% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newSellSetup ? sellEntry2 : na, title="SELL Entry 61% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newSellSetup ? sellStop : na, title="SELL Stop 80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
+// Only one cross marker for entries (Entry 1)
+plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="SELL Entry cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
 plot(enableWickProjection and not na(sellWickProj) ? sellWickProj : na, title="SELL Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
 
-plot(plotLevelCrosses and newBuySetup ? buyEntry1 : na, title="BUY Entry 40% cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newBuySetup ? buyEntry2 : na, title="BUY Entry 61% cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newBuySetup ? buyStop : na, title="BUY Stop 80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newBuySetup ? buyEntry1 : na, title="BUY Entry cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
 plot(enableWickProjection and not na(buyWickProj) ? buyWickProj : na, title="BUY Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
 
 // Plot levels (lines)
