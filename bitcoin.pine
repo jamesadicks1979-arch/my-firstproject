@@ -10,20 +10,22 @@ tradeWhenFlatOnly = input.bool(true, "Trade only when flat")
 highlightOutsideBar = input.bool(true, "Highlight outside bars")
 outsideBarColor = input.color(color.new(color.orange, 85), "Outside bar highlight")
 
-// ───────── Fib entry/stop settings (bearish outside bars) ─────────
-enableSellFib = input.bool(true, "Sell using 45% & 61% retracement (bearish outside)", group="Sell setup")
-entryPct1 = input.float(0.40, "Entry 1 %", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
-entryPct2 = input.float(0.61, "Entry 2 %", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
-stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=1.0, step=0.01, group="Sell setup")
-qtyPct1 = input.float(50, "Order 1 size (%)", minval=0.0, maxval=100.0, step=1, group="Sell setup")
-qtyPct2 = input.float(50, "Order 2 size (%)", minval=0.0, maxval=100.0, step=1, group="Sell setup")
-tpPips = input.int(10000, "Take profit (pips)", minval=1, group="Sell setup")
-cancelAfterBars = input.int(20, "Cancel unfilled after N bars", minval=1, maxval=500, group="Sell setup")
-plotLevels = input.bool(true, "Plot entry/stop levels", group="Sell setup")
-plotLevelCrosses = input.bool(true, "Put crosses on 45% / 61% / 80%", group="Sell setup")
+// ───────── Fib entry/stop settings ─────────
+entryPct1 = input.float(0.40, "Entry 1 %", minval=0.0, maxval=1.0, step=0.01, group="Setup")
+entryPct2 = input.float(0.61, "Entry 2 %", minval=0.0, maxval=1.0, step=0.01, group="Setup")
+stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=1.0, step=0.01, group="Setup")
+qtyPct1 = input.float(50, "Order 1 size (%)", minval=0.0, maxval=100.0, step=1, group="Setup")
+qtyPct2 = input.float(50, "Order 2 size (%)", minval=0.0, maxval=100.0, step=1, group="Setup")
+tpTicks = input.int(1000, "Take profit (ticks)", minval=1, group="Setup", tooltip="1000 ticks = 1000 * syminfo.mintick price distance")
+cancelAfterBars = input.int(20, "Cancel unfilled after N bars", minval=1, maxval=500, group="Setup")
+plotLevels = input.bool(true, "Plot entry/stop levels", group="Setup")
+plotLevelCrosses = input.bool(true, "Put crosses on entry/stop", group="Setup")
+
+enableSellFib = input.bool(true, "Enable SELL setup on bearish outside", group="SELL setup")
+enableBuyFib  = input.bool(true, "Enable BUY setup on bullish outside", group="BUY setup")
 
 enableWickProjection = input.bool(true, "Wick projection level (circle)", group="Wick projection")
-wickOrderPct = input.float(0, "Optional extra sell size at wick level (%)", minval=0.0, maxval=100.0, step=1, group="Wick projection", tooltip="0 = no order, only plot a circle.")
+wickOrderPct = input.float(0, "Optional extra order size at wick level (%)", minval=0.0, maxval=100.0, step=1, group="Wick projection", tooltip="0 = no order, only plot a circle.")
 
 outsideCount = 0
 previousBar = 1
@@ -43,74 +45,122 @@ if isOutside and showLine
     line.new(x1=time, y1=high, x2=time + dt * lineExtension, y2=high, color=lineColor, style=line.style_solid, width=1, xloc=xloc.bar_time)
     line.new(x1=time, y1=low, x2=time + dt * lineExtension, y2=low, color=lineColor, style=line.style_solid, width=1, xloc=xloc.bar_time)
 
-// ───────── Sell setup: place limit sells at 45% & 61% retracement ─────────
+// ───────── Setups: place limit orders at 40% & 61% retracement ─────────
 flat = strategy.position_size == 0
 canEnter = not tradeWhenFlatOnly or flat
 
-var int lastSetupBar = na
-var float obHigh = na
-var float obLow = na
+tick = syminfo.mintick
+tpDist = tpTicks * tick
+
+// SELL setup state
+var int lastSellSetupBar = na
+var float sellObHigh = na
+var float sellObLow = na
 var float sellEntry1 = na
 var float sellEntry2 = na
 var float sellStop = na
-var float wickProj = na
-var bool hitE1 = false
-var bool hitE2 = false
-
+var float sellWickProj = na
 newSellSetup = enableSellFib and canEnter and isOutsideDown
 if newSellSetup
-    lastSetupBar := bar_index
-    obHigh := high
-    obLow := low
-    rng = obHigh - obLow
-    sellEntry1 := obLow + entryPct1 * rng
-    sellEntry2 := obLow + entryPct2 * rng
-    sellStop := obLow + stopPct * rng
-    wickProj := na
-    hitE1 := false
-    hitE2 := false
+    lastSellSetupBar := bar_index
+    sellObHigh := high
+    sellObLow := low
+    rng = sellObHigh - sellObLow
+    sellEntry1 := sellObLow + entryPct1 * rng
+    sellEntry2 := sellObLow + entryPct2 * rng
+    sellStop := sellObLow + stopPct * rng
+    sellWickProj := na
 
-    // Place limit orders (active starting next bar)
     if qtyPct1 > 0
-        strategy.entry("S45", strategy.short, qty=qtyPct1, limit=sellEntry1)
+        strategy.entry("S40", strategy.short, qty=qtyPct1, limit=sellEntry1)
     if qtyPct2 > 0
         strategy.entry("S61", strategy.short, qty=qtyPct2, limit=sellEntry2)
 
-// Compute wick projection on the candle AFTER the outside bar:
-// wick = (outside high - outside open); projection = (next candle open + wick)
-if enableWickProjection and not na(lastSetupBar) and bar_index == lastSetupBar + 1 and not na(obHigh)
-    wick = obHigh - open[1]  // outside bar open is previous bar's open
-    wickProj := open + wick
+// Wick projection for SELL on next bar: (outside high - outside open) + next open
+if enableWickProjection and not na(lastSellSetupBar) and bar_index == lastSellSetupBar + 1 and not na(sellObHigh)
+    wick = sellObHigh - open[1]
+    sellWickProj := open + wick
     if wickOrderPct > 0
-        strategy.entry("SWick", strategy.short, qty=wickOrderPct, limit=wickProj)
+        strategy.entry("SWick", strategy.short, qty=wickOrderPct, limit=sellWickProj)
 
-// Cancel unfilled orders after N bars
-if not na(lastSetupBar) and bar_index > lastSetupBar + cancelAfterBars
-    strategy.cancel("S45")
+// Cancel unfilled SELL orders after N bars
+if not na(lastSellSetupBar) and bar_index > lastSellSetupBar + cancelAfterBars
+    strategy.cancel("S40")
     strategy.cancel("S61")
     strategy.cancel("SWick")
-    lastSetupBar := na
+    lastSellSetupBar := na
 
-// Take-profit (10,000 pips) and stop at 80% of outside bar range (applies to filled positions)
-pipSize = syminfo.currency == "JPY" ? syminfo.mintick : syminfo.mintick * 10
-tpDist = tpPips * pipSize
-
+// Attach SELL exits when position exists
 if strategy.position_size < 0 and not na(sellStop)
-    strategy.exit("S45-exit", from_entry="S45", stop=sellStop, limit=sellEntry1 - tpDist)
+    strategy.exit("S40-exit", from_entry="S40", stop=sellStop, limit=sellEntry1 - tpDist)
     strategy.exit("S61-exit", from_entry="S61", stop=sellStop, limit=sellEntry2 - tpDist)
-    if not na(wickProj)
-        strategy.exit("SWick-exit", from_entry="SWick", stop=sellStop, limit=wickProj - tpDist)
+    if not na(sellWickProj)
+        strategy.exit("SWick-exit", from_entry="SWick", stop=sellStop, limit=sellWickProj - tpDist)
 
-// Put crosses/circle at levels (plot() supports explicit y-values; plotshape() does not)
-plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="45% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newSellSetup ? sellEntry2 : na, title="61% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
-plot(plotLevelCrosses and newSellSetup ? sellStop : na, title="80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
+// BUY setup state
+var int lastBuySetupBar = na
+var float buyObHigh = na
+var float buyObLow = na
+var float buyEntry1 = na
+var float buyEntry2 = na
+var float buyStop = na
+var float buyWickProj = na
+newBuySetup = enableBuyFib and canEnter and isOutsideUp
+if newBuySetup
+    lastBuySetupBar := bar_index
+    buyObHigh := high
+    buyObLow := low
+    rng = buyObHigh - buyObLow
+    // For BUY: retrace down from high
+    buyEntry1 := buyObHigh - entryPct1 * rng
+    buyEntry2 := buyObHigh - entryPct2 * rng
+    buyStop := buyObHigh - stopPct * rng
+    buyWickProj := na
 
-// Circle marker for wick projection level (on the candle after the outside bar)
-plot(enableWickProjection and not na(wickProj) ? wickProj : na, title="Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
+    if qtyPct1 > 0
+        strategy.entry("B40", strategy.long, qty=qtyPct1, limit=buyEntry1)
+    if qtyPct2 > 0
+        strategy.entry("B61", strategy.long, qty=qtyPct2, limit=buyEntry2)
 
-// Plot levels
-plot(plotLevels ? sellEntry1 : na, "Sell 45%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
+// Wick projection for BUY on next bar: next open - (outside open - outside low)
+if enableWickProjection and not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1 and not na(buyObLow)
+    wick = open[1] - buyObLow
+    buyWickProj := open - wick
+    if wickOrderPct > 0
+        strategy.entry("BWick", strategy.long, qty=wickOrderPct, limit=buyWickProj)
+
+// Cancel unfilled BUY orders after N bars
+if not na(lastBuySetupBar) and bar_index > lastBuySetupBar + cancelAfterBars
+    strategy.cancel("B40")
+    strategy.cancel("B61")
+    strategy.cancel("BWick")
+    lastBuySetupBar := na
+
+// Attach BUY exits when position exists
+if strategy.position_size > 0 and not na(buyStop)
+    strategy.exit("B40-exit", from_entry="B40", stop=buyStop, limit=buyEntry1 + tpDist)
+    strategy.exit("B61-exit", from_entry="B61", stop=buyStop, limit=buyEntry2 + tpDist)
+    if not na(buyWickProj)
+        strategy.exit("BWick-exit", from_entry="BWick", stop=buyStop, limit=buyWickProj + tpDist)
+
+// Mark crosses/circles
+plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="SELL Entry 40% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newSellSetup ? sellEntry2 : na, title="SELL Entry 61% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newSellSetup ? sellStop : na, title="SELL Stop 80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
+plot(enableWickProjection and not na(sellWickProj) ? sellWickProj : na, title="SELL Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
+
+plot(plotLevelCrosses and newBuySetup ? buyEntry1 : na, title="BUY Entry 40% cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newBuySetup ? buyEntry2 : na, title="BUY Entry 61% cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newBuySetup ? buyStop : na, title="BUY Stop 80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
+plot(enableWickProjection and not na(buyWickProj) ? buyWickProj : na, title="BUY Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
+
+// Plot levels (lines)
+plot(plotLevels ? sellEntry1 : na, "Sell 40%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
 plot(plotLevels ? sellEntry2 : na, "Sell 61%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
 plot(plotLevels ? sellStop : na, "Sell Stop (80%)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
-plot(plotLevels ? wickProj : na, "Wick projection", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
+plot(plotLevels ? sellWickProj : na, "Sell Wick projection", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
+
+plot(plotLevels ? buyEntry1 : na, "Buy 40%", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
+plot(plotLevels ? buyEntry2 : na, "Buy 61%", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
+plot(plotLevels ? buyStop : na, "Buy Stop (80%)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
+plot(plotLevels ? buyWickProj : na, "Buy Wick projection", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
