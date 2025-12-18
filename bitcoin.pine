@@ -101,13 +101,13 @@ if strategy.position_size < 0 and not na(sellStop)
     if not na(wickProj)
         strategy.exit("SWick-exit", from_entry="SWick", stop=sellStop, limit=wickProj - tpDist)
 
-// Put crosses on levels on setup bar
-plotshape(plotLevelCrosses and newSellSetup, title="45% cross", style=shape.xcross, location=location.absolute, y=sellEntry1, color=color.new(color.red, 0), size=size.tiny)
-plotshape(plotLevelCrosses and newSellSetup, title="61% cross", style=shape.xcross, location=location.absolute, y=sellEntry2, color=color.new(color.red, 0), size=size.tiny)
-plotshape(plotLevelCrosses and newSellSetup, title="80% cross", style=shape.xcross, location=location.absolute, y=sellStop, color=color.new(color.orange, 0), size=size.tiny)
+// Put crosses/circle at levels (plot() supports explicit y-values; plotshape() does not)
+plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="45% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newSellSetup ? sellEntry2 : na, title="61% cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
+plot(plotLevelCrosses and newSellSetup ? sellStop : na, title="80% cross", color=color.new(color.orange, 0), style=plot.style_cross, linewidth=2)
 
 // Circle marker for wick projection level (on the candle after the outside bar)
-plotshape(enableWickProjection and not na(wickProj) and bar_index == lastSetupBar + 1, title="Wick projection", style=shape.circle, location=location.absolute, y=wickProj, color=color.new(color.purple, 0), size=size.tiny)
+plot(enableWickProjection and not na(wickProj) ? wickProj : na, title="Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
 
 // Plot levels
 plot(plotLevels ? sellEntry1 : na, "Sell 45%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
