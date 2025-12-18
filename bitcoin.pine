@@ -20,8 +20,9 @@ tpTicks = input.int(1000, "Take profit (ticks)", minval=1, group="Setup", toolti
 trailActivatePips = input.int(300, "Trail activates after profit (pips)", minval=1, group="Setup")
 trailPullbackPct = input.float(0.80, "Trail pullback %", minval=0.01, maxval=0.99, step=0.01, group="Setup", tooltip="0.80 = allow 80% giveback (keep 20% of max profit).")
 cancelAfterBars = input.int(20, "Cancel unfilled after N bars", minval=1, maxval=500, group="Setup")
-plotLevels = input.bool(true, "Plot entry/stop levels", group="Setup")
-plotLevelCrosses = input.bool(true, "Put crosses on entry/stop", group="Setup")
+plotLevelCrosses = input.bool(true, "Put cross at entry (single bar)", group="Setup")
+showLevelLines = input.bool(false, "Show level lines (limited length)", group="Setup")
+levelLineBars = input.int(20, "Level line length (bars)", minval=1, maxval=500, group="Setup")
 
 enableSellFib = input.bool(true, "Enable SELL setup on bearish outside", group="SELL setup")
 enableBuyFib  = input.bool(true, "Enable BUY setup on bullish outside", group="BUY setup")
@@ -179,18 +180,21 @@ if strategy.position_size > 0 and not na(buyStop)
 // Mark crosses/circles
 // Only one cross marker for entries (Entry 1)
 plot(plotLevelCrosses and newSellSetup ? sellEntry1 : na, title="SELL Entry cross", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
-plot(enableWickProjection and not na(sellWickProj) ? sellWickProj : na, title="SELL Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
+sellWickCircle = enableWickProjection and not na(lastSellSetupBar) and bar_index == lastSellSetupBar + 1 ? sellWickProj : na
+plot(sellWickCircle, title="SELL Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
 
 plot(plotLevelCrosses and newBuySetup ? buyEntry1 : na, title="BUY Entry cross", color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
-plot(enableWickProjection and not na(buyWickProj) ? buyWickProj : na, title="BUY Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
+buyWickCircle = enableWickProjection and not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1 ? buyWickProj : na
+plot(buyWickCircle, title="BUY Wick projection circle", color=color.new(color.purple, 0), style=plot.style_circles, linewidth=2)
 
-// Plot levels (lines)
-plot(plotLevels ? sellEntry1 : na, "Sell 40%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
-plot(plotLevels ? sellEntry2 : na, "Sell 61%", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
-plot(plotLevels ? sellStop : na, "Sell Stop (80%)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
-plot(plotLevels ? sellWickProj : na, "Sell Wick projection", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
+// Optional level lines (limited to N bars so they don't span the whole chart)
+sellLinesActive = showLevelLines and not na(lastSellSetupBar) and bar_index >= lastSellSetupBar and bar_index <= lastSellSetupBar + levelLineBars
+buyLinesActive  = showLevelLines and not na(lastBuySetupBar)  and bar_index >= lastBuySetupBar  and bar_index <= lastBuySetupBar + levelLineBars
 
-plot(plotLevels ? buyEntry1 : na, "Buy 40%", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
-plot(plotLevels ? buyEntry2 : na, "Buy 61%", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
-plot(plotLevels ? buyStop : na, "Buy Stop (80%)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
-plot(plotLevels ? buyWickProj : na, "Buy Wick projection", color=color.new(color.purple, 0), linewidth=1, style=plot.style_linebr)
+plot(sellLinesActive ? sellEntry1 : na, "Sell 40% (line)", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
+plot(sellLinesActive ? sellEntry2 : na, "Sell 61% (line)", color=color.new(color.red, 0), linewidth=1, style=plot.style_linebr)
+plot(sellLinesActive ? sellStop   : na, "Sell Stop 80% (line)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
+
+plot(buyLinesActive ? buyEntry1 : na, "Buy 40% (line)", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
+plot(buyLinesActive ? buyEntry2 : na, "Buy 61% (line)", color=color.new(color.green, 0), linewidth=1, style=plot.style_linebr)
+plot(buyLinesActive ? buyStop   : na, "Buy Stop 80% (line)", color=color.new(color.orange, 0), linewidth=2, style=plot.style_linebr)
