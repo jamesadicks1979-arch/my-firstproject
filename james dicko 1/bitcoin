@@ -206,17 +206,40 @@ confirmRequireOpenOutside = input.bool(true, "Confirm candle must OPEN outside b
 shortConfirmOk = (close < hullma) and (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
 longConfirmOk  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
 
+entryMode = input.string(
+    "Armed window (current)",
+    "Entry mode",
+    options=[
+        "Armed window (current)",
+        "Same bar only",
+        "Arm close outside band; confirm MA side (anywhere)"
+    ],
+    group="Trades",
+    tooltip="Use this if entries are missed or too frequent."
+)
+
 shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
 longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
 
-shortSignal = signalMode == "Same bar" ? shortSignalSame : shortSignalWindow
-longSignal  = signalMode == "Same bar" ? longSignalSame  : longSignalWindow
+// Alternate entry modes
+shortSignalArmAny = enableShorts and (shortArmed > 0) and (close < hullma)
+longSignalArmAny  = enableLongs  and (longArmed  > 0) and (close > hullma)
+
+shortSignal =
+     entryMode == "Same bar only" ? shortSignalSame :
+     entryMode == "Arm close outside band; confirm MA side (anywhere)" ? shortSignalArmAny :
+     (signalMode == "Same bar" ? shortSignalSame : shortSignalWindow)
+
+longSignal =
+     entryMode == "Same bar only" ? longSignalSame :
+     entryMode == "Arm close outside band; confirm MA side (anywhere)" ? longSignalArmAny :
+     (signalMode == "Same bar" ? longSignalSame : longSignalWindow)
 
 // Avoid repeated signals in window mode after first trigger
 if signalMode == "Within window"
-    if shortSignalWindow
+    if shortSignalWindow or shortSignalArmAny
         shortArmed := 0
-    if longSignalWindow
+    if longSignalWindow or longSignalArmAny
         longArmed := 0
 
 // ───────── Signal box helper ─────────
@@ -257,6 +280,17 @@ justExited = strategy.position_size == 0 and strategy.position_size[1] != 0
 if justExited
     lastExitBar := bar_index
 canEnter = flat and (na(lastExitBar) or bar_index > lastExitBar + cooldownBars)
+
+exitMode = input.string(
+    "Current",
+    "Exit mode",
+    options=[
+        "Current",
+        "MA stop only (no TP)",
+        "TP only (no MA stop)"
+    ],
+    group="Trades"
+)
 
 if canEnter and shortSignal
     strategy.entry("S", strategy.short)
@@ -322,9 +356,9 @@ if stopMode == "70% retracement"
         shortRetraceStop := na
 
 // Take profit at fixed 300 pips (limit order)
-if strategy.position_size < 0 and tpDist > 0
+if exitMode != "MA stop only (no TP)" and strategy.position_size < 0 and tpDist > 0
     strategy.exit("S-TP", from_entry="S", limit=shortTpPrice)
-if strategy.position_size > 0 and tpDist > 0
+if exitMode != "MA stop only (no TP)" and strategy.position_size > 0 and tpDist > 0
     strategy.exit("L-TP", from_entry="L", limit=longTpPrice)
 
 // After +100 pips, move stop to +30 pips profit (stop order)
@@ -341,15 +375,15 @@ if stopMode == "70% retracement"
         strategy.exit("L-RetraceStop", from_entry="L", stop=longRetraceStop)
 
 // Take profit when touching opposite band
-if tpOnOtherBand and strategy.position_size < 0 and low <= lowerNR
+if exitMode != "MA stop only (no TP)" and tpOnOtherBand and strategy.position_size < 0 and low <= lowerNR
     strategy.close("S", comment="TP band")
-if tpOnOtherBand and strategy.position_size > 0 and high >= upperNR
+if exitMode != "MA stop only (no TP)" and tpOnOtherBand and strategy.position_size > 0 and high >= upperNR
     strategy.close("L", comment="TP band")
 
 // Stop (market): close across MA AND beyond entry price
-if maExit and strategy.position_size < 0 and close > hullma and close > entryPrice
+if exitMode != "TP only (no MA stop)" and maExit and strategy.position_size < 0 and close > hullma and close > entryPrice
     strategy.close("S", comment="STOP MA")
-if maExit and strategy.position_size > 0 and close < hullma and close < entryPrice
+if exitMode != "TP only (no MA stop)" and maExit and strategy.position_size > 0 and close < hullma and close < entryPrice
     strategy.close("L", comment="STOP MA")
 
 // Plot markers on every signal bar (not only when flat)
