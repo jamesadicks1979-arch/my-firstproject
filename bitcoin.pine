@@ -8,6 +8,7 @@ lineExtension = input.int(5, "Signal Line Extension Length", tooltip="The number
 lineColor = input.color(color.new(color.blue, 0), title="Signal Line Color")
 tradeWhenFlatOnly = input.bool(true, "Trade only when flat")
 showBuySellLabels = input.bool(true, "Show BUY/SELL labels")
+labelDelayBars = input.int(1, "Label delay (bars)", minval=0, maxval=5, tooltip="1 = show BUY/SELL label on the candle AFTER the outside bar")
 highlightOutsideBar = input.bool(true, "Highlight outside bars")
 outsideBarColor = input.color(color.new(color.orange, 85), "Outside bar highlight")
 
@@ -32,8 +33,11 @@ if isOutside and showLine
 plotshape(showArrow and isOutsideUp, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.normal)
 plotshape(showArrow and isOutsideDown, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.normal)
 
-plotshape(showBuySellLabels and isOutsideUp, title="BUY label", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, text="BUY", size=size.tiny)
-plotshape(showBuySellLabels and isOutsideDown, title="SELL label", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, text="SELL", size=size.tiny)
+// Show BUY/SELL labels on the next candle after the outside bar (default)
+buyLabel = showBuySellLabels and isOutsideUp[labelDelayBars]
+sellLabel = showBuySellLabels and isOutsideDown[labelDelayBars]
+plotshape(buyLabel, title="BUY label", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, text="BUY", size=size.tiny)
+plotshape(sellLabel, title="SELL label", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, text="SELL", size=size.tiny)
 
 // Entries (executed on next candle open because process_orders_on_close=false)
 flat = strategy.position_size == 0
