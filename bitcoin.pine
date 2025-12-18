@@ -4,7 +4,7 @@
 
 //@version=5
 strategy("Nadaraya-Watson Envelope [LuxAlgo] + R:R Trades", "LuxAlgo - Nadaraya-Watson Envelope + Trades", overlay = true, format=format.price, precision=2,
-     max_lines_count = 500, max_labels_count = 500, max_bars_back=500, pyramiding=0)
+     max_lines_count = 500, max_labels_count = 500, max_boxes_count = 500, max_bars_back=500, pyramiding=0)
 
 // ───────── Trade inputs ─────────
 enableLongs  = input.bool(true,  "Enable Longs",  group="Trades")
@@ -13,6 +13,11 @@ stopLen      = input.int(5,      "Stop lookback bars", minval=1, group="Trades")
 rr           = input.float(2.0,  "Profit target (R multiple)", minval=0.1, step=0.1, group="Trades")
 signalMode   = input.string("Within window", "Signal mode", options=["Same bar", "Within window"], group="Trades")
 confirmBars  = input.int(5, "MA confirm window (bars)", minval=1, group="Trades", tooltip="In 'Within window' mode: after price closes beyond the band, a BUY/SELL can trigger within this many bars once price closes back across the MA.")
+plotSignals  = input.bool(true, "Plot BUY/SELL markers", group="Trades")
+plotBoxes    = input.bool(true, "Plot signal box", group="Trades")
+boxLookback  = input.int(10, "Box lookback bars", minval=1, group="Trades", tooltip="Box will cover the high/low range of the last N bars ending on the signal bar.")
+boxOpacity   = input.int(85, "Box fill opacity (0-100)", minval=0, maxval=100, group="Trades")
+maxSigBoxes  = input.int(50, "Max signal boxes to keep", minval=0, group="Trades")
 
 // ───────── Original inputs ─────────
 coeff = input.float(1, 'Multiplier', step=0.1)
@@ -152,6 +157,21 @@ plot(repaint ? na : lowerNR, 'Lower', dnCss)
 shortBreak = close > upperNR
 longBreak  = close < lowerNR
 
+// ───────── Signal box helper ─────────
+var sigBoxes = array.new_box(0)
+f_addSignalBox(_isShort) =>
+    if plotBoxes and bar_index >= boxLookback
+        top = ta.highest(high, boxLookback)
+        bot = ta.lowest(low, boxLookback)
+        if not na(top) and not na(bot)
+            c = _isShort ? dnCss : upCss
+            b = box.new(left=bar_index - boxLookback + 1, top=top, right=bar_index, bottom=bot, xloc=xloc.bar_index,
+                 border_color=c, bgcolor=color.new(c, boxOpacity))
+            array.push(sigBoxes, b)
+            if array.size(sigBoxes) > maxSigBoxes
+                old = array.shift(sigBoxes)
+                box.delete(old)
+
 var int shortArmed = 0
 var int longArmed  = 0
 
@@ -179,6 +199,12 @@ if signalMode == "Within window"
         shortArmed := 0
     if longSignalWindow
         longArmed := 0
+
+// Draw boxes on signal bars
+if shortSignal
+    f_addSignalBox(true)
+if longSignal
+    f_addSignalBox(false)
 
 var float shortStop   = na
 var float shortTarget = na
@@ -213,7 +239,6 @@ if flat
     longStop := na
     longTarget := na
 
-plotSignals = input.bool(true, "Plot BUY/SELL markers", group="Trades")
 // Plot markers on every signal bar (not only when flat)
 plotshape(plotSignals and shortSignal, title="SELL", style=shape.labeldown, text="SELL", location=location.abovebar, color=dnCss, textcolor=color.white, size=size.tiny)
 plotshape(plotSignals and longSignal,  title="BUY",  style=shape.labelup,   text="BUY",  location=location.belowbar, color=upCss, textcolor=color.white, size=size.tiny)
