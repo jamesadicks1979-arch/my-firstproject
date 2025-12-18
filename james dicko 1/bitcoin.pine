@@ -11,6 +11,8 @@ enableLongs  = input.bool(true,  "Enable Longs",  group="Trades")
 enableShorts = input.bool(true,  "Enable Shorts", group="Trades")
 tpPips       = input.int(300,    "Take profit (pips)", minval=1, group="Trades")
 tpOnOtherBand = input.bool(true, "Take profit on opposite band touch", group="Trades")
+trailTriggerPips = input.int(100, "Move stop after profit (pips)", minval=1, group="Trades")
+trailLockPips    = input.int(30,  "Lock-in profit (pips)", minval=1, group="Trades")
 signalMode   = input.string("Within window", "Signal mode", options=["Same bar", "Within window"], group="Trades")
 confirmBars  = input.int(5, "MA confirm window (bars)", minval=1, group="Trades", tooltip="In 'Within window' mode: after price closes beyond the band, a BUY/SELL can trigger within this many bars once price closes back across the MA.")
 plotSignals  = input.bool(true, "Plot BUY/SELL markers", group="Trades")
@@ -255,16 +257,40 @@ if flat and longSignal
 // Pip size (TradingView-style pip approximation)
 pipSize = syminfo.currency == "JPY" ? syminfo.mintick : syminfo.mintick * 10
 tpDist = tpPips * pipSize
+trailTrigDist = trailTriggerPips * pipSize
+trailLockDist = trailLockPips * pipSize
 
 entryPrice = strategy.position_avg_price
 shortTpPrice = entryPrice - tpDist
 longTpPrice  = entryPrice + tpDist
+shortLockStop = entryPrice - trailLockDist
+longLockStop  = entryPrice + trailLockDist
+
+var bool shortLocked = false
+var bool longLocked  = false
+
+// Reset lock flags when flat
+if flat
+    shortLocked := false
+    longLocked := false
+
+// Arm trailing lock once price moves in favor by trailTriggerPips
+if strategy.position_size < 0 and not shortLocked and (entryPrice - low) >= trailTrigDist
+    shortLocked := true
+if strategy.position_size > 0 and not longLocked and (high - entryPrice) >= trailTrigDist
+    longLocked := true
 
 // Take profit at fixed 300 pips (limit order)
 if strategy.position_size < 0 and tpDist > 0
     strategy.exit("S-TP", from_entry="S", limit=shortTpPrice)
 if strategy.position_size > 0 and tpDist > 0
     strategy.exit("L-TP", from_entry="L", limit=longTpPrice)
+
+// After +100 pips, move stop to +30 pips profit (stop order)
+if strategy.position_size < 0 and shortLocked and trailLockDist > 0
+    strategy.exit("S-LockStop", from_entry="S", stop=shortLockStop)
+if strategy.position_size > 0 and longLocked and trailLockDist > 0
+    strategy.exit("L-LockStop", from_entry="L", stop=longLockStop)
 
 // Take profit when touching opposite band
 if tpOnOtherBand and strategy.position_size < 0 and low <= lowerNR
@@ -285,6 +311,8 @@ plotshape(plotSignals and longSignal,  title="BUY",  style=shape.labelup,   text
 plot(strategy.position_size != 0 ? entryPrice : na, "Entry", color=color.new(color.gray, 0), linewidth=1, style=plot.style_linebr)
 plot(strategy.position_size < 0 ? shortTpPrice : na, "Short TP (pips)", color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
 plot(strategy.position_size > 0 ? longTpPrice  : na, "Long TP (pips)",  color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
+plot(strategy.position_size < 0 and shortLocked ? shortLockStop : na, "Short Stop (locked +pips)", color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
+plot(strategy.position_size > 0 and longLocked  ? longLockStop  : na, "Long Stop (locked +pips)",  color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
 
 // Mark PROFIT / STOP on the chart when trades close
 var int lastClosed = 0
