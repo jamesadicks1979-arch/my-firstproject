@@ -11,6 +11,8 @@ enableLongs  = input.bool(true,  "Enable Longs",  group="Trades")
 enableShorts = input.bool(true,  "Enable Shorts", group="Trades")
 stopLen      = input.int(5,      "Stop lookback bars", minval=1, group="Trades")
 rr           = input.float(2.0,  "Profit target (R multiple)", minval=0.1, step=0.1, group="Trades")
+signalMode   = input.string("Within window", "Signal mode", options=["Same bar", "Within window"], group="Trades")
+confirmBars  = input.int(5, "MA confirm window (bars)", minval=1, group="Trades", tooltip="In 'Within window' mode: after price closes beyond the band, a BUY/SELL can trigger within this many bars once price closes back across the MA.")
 
 // ───────── Original inputs ─────────
 coeff = input.float(1, 'Multiplier', step=0.1)
@@ -144,11 +146,39 @@ plot(repaint ? na : upperNR, 'Upper', upCss)
 plot(repaint ? na : lowerNR, 'Lower', dnCss)
 
 // ───────── Trading rules (use NON-repainting bands) ─────────
-// Sell: close above upper band AND close below MA
-shortSignal = enableShorts and (close > upperNR) and (close < hullma)
+// Two options:
+// - Same bar: both conditions must be true on the same candle.
+// - Within window: a band break "arms" the setup; within N bars, a close across the MA triggers.
+shortBreak = close > upperNR
+longBreak  = close < lowerNR
 
-// Optional symmetric buy (disable via input)
-longSignal  = enableLongs  and (close < lowerNR) and (close > hullma)
+var int shortArmed = 0
+var int longArmed  = 0
+
+if shortBreak
+    shortArmed := confirmBars
+else
+    shortArmed := math.max(shortArmed - 1, 0)
+
+if longBreak
+    longArmed := confirmBars
+else
+    longArmed := math.max(longArmed - 1, 0)
+
+shortSignalSame   = enableShorts and shortBreak and (close < hullma)
+longSignalSame    = enableLongs  and longBreak  and (close > hullma)
+shortSignalWindow = enableShorts and (shortArmed > 0) and (close < hullma)
+longSignalWindow  = enableLongs  and (longArmed  > 0) and (close > hullma)
+
+shortSignal = signalMode == "Same bar" ? shortSignalSame : shortSignalWindow
+longSignal  = signalMode == "Same bar" ? longSignalSame  : longSignalWindow
+
+// Avoid repeated signals in window mode after first trigger
+if signalMode == "Within window"
+    if shortSignalWindow
+        shortArmed := 0
+    if longSignalWindow
+        longArmed := 0
 
 var float shortStop   = na
 var float shortTarget = na
