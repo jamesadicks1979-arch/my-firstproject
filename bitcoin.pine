@@ -39,8 +39,7 @@ if fire
         strategy.entry("S", strategy.short)
     tradedThisOutside := true
 
-// ───────── Labels ─────────
-if plotLabels
-    plotshape(outsideStart, title="Outside start", style=shape.circle, location=location.top, size=size.tiny, color=color.new(color.gray, 0), text="OUT")
-    plotshape(fire and dir == 1, title="BUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.green, 0), textcolor=color.white, text="BUY\n(next open)")
-    plotshape(fire and dir == -1, title="SELL", style=shape.labeldown, location=location.abovebar, size=size.tiny, color=color.new(color.red, 0), textcolor=color.white, text="SELL\n(next open)")
+// ───────── Labels (must be in global scope) ─────────
+plotshape(plotLabels and outsideStart, title="Outside start", style=shape.circle, location=location.top, size=size.tiny, color=color.new(color.gray, 0), text="OUT")
+plotshape(plotLabels and fire and dir == 1, title="BUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.green, 0), textcolor=color.white, text="BUY (next open)")
+plotshape(plotLabels and fire and dir == -1, title="SELL", style=shape.labeldown, location=location.abovebar, size=size.tiny, color=color.new(color.red, 0), textcolor=color.white, text="SELL (next open)")
