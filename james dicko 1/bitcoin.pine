@@ -14,7 +14,7 @@ rr           = input.float(2.0,  "Profit target (R multiple)", minval=0.1, step=
 signalMode   = input.string("Within window", "Signal mode", options=["Same bar", "Within window"], group="Trades")
 confirmBars  = input.int(5, "MA confirm window (bars)", minval=1, group="Trades", tooltip="In 'Within window' mode: after price closes beyond the band, a BUY/SELL can trigger within this many bars once price closes back across the MA.")
 plotSignals  = input.bool(true, "Plot BUY/SELL markers", group="Trades")
-plotBoxes    = input.bool(true, "Plot signal box", group="Trades")
+plotBoxes    = input.bool(false, "Plot signal box", group="Trades")
 boxLookback  = input.int(10, "Box lookback bars", minval=1, group="Trades", tooltip="Box will cover the high/low range of the last N bars ending on the signal bar.")
 boxOpacity   = input.int(85, "Box fill opacity (0-100)", minval=0, maxval=100, group="Trades")
 maxSigBoxes  = input.int(50, "Max signal boxes to keep", minval=0, group="Trades")
@@ -108,6 +108,9 @@ plot(hullma, title="Hull MA", color=color.new(color.blue, 0), linewidth=2)
 if barstate.islast and repaint
     // How many bars to draw back (cap to available history)
     hist = math.min(bandHistoryBars, n)
+    // Need at least 2 points to draw a segment
+    if hist < 2
+        hist := 2
     // We have 250 segments per side => 251 points max. Choose step to cover hist.
     step = math.max(1, int(math.ceil(hist / 250.0)))
     points = int(math.floor((hist - 1) / step)) + 1
@@ -116,6 +119,7 @@ if barstate.islast and repaint
     var yPts = array.new_float(0)
     array.clear(yPts)
     sumAbs = 0.0
+    cntAbs = 0
 
     // Inner calc window (LuxAlgo uses 0..499)
     calcN = math.min(499, n - 1)
@@ -129,10 +133,12 @@ if barstate.islast and repaint
             sumw += w
         y = sumw != 0.0 ? (sum / sumw) : na
         array.push(yPts, y)
-        if not na(y)
+        // Only use src[i] for error if it's within available history (max 499 here)
+        if not na(y) and i <= calcN
             sumAbs += math.abs(src[i] - y)
+            cntAbs += 1
 
-    sae = points > 0 ? (sumAbs / points) * mult : na
+    sae = cntAbs > 0 ? (sumAbs / cntAbs) * mult : na
 
     // Update/reuse line segments
     for seg = 0 to 249
@@ -205,6 +211,12 @@ f_addSignalBox(_isShort) =>
             if array.size(sigBoxes) > maxSigBoxes
                 old = array.shift(sigBoxes)
                 box.delete(old)
+
+// If boxes are turned off, remove any previously drawn ones
+if not plotBoxes and array.size(sigBoxes) > 0
+    for i = 0 to array.size(sigBoxes) - 1
+        box.delete(array.get(sigBoxes, i))
+    array.clear(sigBoxes)
 
 var int shortArmed = 0
 var int longArmed  = 0
