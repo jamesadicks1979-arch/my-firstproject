@@ -18,6 +18,8 @@ plotBoxes    = input.bool(true, "Plot signal box", group="Trades")
 boxLookback  = input.int(10, "Box lookback bars", minval=1, group="Trades", tooltip="Box will cover the high/low range of the last N bars ending on the signal bar.")
 boxOpacity   = input.int(85, "Box fill opacity (0-100)", minval=0, maxval=100, group="Trades")
 maxSigBoxes  = input.int(50, "Max signal boxes to keep", minval=0, group="Trades")
+maExit       = input.bool(true, "Exit when close crosses MA (market)", group="Trades", tooltip="If in a trade, exit when price CLOSES back on the other side of the MA.")
+markPnL      = input.bool(true, "Mark PROFIT/STOP on exits", group="Trades")
 
 // ───────── Original inputs ─────────
 coeff = input.float(1, 'Multiplier', step=0.1)
@@ -40,6 +42,7 @@ repaint = input.bool(true, 'Repainting Smoothing', tooltip = 'Repainting is an e
 //Style
 upCss = input.color(color.teal, 'Colors', inline = 'inline1', group = 'Style')
 dnCss = input.color(color.red, '', inline = 'inline1', group = 'Style')
+bandHistoryBars = input.int(2000, "Repaint band history (bars)", minval=200, maxval=5000, group="Style", tooltip="How far back the repainting bands draw. Larger values are heavier.")
 
 //-----------------------------------------------------------------------------}
 //Functions
@@ -52,11 +55,13 @@ gauss(x, h) => math.exp(-(math.pow(x, 2) / (h * h * 2)))
 //-----------------------------------------------------------------------------{
 n = bar_index
 
-var ln = array.new_line(0)
-
-if barstate.isfirst and repaint
-    for i = 0 to 499
-        array.push(ln, line.new(na, na, na, na))
+// Reuse a fixed number of line objects (keeps within max_lines_count=500)
+var upLn = array.new_line(0)
+var dnLn = array.new_line(0)
+if barstate.isfirst
+    for _ = 0 to 249
+        array.push(upLn, line.new(na, na, na, na, xloc=xloc.bar_index, color=upCss))
+        array.push(dnLn, line.new(na, na, na, na, xloc=xloc.bar_index, color=dnCss))
 
 //-----------------------------------------------------------------------------}
 //End point method (NON-repainting series for trading/signals)
@@ -96,40 +101,69 @@ hullma = ta.wma(2 * ta.wma(src1, lenHalf) - ta.wma(src1, length), lenSqrt)
 plot(hullma, title="Hull MA", color=color.new(color.blue, 0), linewidth=2)
 
 //-----------------------------------------------------------------------------}
-//Compute and display NWE (repainting visual mode)
+//Compute and display NWE (repainting visual mode) — extended history
 //-----------------------------------------------------------------------------{
-float y2 = na
-float y1 = na
-
-nwe = array.new<float>(0)
+// This draws the LuxAlgo-style repainting bands using a fixed number of line segments.
+// It uses downsampling when bandHistoryBars is large to stay within the line limit.
 if barstate.islast and repaint
-    sae = 0.
-    //Compute and set NWE point
-    for i = 0 to math.min(499, n - 1)
-        sum = 0.
-        sumw = 0.
-        //Compute weighted mean
-        for j = 0 to math.min(499, n - 1)
+    // How many bars to draw back (cap to available history)
+    hist = math.min(bandHistoryBars, n)
+    // We have 250 segments per side => 251 points max. Choose step to cover hist.
+    step = math.max(1, int(math.ceil(hist / 250.0)))
+    points = int(math.floor((hist - 1) / step)) + 1
+
+    // Compute downsampled NWE points + average error (sae)
+    var yPts = array.new_float(0)
+    array.clear(yPts)
+    sumAbs = 0.0
+
+    // Inner calc window (LuxAlgo uses 0..499)
+    calcN = math.min(499, n - 1)
+    for p = 0 to points - 1
+        i = p * step
+        sum = 0.0
+        sumw = 0.0
+        for j = 0 to calcN
             w = gauss(i - j, h)
             sum += src[j] * w
             sumw += w
+        y = sumw != 0.0 ? (sum / sumw) : na
+        array.push(yPts, y)
+        if not na(y)
+            sumAbs += math.abs(src[i] - y)
 
-        y2 := sum / sumw
-        sae += math.abs(src[i] - y2)
-        nwe.push(y2)
+    sae = points > 0 ? (sumAbs / points) * mult : na
 
-    sae := sae / math.min(499, n - 1) * mult
-    for i = 0 to math.min(499, n - 1)
-        if i % 2
-            line.new(n - i + 1, y1 + sae, n - i, nwe.get(i) + sae, color=upCss)
-            line.new(n - i + 1, y1 - sae, n - i, nwe.get(i) - sae, color=dnCss)
+    // Update/reuse line segments
+    for seg = 0 to 249
+        lUp = array.get(upLn, seg)
+        lDn = array.get(dnLn, seg)
 
-        if src[i] > nwe.get(i) + sae and src[i + 1] < nwe.get(i) + sae
-            label.new(n - i, src[i], '▼', color=color(na), style=label.style_label_down, textcolor=dnCss, textalign=text.align_center)
-        if src[i] < nwe.get(i) - sae and src[i + 1] > nwe.get(i) - sae
-            label.new(n - i, src[i], '▲', color=color(na), style=label.style_label_up, textcolor=upCss, textalign=text.align_center)
+        if seg < points - 1 and not na(sae)
+            i1 = seg * step
+            i2 = (seg + 1) * step
+            y1 = array.get(yPts, seg)
+            y2 = array.get(yPts, seg + 1)
 
-        y1 := nwe.get(i)
+            x1 = n - i1
+            x2 = n - i2
+
+            if not na(y1) and not na(y2)
+                line.set_xy1(lUp, x1, y1 + sae)
+                line.set_xy2(lUp, x2, y2 + sae)
+                line.set_color(lUp, upCss)
+                line.set_width(lUp, 2)
+
+                line.set_xy1(lDn, x1, y1 - sae)
+                line.set_xy2(lDn, x2, y2 - sae)
+                line.set_color(lDn, dnCss)
+                line.set_width(lDn, 2)
+            else
+                line.set_xy1(lUp, na, na), line.set_xy2(lUp, na, na)
+                line.set_xy1(lDn, na, na), line.set_xy2(lDn, na, na)
+        else
+            line.set_xy1(lUp, na, na), line.set_xy2(lUp, na, na)
+            line.set_xy1(lDn, na, na), line.set_xy2(lDn, na, na)
 
 //-----------------------------------------------------------------------------}
 //Dashboard
@@ -233,6 +267,12 @@ if strategy.position_size < 0 and not na(shortStop) and not na(shortTarget)
 if strategy.position_size > 0 and not na(longStop) and not na(longTarget)
     strategy.exit("L-exit", from_entry="L", stop=longStop, limit=longTarget)
 
+// Exit when price CLOSES back across the MA (market exit)
+if maExit and strategy.position_size < 0 and close > hullma
+    strategy.close("S")
+if maExit and strategy.position_size > 0 and close < hullma
+    strategy.close("L")
+
 if flat
     shortStop := na
     shortTarget := na
@@ -248,3 +288,17 @@ plot(strategy.position_size < 0 ? shortTarget : na, "Short Target", color=color.
 
 plot(strategy.position_size > 0 ? longStop    : na, "Long Stop",    color=color.new(color.red, 0),   linewidth=2, style=plot.style_linebr)
 plot(strategy.position_size > 0 ? longTarget  : na, "Long Target",  color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
+
+// Mark PROFIT / STOP on the chart when trades close
+var int lastClosed = 0
+if markPnL and strategy.closedtrades > lastClosed
+    for t = lastClosed to strategy.closedtrades - 1
+        xb = strategy.closedtrades.exit_bar_index(t)
+        yp = strategy.closedtrades.exit_price(t)
+        pr = strategy.closedtrades.profit(t)
+        isWin = pr > 0
+        txt = isWin ? "PROFIT" : "STOP"
+        col = isWin ? color.new(color.green, 0) : color.new(color.red, 0)
+        style = isWin ? label.style_label_up : label.style_label_down
+        label.new(x=xb, y=yp, xloc=xloc.bar_index, text=txt, style=style, color=color.new(col, 75), textcolor=col, size=size.tiny)
+    lastClosed := strategy.closedtrades
