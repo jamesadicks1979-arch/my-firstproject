@@ -172,10 +172,6 @@ plot(showSignalBands ? lowerNR : na, 'Signal Lower (NR)', color=color.new(dnCss,
 shortBreak = close > upperNR
 longBreak  = close < lowerNR
 
-plotArms = input.bool(true, "Plot ARM markers", group="Trades", tooltip="Shows the candle that CLOSED outside the band (arms the setup).")
-plotshape(plotArms and shortBreak, title="ARM SELL", style=shape.triangledown, location=location.abovebar, color=color.new(dnCss, 0), size=size.tiny, text="ARM")
-plotshape(plotArms and longBreak,  title="ARM BUY",  style=shape.triangleup,   location=location.belowbar, color=color.new(upCss, 0), size=size.tiny, text="ARM")
-
 var int shortArmed = 0
 var int longArmed  = 0
 
@@ -195,9 +191,11 @@ else
 shortSignalSame = enableShorts and (close > upperNR) and (close < hullma)
 longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
 
-// Window mode still requires CLOSE beyond band on the trigger candle too (prevents “wrong price” triggers).
-shortConfirmOk = (close > upperNR) and (close < hullma)
-longConfirmOk  = (close < lowerNR) and (close > hullma)
+// Window mode:
+// After a CLOSE outside the band (arm), trigger when price CLOSES back across the MA.
+// This is what picks up the boxed sell you highlighted (no need to still be above the band).
+shortConfirmOk = ta.crossunder(close, hullma)
+longConfirmOk  = ta.crossover(close, hullma)
 
 shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
 longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
