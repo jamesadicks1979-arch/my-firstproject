@@ -168,7 +168,8 @@ plot(showSignalBands ? lowerNR : na, 'Signal Lower (NR)', color=color.new(dnCss,
 // - Same bar: SELL/BUY must be true on the same candle.
 // - Within window: a CLOSE outside the band ARMS the setup; within N bars, a qualifying candle can trigger.
 //
-// IMPORTANT: per your request, we ONLY use CLOSE vs the bands (no wick-touch logic).
+// IMPORTANT: per your request, signals must be on a candle that OPENS outside the band
+// (above upper for SELL / below lower for BUY).
 shortBreak = close > upperNR
 longBreak  = close < lowerNR
 
@@ -185,17 +186,17 @@ if longBreak
 else
     longArmed := math.max(longArmed - 1, 0)
 
-// STRICT same-bar entries:
-// SELL: close above upper band AND close below MA
-// BUY : close below lower band AND close above MA
-shortSignalSame = enableShorts and (close > upperNR) and (close < hullma)
-longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
+// Same-bar entries (single candle reversal):
+// SELL: candle OPENS above upper band AND CLOSES below MA
+// BUY : candle OPENS below lower band AND CLOSES above MA
+shortSignalSame = enableShorts and (open > upperNR) and (close < hullma)
+longSignalSame  = enableLongs  and (open < lowerNR) and (close > hullma)
 
 // Window mode:
-// After a CLOSE outside the band (arm), trigger when price CLOSES back across the MA.
-// This is what picks up the boxed sell you highlighted (no need to still be above the band).
-shortConfirmOk = ta.crossunder(close, hullma)
-longConfirmOk  = ta.crossover(close, hullma)
+// After a CLOSE outside the band (arm), trigger on a candle that OPENS outside the band
+// and CLOSES on the other side of the MA.
+shortConfirmOk = (open > upperNR) and (close < hullma)
+longConfirmOk  = (open < lowerNR) and (close > hullma)
 
 shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
 longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
