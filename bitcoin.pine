@@ -167,8 +167,14 @@ plot(showSignalBands ? lowerNR : na, 'Signal Lower (NR)', color=color.new(dnCss,
 // Two modes:
 // - Same bar: both conditions must be true on the same candle.
 // - Within window: a close outside the band ARMS the setup; within N bars, a close across the MA triggers.
-shortBreak = close > upperNR
-longBreak  = close < lowerNR
+bandTouch = input.string("Wick", "Band check type", options=["Wick", "Close"], group="Trades", tooltip="Wick = HIGH/LOW crosses band. Close = CLOSE crosses band.")
+requireBandOnConfirm = input.bool(true, "Require band check on SELL/BUY bar", group="Trades", tooltip="If ON, the SELL/BUY candle must also touch the band (per Band check type).")
+
+shortBandTouch = bandTouch == "Close" ? (close > upperNR) : (high > upperNR)
+longBandTouch  = bandTouch == "Close" ? (close < lowerNR) : (low < lowerNR)
+
+shortBreak = shortBandTouch
+longBreak  = longBandTouch
 
 plotArms = input.bool(true, "Plot ARM markers", group="Trades", tooltip="Shows the candle that CLOSED outside the band (arms the setup).")
 plotshape(plotArms and shortBreak, title="ARM SELL", style=shape.triangledown, location=location.abovebar, color=color.new(dnCss, 0), size=size.tiny, text="ARM")
@@ -187,10 +193,14 @@ if longBreak
 else
     longArmed := math.max(longArmed - 1, 0)
 
-shortSignalSame   = enableShorts and shortBreak and (close < hullma)
-longSignalSame    = enableLongs  and longBreak  and (close > hullma)
-shortSignalWindow = enableShorts and (shortArmed > 0) and (close < hullma)
-longSignalWindow  = enableLongs  and (longArmed  > 0) and (close > hullma)
+shortSignalSame   = enableShorts and shortBandTouch and (close < hullma)
+longSignalSame    = enableLongs  and longBandTouch  and (close > hullma)
+
+shortConfirmOk = (close < hullma) and (not requireBandOnConfirm or shortBandTouch)
+longConfirmOk  = (close > hullma) and (not requireBandOnConfirm or longBandTouch)
+
+shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
+longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
 
 shortSignal = signalMode == "Same bar" ? shortSignalSame : shortSignalWindow
 longSignal  = signalMode == "Same bar" ? longSignalSame  : longSignalWindow
