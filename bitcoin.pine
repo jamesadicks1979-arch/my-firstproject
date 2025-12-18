@@ -11,6 +11,11 @@ enableLongs  = input.bool(true,  "Enable Longs",  group="Trades")
 enableShorts = input.bool(true,  "Enable Shorts", group="Trades")
 tpPips       = input.int(300,    "Take profit (pips)", minval=1, group="Trades")
 tpOnOtherBand = input.bool(true, "Take profit on opposite band touch", group="Trades")
+stopMode = input.string("70% retracement", "Stop mode", options=["Lock +pips after +pips", "70% retracement"], group="Trades")
+trailTriggerPips = input.int(100, "Move stop after profit (pips)", minval=1, group="Trades", tooltip="For 'Lock +pips after +pips' mode.")
+trailLockPips    = input.int(30,  "Lock-in profit (pips)", minval=1, group="Trades", tooltip="For 'Lock +pips after +pips' mode.")
+retraceTriggerPips = input.int(100, "Retracement activates after (pips)", minval=1, group="Trades", tooltip="For '70% retracement' mode. Minimum max profit before trailing starts.")
+retracePct = input.float(0.70, "Retracement % (0-1)", minval=0.0, maxval=0.99, step=0.01, group="Trades", tooltip="0.70 = allow 70% giveback (keep 30% of max profit).")
 signalMode   = input.string("Within window", "Signal mode", options=["Same bar", "Within window"], group="Trades")
 confirmBars  = input.int(5, "MA confirm window (bars)", minval=1, group="Trades", tooltip="In 'Within window' mode: after price closes beyond the band, a BUY/SELL can trigger within this many bars once price closes back across the MA.")
 plotSignals  = input.bool(true, "Plot BUY/SELL markers", group="Trades")
@@ -255,16 +260,78 @@ if flat and longSignal
 // Pip size (TradingView-style pip approximation)
 pipSize = syminfo.currency == "JPY" ? syminfo.mintick : syminfo.mintick * 10
 tpDist = tpPips * pipSize
+trailTrigDist = trailTriggerPips * pipSize
+trailLockDist = trailLockPips * pipSize
+retraceTrigDist = retraceTriggerPips * pipSize
 
 entryPrice = strategy.position_avg_price
 shortTpPrice = entryPrice - tpDist
 longTpPrice  = entryPrice + tpDist
+shortLockStop = entryPrice - trailLockDist
+longLockStop  = entryPrice + trailLockDist
+
+var bool shortLocked = false
+var bool longLocked  = false
+var float longPeak = na
+var float shortTrough = na
+var float longRetraceStop = na
+var float shortRetraceStop = na
+
+// Reset lock flags when flat
+if flat
+    shortLocked := false
+    longLocked := false
+    longPeak := na
+    shortTrough := na
+    longRetraceStop := na
+    shortRetraceStop := na
+
+// Arm trailing lock once price moves in favor by trailTriggerPips
+if stopMode == "Lock +pips after +pips"
+    if strategy.position_size < 0 and not shortLocked and (entryPrice - low) >= trailTrigDist
+        shortLocked := true
+    if strategy.position_size > 0 and not longLocked and (high - entryPrice) >= trailTrigDist
+        longLocked := true
+
+// 70% retracement stop (trail stop that gives back retracePct of max profit)
+if stopMode == "70% retracement"
+    if strategy.position_size > 0
+        longPeak := na(longPeak) ? high : math.max(longPeak, high)
+        mfe = longPeak - entryPrice
+        if mfe >= retraceTrigDist
+            // keep (1 - retracePct) of max profit
+            longRetraceStop := entryPrice + (1.0 - retracePct) * mfe
+    else
+        longPeak := na
+        longRetraceStop := na
+
+    if strategy.position_size < 0
+        shortTrough := na(shortTrough) ? low : math.min(shortTrough, low)
+        mfe = entryPrice - shortTrough
+        if mfe >= retraceTrigDist
+            shortRetraceStop := entryPrice - (1.0 - retracePct) * mfe
+    else
+        shortTrough := na
+        shortRetraceStop := na
 
 // Take profit at fixed 300 pips (limit order)
 if strategy.position_size < 0 and tpDist > 0
     strategy.exit("S-TP", from_entry="S", limit=shortTpPrice)
 if strategy.position_size > 0 and tpDist > 0
     strategy.exit("L-TP", from_entry="L", limit=longTpPrice)
+
+// After +100 pips, move stop to +30 pips profit (stop order)
+if stopMode == "Lock +pips after +pips"
+    if strategy.position_size < 0 and shortLocked and trailLockDist > 0
+        strategy.exit("S-LockStop", from_entry="S", stop=shortLockStop)
+    if strategy.position_size > 0 and longLocked and trailLockDist > 0
+        strategy.exit("L-LockStop", from_entry="L", stop=longLockStop)
+
+if stopMode == "70% retracement"
+    if strategy.position_size < 0 and not na(shortRetraceStop)
+        strategy.exit("S-RetraceStop", from_entry="S", stop=shortRetraceStop)
+    if strategy.position_size > 0 and not na(longRetraceStop)
+        strategy.exit("L-RetraceStop", from_entry="L", stop=longRetraceStop)
 
 // Take profit when touching opposite band
 if tpOnOtherBand and strategy.position_size < 0 and low <= lowerNR
@@ -285,6 +352,10 @@ plotshape(plotSignals and longSignal,  title="BUY",  style=shape.labelup,   text
 plot(strategy.position_size != 0 ? entryPrice : na, "Entry", color=color.new(color.gray, 0), linewidth=1, style=plot.style_linebr)
 plot(strategy.position_size < 0 ? shortTpPrice : na, "Short TP (pips)", color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
 plot(strategy.position_size > 0 ? longTpPrice  : na, "Long TP (pips)",  color=color.new(color.green, 0), linewidth=2, style=plot.style_linebr)
+plot(stopMode == "Lock +pips after +pips" and strategy.position_size < 0 and shortLocked ? shortLockStop : na, "Short Stop (locked +pips)", color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
+plot(stopMode == "Lock +pips after +pips" and strategy.position_size > 0 and longLocked  ? longLockStop  : na, "Long Stop (locked +pips)",  color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
+plot(stopMode == "70% retracement" and strategy.position_size < 0 ? shortRetraceStop : na, "Short Stop (70% retrace)", color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
+plot(stopMode == "70% retracement" and strategy.position_size > 0 ? longRetraceStop  : na, "Long Stop (70% retrace)",  color=color.new(color.red, 0), linewidth=2, style=plot.style_linebr)
 
 // Mark PROFIT / STOP on the chart when trades close
 var int lastClosed = 0
