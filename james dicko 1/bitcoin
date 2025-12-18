@@ -201,7 +201,7 @@ longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
 // 1) Arm when CLOSE is outside the band (above upper / below lower)
 // 2) Trigger when a later candle CLOSES on the other side of the MA,
 //    while still remaining outside the band.
-confirmMustStayOutside   = input.bool(false, "Confirm must stay outside band", group="Trades", tooltip="If ON: confirm candle must still close outside the band. If OFF: after arming, confirmation is based only on MA close (won't miss boxed setups).")
+confirmMustStayOutside   = input.bool(true, "Confirm must stay outside band", group="Trades", tooltip="If ON: confirm candle must still close outside the band. If OFF: after arming, confirmation is based only on MA close (won't miss boxed setups).")
 confirmRequireOpenOutside = input.bool(true, "Confirm candle must OPEN outside band", group="Trades", tooltip="If ON: SELL confirm requires open > upper band; BUY confirm requires open < lower band. Helps prevent signals after price returns inside the bands.")
 shortConfirmOk = (close < hullma) and (not confirmMustStayOutside or close > upperNR) and (not confirmRequireOpenOutside or open > upperNR)
 longConfirmOk  = (close > hullma) and (not confirmMustStayOutside or close < lowerNR) and (not confirmRequireOpenOutside or open < lowerNR)
@@ -251,10 +251,17 @@ if longSignal
 // ───────── Orders / exits ─────────
 flat = strategy.position_size == 0
 
-if flat and shortSignal
+cooldownBars = input.int(1, "Cooldown bars after exit", minval=0, group="Trades", tooltip="Prevents immediate re-entries right after a close/stop on the same or next bar.")
+var int lastExitBar = na
+justExited = strategy.position_size == 0 and strategy.position_size[1] != 0
+if justExited
+    lastExitBar := bar_index
+canEnter = flat and (na(lastExitBar) or bar_index > lastExitBar + cooldownBars)
+
+if canEnter and shortSignal
     strategy.entry("S", strategy.short)
 
-if flat and longSignal
+if canEnter and longSignal
     strategy.entry("L", strategy.long)
 
 // Pip size (TradingView-style pip approximation)
