@@ -186,17 +186,18 @@ if longBreak
 else
     longArmed := math.max(longArmed - 1, 0)
 
-// Same-bar entries (single candle reversal):
-// SELL: candle OPENS above upper band AND CLOSES below MA
-// BUY : candle OPENS below lower band AND CLOSES above MA
-shortSignalSame = enableShorts and (open > upperNR) and (close < hullma)
-longSignalSame  = enableLongs  and (open < lowerNR) and (close > hullma)
+// Same-bar entries (rare, requires MA outside band):
+// SELL: close ABOVE upper band AND close BELOW MA (still above band)
+// BUY : close BELOW lower band AND close ABOVE MA (still below band)
+shortSignalSame = enableShorts and (close > upperNR) and (close < hullma)
+longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
 
-// Window mode:
-// After a CLOSE outside the band (arm), trigger on a candle that OPENS outside the band
-// and CLOSES on the other side of the MA.
-shortConfirmOk = (open > upperNR) and (close < hullma)
-longConfirmOk  = (open < lowerNR) and (close > hullma)
+// Window mode (your described behavior):
+// 1) Arm when CLOSE is outside the band (above upper / below lower)
+// 2) Trigger when a later candle CLOSES on the other side of the MA,
+//    while still remaining outside the band.
+shortConfirmOk = (close > upperNR) and ta.crossunder(close, hullma)
+longConfirmOk  = (close < lowerNR) and ta.crossover(close, hullma)
 
 shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
 longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
