@@ -196,8 +196,10 @@ longSignalSame  = enableLongs  and (close < lowerNR) and (close > hullma)
 // 1) Arm when CLOSE is outside the band (above upper / below lower)
 // 2) Trigger when a later candle CLOSES on the other side of the MA,
 //    while still remaining outside the band.
-shortConfirmOk = (close > upperNR) and ta.crossunder(close, hullma)
-longConfirmOk  = (close < lowerNR) and ta.crossover(close, hullma)
+// NOTE: use a pure condition (no cross required), so we don't miss cases where price
+// is already on the MA's other side but still outside the band.
+shortConfirmOk = (close > upperNR) and (close < hullma)
+longConfirmOk  = (close < lowerNR) and (close > hullma)
 
 shortSignalWindow = enableShorts and (shortArmed > 0) and shortConfirmOk
 longSignalWindow  = enableLongs  and (longArmed  > 0) and longConfirmOk
