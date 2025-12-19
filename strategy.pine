@@ -125,8 +125,8 @@ if repaint
 // NOTE: For bands to be visible during backtesting/strategy execution, we should plot the NON-REPAINTING version 
 // unless 'repaint' is true. But strategy needs stable signals.
 // We plot the bands used for calculations to ensure they are visible.
-plot(out + mae, 'Upper Band (Non-Repainting)', upCss, linewidth=2)
-plot(out - mae, 'Lower Band (Non-Repainting)', dnCss, linewidth=2)
+plot(out + mae, 'Strat Upper', color.new(color.red, 50), linewidth=2)
+plot(out - mae, 'Strat Lower', color.new(color.green, 50), linewidth=2)
 
 
 // ==========================================
@@ -137,21 +137,27 @@ current_upper_band = out + mae
 current_lower_band = out - mae
 
 // --- SELL LOGIC ---
-band_break_sell = (high > current_upper_band) or (close > current_upper_band)
+// 1. PREVIOUS candle broke the band
+prev_band_break_sell = (high[1] > current_upper_band[1]) or (close[1] > current_upper_band[1])
+
+// 2. CURRENT candle forms the pattern
 dko_cover_sell_formation = (low > low[1]) and (close < open) and (high > high[1])
 
-if (band_break_sell and dko_cover_sell_formation)
+if (prev_band_break_sell and dko_cover_sell_formation)
     // Put a STOP order to sell if price hits the LOW of the signal candle
     strategy.entry("Sell", strategy.short, stop=low)
 
 // --- BUY LOGIC ---
-band_break_buy = (low < current_lower_band) or (close < current_lower_band)
+// 1. PREVIOUS candle broke the band
+prev_band_break_buy = (low[1] < current_lower_band[1]) or (close[1] < current_lower_band[1])
+
+// 2. CURRENT candle forms the pattern
 dko_cover_buy_formation = (high < high[1]) and (close > open) and (low < low[1])
 
-if (band_break_buy and dko_cover_buy_formation)
+if (prev_band_break_buy and dko_cover_buy_formation)
     // Put a STOP order to buy if price hits the HIGH of the signal candle
     strategy.entry("Buy", strategy.long, stop=high)
 
 // Visual markers for triggers
-plotshape(band_break_sell and dko_cover_sell_formation, title="Sell Triggered", location=location.abovebar, color=color.orange, style=shape.diamond, text="STOP SELL")
-plotshape(band_break_buy and dko_cover_buy_formation, title="Buy Triggered", location=location.belowbar, color=color.blue, style=shape.diamond, text="STOP BUY")
+plotshape(prev_band_break_sell and dko_cover_sell_formation, title="Sell Triggered", location=location.abovebar, color=color.orange, style=shape.diamond, text="STOP SELL")
+plotshape(prev_band_break_buy and dko_cover_buy_formation, title="Buy Triggered", location=location.belowbar, color=color.blue, style=shape.diamond, text="STOP BUY")
