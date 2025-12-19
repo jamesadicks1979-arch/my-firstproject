@@ -42,7 +42,8 @@ rangePos    = (candleRange > 0) ? (close - low) / candleRange : 0.5
 // COVER (sell) pattern
 // Logic: Higher Low, Close < Open (Bearish), Higher High
 // Added: Close must be in the lower part of the candle (Strong Bearish Close)
-// If User wants "Above 60%", for a Sell that usually means < 40% (Inverse)
+// If User wants "Above 60%", for a Sell that usually means < 40% (Inverse of 60%)
+// So we use (1.0 - rangePct)
 dkoCover = (low > low[1]) and (close < open) and (high > high[1]) and (rangePos < (1.0 - rangePct))
 
 // PER (buy) pattern
