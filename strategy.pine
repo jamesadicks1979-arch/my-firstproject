@@ -10,25 +10,28 @@ strategy("DKO Pattern Strategy + SMA Filter", overlay = true, format=format.pric
 useTrendFilter = input.bool(true, "Use SMA Trend Filter?")
 fastLen        = input.int(5, "Fast SMA Length", minval=1)
 slowLen        = input.int(9, "Slow SMA Length", minval=1)
+trendLen       = input.int(21, "Trend SMA Length", minval=1)
 rangePct       = input.float(0.60, "Min Candle Range Pct (0.60 = 60%)", minval=0.0, maxval=1.0)
 extremeLen     = input.int(20, "Extreme Lookback Length", minval=1)
 
 
 // ==========================================
-// 2. TREND FILTER (SMA 5 & 9)
+// 2. TREND FILTER (SMA 5, 9, 21)
 // ==========================================
-smaFast = ta.sma(close, fastLen) // SMA 5
-smaSlow = ta.sma(close, slowLen) // SMA 9
+smaFast  = ta.sma(close, fastLen) // SMA 5
+smaSlow  = ta.sma(close, slowLen) // SMA 9
+smaTrend = ta.sma(close, trendLen) // SMA 21
 
 // Plot SMAs for visual reference
-plot(useTrendFilter ? smaFast : na, "Fast SMA (5)", color=color.blue, linewidth=1)
-plot(useTrendFilter ? smaSlow : na, "Slow SMA (9)", color=color.orange, linewidth=1)
+plot(useTrendFilter ? smaFast  : na, "Fast SMA (5)", color=color.blue, linewidth=1)
+plot(useTrendFilter ? smaSlow  : na, "Slow SMA (9)", color=color.orange, linewidth=1)
+plot(useTrendFilter ? smaTrend : na, "Trend SMA (21)", color=color.white, linewidth=2)
 
 // Trend Logic:
-// 5 > 9 => Uptrend (Take PERs/Buys)
-// 5 < 9 => Downtrend (Take COVERs/Sells)
-isUptrend   = not useTrendFilter or (smaFast > smaSlow)
-isDowntrend = not useTrendFilter or (smaFast < smaSlow)
+// Uptrend: 5 > 9 AND 9 > 21
+// Downtrend: 5 < 9 AND 9 < 21
+isUptrend   = not useTrendFilter or (smaFast > smaSlow and smaSlow > smaTrend)
+isDowntrend = not useTrendFilter or (smaFast < smaSlow and smaSlow < smaTrend)
 
 
 // ==========================================
