@@ -2,166 +2,65 @@
 // © LuxAlgo
 
 //@version=5
-// Strategy Updated: [Current Timestamp]
-strategy("Nadaraya-Watson Envelope Strategy - Updated", "Nadaraya-Watson Strategy", overlay = true, format=format.price, precision=2, max_lines_count = 500, max_labels_count = 500, max_bars_back=500)
+strategy("DKO Pattern Strategy + SMA Filter", overlay = true, format=format.price, precision=2, max_lines_count = 500, max_labels_count = 500, max_bars_back=500)
 
-coeff = input.float(1, 'Multiplier', step=0.1)
-AP = input(14, 'Common Period')
-ATR = ta.sma(ta.tr, AP)
-src = input(close)
-showsignalsk = input(title='Show Signals?', defval=true)
-novolumedata = input(title='Change calculation (no volume data)?', defval=false)
-upT = low - ATR * coeff
-downT = high + ATR * coeff
-
-//------------------------------------------------------------------------------
-//Settings
-//-----------------------------------------------------------------------------{
-h = input.float(8.,'Bandwidth', minval = 0)
-mult = input.float(3., minval = 0)
-//src = input(close, 'Source')
-
-repaint = input(true, 'Repainting Smoothing', tooltip = 'Repainting is an effect where the indicators historical output is subject to change over time. Disabling repainting will cause the indicator to output the endpoints of the calculations')
-
-//Style
-upCss = input.color(color.teal, 'Colors', inline = 'inline1', group = 'Style')
-dnCss = input.color(color.red, '', inline = 'inline1', group = 'Style')
-
-//-----------------------------------------------------------------------------}
-//Functions
-//-----------------------------------------------------------------------------{
-//Gaussian window
-gauss(x, h) => math.exp(-(math.pow(x, 2)/(h * h * 2)))
-
-//-----------------------------------------------------------------------------}
-//Append lines
-//-----------------------------------------------------------------------------{
-n = bar_index
-
-var ln = array.new_line(0) 
-
-if barstate.isfirst and repaint
-    for i = 0 to 499
-        array.push(ln,line.new(na,na,na,na))
-
-//-----------------------------------------------------------------------------}
-//End point method
-//-----------------------------------------------------------------------------{
-var coefs = array.new_float(0)
-var den = 0.
-
-if barstate.isfirst and not repaint
-    for i = 0 to 499
-        w = gauss(i, h)
-        coefs.push(w)
-
-    den := coefs.sum()
-
-out = 0.
-if not repaint
-    for i = 0 to 499
-        out += src[i] * coefs.get(i)
-out /= den
-mae = ta.sma(math.abs(src - out), 499) * mult
-
-upper = out + mae
-lower = out - mae
-
-//-----------------------------------------------------------------------------}
-//Compute and display NWE
-//-----------------------------------------------------------------------------{
-float y2 = na
-float y1 = na
-
-// Arrays to store the smooth band values
-var float smooth_upper = na
-var float smooth_lower = na
-
-nwe = array.new<float>(0)
-if barstate.islast and repaint
-    sae = 0.
-    //Compute and set NWE point 
-    for i = 0 to math.min(499,n - 1)
-        sum = 0.
-        sumw = 0.
-        //Compute weighted mean 
-        for j = 0 to math.min(499,n - 1)
-            w = gauss(i - j, h)
-            sum += src[j] * w
-            sumw += w
-
-        y2 := sum / sumw
-        sae += math.abs(src[i] - y2)
-        nwe.push(y2)
-    
-    sae := sae / math.min(499,n - 1) * mult
-    for i = 0 to math.min(499,n - 1)
-        if i%2
-            line.new(n-i+1, y1 + sae, n-i, nwe.get(i) + sae, color = upCss)
-            line.new(n-i+1, y1 - sae, n-i, nwe.get(i) - sae, color = dnCss)
-        
-        if src[i] > nwe.get(i) + sae and src[i+1] < nwe.get(i) + sae 
-            label.new(n-i, src[i], '▼', color = color(na), style = label.style_label_down, textcolor = dnCss, textalign = text.align_center)
-        if src[i] < nwe.get(i) - sae and src[i+1] > nwe.get(i) - sae
-            label.new(n-i, src[i], '▲', color = color(na), style = label.style_label_up, textcolor = upCss, textalign = text.align_center)
-        
-        y1 := nwe.get(i)
-
-//-----------------------------------------------------------------------------}
-//Dashboard
-//-----------------------------------------------------------------------------{
-var tb = table.new(position.top_right, 1, 1
-  , bgcolor = #1e222d
-  , border_color = #373a46
-  , border_width = 1
-  , frame_color = #373a46
-  , frame_width = 1)
-
-if repaint
-    tb.cell(0, 0, 'Repainting Mode Enabled', text_color = color.white, text_size = size.small)
-
-//-----------------------------------------------------------------------------}
-//Plot
-//-----------------------------------------------------------------------------}
-// NOTE: For bands to be visible during backtesting/strategy execution, we should plot the NON-REPAINTING version 
-// unless 'repaint' is true. But strategy needs stable signals.
-// We plot the bands used for calculations to ensure they are visible.
-plot(out + mae, 'Strat Upper', color.new(color.red, 50), linewidth=2)
-plot(out - mae, 'Strat Lower', color.new(color.green, 50), linewidth=2)
+// ==========================================
+// 1. INPUTS
+// ==========================================
+useTrendFilter = input.bool(true, "Use SMA Trend Filter?")
+fastLen        = input.int(5, "Fast SMA Length", minval=1)
+slowLen        = input.int(9, "Slow SMA Length", minval=1)
 
 
 // ==========================================
-// STRATEGY EXECUTION LOGIC
+// 2. TREND FILTER (SMA 5 & 9)
+// ==========================================
+smaFast = ta.sma(close, fastLen) // SMA 5
+smaSlow = ta.sma(close, slowLen) // SMA 9
+
+// Plot SMAs for visual reference
+plot(useTrendFilter ? smaFast : na, "Fast SMA (5)", color=color.blue, linewidth=1)
+plot(useTrendFilter ? smaSlow : na, "Slow SMA (9)", color=color.orange, linewidth=1)
+
+// Trend Logic:
+// 5 > 9 => Uptrend (Take PERs/Buys)
+// 5 < 9 => Downtrend (Take COVERs/Sells)
+isUptrend   = not useTrendFilter or (smaFast > smaSlow)
+isDowntrend = not useTrendFilter or (smaFast < smaSlow)
+
+
+// ==========================================
+// 3. PATTERN DEFINITIONS (DKO)
 // ==========================================
 
-current_upper_band = out + mae
-current_lower_band = out - mae
+// COVER (sell) pattern
+// Logic: Higher Low, Close < Open (Bearish), Higher High
+dkoCover = (low > low[1]) and (close < open) and (high > high[1])
+
+// PER (buy) pattern
+// Logic: Lower High, Close > Open (Bullish), Lower Low
+dkoPer   = (high < high[1]) and (close > open) and (low < low[1])
+
+
+// ==========================================
+// 4. STRATEGY EXECUTION
+// ==========================================
 
 // --- SELL LOGIC ---
-// Trigger if: (Current Break OR Previous Break) AND (Current Pattern)
-break_upper = (high > current_upper_band) or (close > current_upper_band)
-prev_break_upper = (high[1] > current_upper_band[1]) or (close[1] > current_upper_band[1])
-
-cover_sell_pattern = (high > high[1]) and (low > low[1]) and (close < open)
-
-valid_sell = (break_upper or prev_break_upper) and cover_sell_pattern
-
-if (valid_sell)
+// Only take COVERs if Fast SMA < Slow SMA
+if (dkoCover and isDowntrend)
     strategy.entry("Sell", strategy.short, stop=low)
-
+    alert("Sell Signal (DKO Cover + SMA Downtrend)", alert.freq_once_per_bar_close)
 
 // --- BUY LOGIC ---
-// Trigger if: (Current Break OR Previous Break) AND (Current Pattern)
-break_lower = (low < current_lower_band) or (close < current_lower_band)
-prev_break_lower = (low[1] < current_lower_band[1]) or (close[1] < current_lower_band[1])
-
-cover_buy_pattern = (high < high[1]) and (low < low[1]) and (close > open)
-
-valid_buy = (break_lower or prev_break_lower) and cover_buy_pattern
-
-if (valid_buy)
+// Only take PERs if Fast SMA > Slow SMA
+if (dkoPer and isUptrend)
     strategy.entry("Buy", strategy.long, stop=high)
+    alert("Buy Signal (DKO Per + SMA Uptrend)", alert.freq_once_per_bar_close)
 
-// Visual markers
-plotshape(valid_sell, title="Sell Triggered", location=location.abovebar, color=color.orange, style=shape.diamond, text="STOP SELL")
-plotshape(valid_buy, title="Buy Triggered", location=location.belowbar, color=color.blue, style=shape.diamond, text="STOP BUY")
+
+// ==========================================
+// 5. VISUALS
+// ==========================================
+plotshape(dkoCover and isDowntrend, title="Sell Pattern", location=location.abovebar, style=shape.triangledown, color=color.red, size=size.small, text="COVER")
+plotshape(dkoPer and isUptrend,     title="Buy Pattern",  location=location.belowbar, style=shape.triangleup,   color=color.lime, size=size.small, text="PER")
