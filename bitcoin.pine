@@ -127,26 +127,35 @@ if barstate.isfirst and nwe_repaint
 // End point method (non-repainting)
 var nwe_coefs = array.new_float(0)
 var float nwe_den = na
-if barstate.isfirst and not nwe_repaint
+if barstate.isfirst
+    // Precompute Gaussian weights once (used for non-repainting signals even when repainting is ON)
     for i = 0 to 499
-        w = nwe_gauss(i, nwe_h)
-        array.push(nwe_coefs, w)
+        array.push(nwe_coefs, nwe_gauss(i, nwe_h))
     nwe_den := array.sum(nwe_coefs)
 
-float nwe_out = na
-if not nwe_repaint and not na(nwe_den)
+// Endpoint series (non-repainting) — always computed so BUY/SELL markers work
+float nwe_outNR = na
+if not na(nwe_den)
     float acc = 0.0
     for i = 0 to 499
         acc += nwe_src[i] * array.get(nwe_coefs, i)
-    nwe_out := acc / nwe_den
+    nwe_outNR := acc / nwe_den
 
-nwe_mae = ta.sma(math.abs(nwe_src - nwe_out), 499) * nwe_mult
-nwe_upper = nwe_out + nwe_mae
-nwe_lower = nwe_out - nwe_mae
+nwe_maeNR = ta.sma(math.abs(nwe_src - nwe_outNR), 499) * nwe_mult
+nwe_upperNR = nwe_outNR + nwe_maeNR
+nwe_lowerNR = nwe_outNR - nwe_maeNR
 
-// Crossing arrows (endpoint method)
-plotshape(nwe_showSignals and ta.crossunder(close, nwe_out - nwe_mae) ? low : na, "NWE Crossunder", shape.labelup, location.absolute, color(na), 0, text="▲", textcolor=nwe_upCss, size=size.tiny)
-plotshape(nwe_showSignals and ta.crossover(close, nwe_out + nwe_mae) ? high : na, "NWE Crossover", shape.labeldown, location.absolute, color(na), 0, text="▼", textcolor=nwe_dnCss, size=size.tiny)
+// Signals
+nwe_buy = nwe_showSignals and ta.crossunder(close, nwe_lowerNR)
+nwe_sell = nwe_showSignals and ta.crossover(close, nwe_upperNR)
+
+showNweBuySell = input.bool(true, "Show BUY/SELL labels", group="NWE")
+plotshape(showNweBuySell and nwe_buy, title="NWE BUY", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, text="BUY", size=size.tiny)
+plotshape(showNweBuySell and nwe_sell, title="NWE SELL", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, text="SELL", size=size.tiny)
+
+// Original arrow markers (kept)
+plotshape(nwe_buy ? low : na, "NWE Crossunder", shape.labelup, location.absolute, color(na), 0, text="▲", textcolor=nwe_upCss, size=size.tiny)
+plotshape(nwe_sell ? high : na, "NWE Crossover", shape.labeldown, location.absolute, color(na), 0, text="▼", textcolor=nwe_dnCss, size=size.tiny)
 
 // Hull MA (as in pasted code)
 nwe_hmaLen = input.int(9, "Hull MA Length", minval=1, group="NWE")
@@ -192,8 +201,8 @@ if nwe_repaint
     nwe_tb.cell(0, 0, "Repainting Mode Enabled", text_color=color.white, text_size=size.small)
 
 // Plot endpoint bands when not repainting (matches LuxAlgo)
-plot(nwe_repaint ? na : nwe_upper, "NWE Upper", nwe_upCss)
-plot(nwe_repaint ? na : nwe_lower, "NWE Lower", nwe_dnCss)
+plot(nwe_repaint ? na : nwe_upperNR, "NWE Upper", nwe_upCss)
+plot(nwe_repaint ? na : nwe_lowerNR, "NWE Lower", nwe_dnCss)
 
 // Example sell signal from pasted code
 _nwe_sellSignal = close < nwe_hullma
