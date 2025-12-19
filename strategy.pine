@@ -13,6 +13,7 @@ slowLen        = input.int(9, "Slow SMA Length", minval=1)
 trendLen       = input.int(21, "Trend SMA Length", minval=1)
 rangePct       = input.float(0.60, "Min Candle Range Pct (0.60 = 60%)", minval=0.0, maxval=1.0)
 minPips        = input.float(20.0, "Min Body Size (Pips)", minval=0.0, tooltip="Difference between Open and Close in Pips (1 Pip = 10 Minticks)")
+extensionPips  = input.float(20.0, "Min Extension vs Prev (Pips)", minval=0.0, tooltip="Candle must exceed prev high/low by this many pips")
 extremeLen     = input.int(20, "Extreme Lookback Length", minval=1)
 
 
@@ -51,22 +52,31 @@ isHighest20 = (high >= ta.highest(high, extremeLen))
 candleRange = high - low
 rangePos    = (candleRange > 0) ? (close - low) / candleRange : 0.5
 
-// Helper: Body Size in Pips
+// Helper: Body Size and Pips
 pipSize     = syminfo.mintick * 10
 bodySize    = math.abs(close - open)
 isBigEnough = bodySize >= (minPips * pipSize)
+
+// Helper: Extension logic
+// Sell: High must be >= Prev High + Extension
+// Buy:  Low  must be <= Prev Low  - Extension
+extVal      = extensionPips * pipSize
+isHighExt   = high >= (high[1] + extVal)
+isLowExt    = low  <= (low[1] - extVal)
 
 // COVER (sell) pattern
 // Logic: Higher Low, Close < Open (Bearish), Higher High
 // Added: Close < 40% of range (Strict)
 // Added: Body Size > Min Pips
-dkoCover = (low > low[1]) and (close < open) and (high > high[1]) and (rangePos < (1.0 - rangePct)) and isBigEnough
+// Added: High Extension > 20 Pips above prev High
+dkoCover = (low > low[1]) and (close < open) and (high > high[1]) and (rangePos < (1.0 - rangePct)) and isBigEnough and isHighExt
 
 // PER (buy) pattern
 // Logic: Lower High, Close > Open (Bullish), Lower Low
 // Added: Close > 60% of range (Strict)
 // Added: Body Size > Min Pips
-dkoPer   = (high < high[1]) and (close > open) and (low < low[1]) and (rangePos > rangePct) and isBigEnough
+// Added: Low Extension > 20 Pips below prev Low
+dkoPer   = (high < high[1]) and (close > open) and (low < low[1]) and (rangePos > rangePct) and isBigEnough and isLowExt
 
 
 // ==========================================
@@ -125,15 +135,7 @@ plotshape(dkoPer and isUptrend and not isLowest20, title="Buy Trend", location=l
 // 7. VISUALS (Win/Loss Labels)
 // ==========================================
 // We check if a trade closed on the current bar
-// 'strategy.closedtrades' increments when a trade closes.
-// We compare current count with previous count.
 if strategy.closedtrades > strategy.closedtrades[1]
-    // Get the profit of the most recently closed trade
-    // Index for strategy.closedtrades.entry_id is (strategy.closedtrades - 1)
     pnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
     isWin = pnl > 0
-    
-    // Plot label at the bar where trade closed
-    // We use label.new because plotshape can't easily access PnL dynamically in the same way for text
     label.new(bar_index, high + syminfo.mintick*20, text = isWin ? "WIN" : "LOSS", color = isWin ? color.green : color.red, textcolor = color.white, style = label.style_label_down, size=size.small)
-
