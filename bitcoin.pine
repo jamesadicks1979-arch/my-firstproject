@@ -146,29 +146,30 @@ dko_per   = (high < high[1]) and (close > open) and (low < low[1])
 dko_isBull = close > dko_hma
 dko_isBear = close < dko_hma
 
-// -------- NWE band touch filter (trigger candle) --------
-// Sell only if price traded ABOVE upper band, then COVER -> sell NEXT candle
-// Buy only if price traded BELOW lower band, then PER -> buy NEXT candle
+// -------- NWE band touch filter (TRIGGER candle = previous bar) --------
+// If the previous candle traded outside the bands:
+// - then a COVER on THIS candle prints a SELL
+// - then a PER   on THIS candle prints a BUY
 dko_hasBands = not na(nwe_upperNR) and not na(nwe_lowerNR)
-dko_coverAtBand = dko_hasBands and dko_cover and dko_isBear and (high > nwe_upperNR)
-dko_perAtBand   = dko_hasBands and dko_per   and dko_isBull and (low  < nwe_lowerNR)
+dko_prevTradedAboveUpper = dko_hasBands and (high[1] > nwe_upperNR[1])
+dko_prevTradedBelowLower = dko_hasBands and (low[1]  < nwe_lowerNR[1])
 
-// -------- NEXT candle signals --------
-dko_sellNext = dko_coverAtBand[1]
-dko_buyNext  = dko_perAtBand[1]
+// -------- Signals (on the NEXT candle) --------
+dko_sellSignal = dko_prevTradedAboveUpper and dko_cover and dko_isBear
+dko_buySignal  = dko_prevTradedBelowLower and dko_per   and dko_isBull
 
-// -------- Plot (next candle) --------
-plotshape(dko_showSignalLabels and dko_buyNext,  title="DKO BUY (next candle)",  style=shape.labelup,   location=location.belowbar, color=color.new(color.lime, 0), textcolor=color.black, text="BUY",  size=size.tiny)
-plotshape(dko_showSignalLabels and dko_sellNext, title="DKO SELL (next candle)", style=shape.labeldown, location=location.abovebar, color=color.new(color.red,  0), textcolor=color.white, text="SELL", size=size.tiny)
+// -------- Plot (signal candle = next candle after band-touch) --------
+plotshape(dko_showSignalLabels and dko_buySignal,  title="DKO BUY (next candle)",  style=shape.labelup,   location=location.belowbar, color=color.new(color.lime, 0), textcolor=color.black, text="BUY",  size=size.tiny)
+plotshape(dko_showSignalLabels and dko_sellSignal, title="DKO SELL (next candle)", style=shape.labeldown, location=location.abovebar, color=color.new(color.red,  0), textcolor=color.white, text="SELL", size=size.tiny)
 
-// Optional debug markers on the trigger candle (where PER/COVER + band-touch happened)
-plotshape(dko_showBandTouchDbg and dko_perAtBand,   title="DKO PER @ Band (trigger)",   location=location.belowbar, style=shape.triangleup,   size=size.tiny, color=color.new(color.lime, 0))
-plotshape(dko_showBandTouchDbg and dko_coverAtBand, title="DKO COVER @ Band (trigger)", location=location.abovebar, style=shape.triangledown, size=size.tiny, color=color.new(color.red,  0))
+// Optional debug markers on the TRIGGER candle (previous bar that touched bands)
+plotshape(dko_showBandTouchDbg and dko_prevTradedBelowLower, title="Prev bar < Lower (trigger)", location=location.belowbar, style=shape.triangleup,   size=size.tiny, color=color.new(color.lime, 0), offset=-1)
+plotshape(dko_showBandTouchDbg and dko_prevTradedAboveUpper, title="Prev bar > Upper (trigger)", location=location.abovebar, style=shape.triangledown, size=size.tiny, color=color.new(color.red,  0), offset=-1)
 
 // -------- Black next candle --------
-dko_blackNext = (dko_buyNext or dko_sellNext) and dko_blackCandleOn
+dko_blackNext = (dko_buySignal[1] or dko_sellSignal[1]) and dko_blackCandleOn
 barcolor(dko_blackNext ? color.black : na)
 
 // -------- Alerts (fire on the next candle) --------
-alertcondition(dko_buyNext,  title="DKO BUY (next candle)",  message="DKO BUY next candle: prior bar had PER + low below NWE lower band (and HMA bull).")
-alertcondition(dko_sellNext, title="DKO SELL (next candle)", message="DKO SELL next candle: prior bar had COVER + high above NWE upper band (and HMA bear).")
+alertcondition(dko_buySignal,  title="DKO BUY (next candle)",  message="DKO BUY: previous bar traded below NWE lower band, and this bar is PER (HMA bull).")
+alertcondition(dko_sellSignal, title="DKO SELL (next candle)", message="DKO SELL: previous bar traded above NWE upper band, and this bar is COVER (HMA bear).")
