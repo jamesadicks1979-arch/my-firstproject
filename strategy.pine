@@ -52,20 +52,19 @@ candleRange = high - low
 rangePos    = (candleRange > 0) ? (close - low) / candleRange : 0.5
 
 // Helper: Body Size in Pips
-// We use syminfo.mintick * 10 to approximate 1 pip for most standard pairs
 pipSize     = syminfo.mintick * 10
 bodySize    = math.abs(close - open)
 isBigEnough = bodySize >= (minPips * pipSize)
 
 // COVER (sell) pattern
 // Logic: Higher Low, Close < Open (Bearish), Higher High
-// Added: Close < 40% of range
+// Added: Close < 40% of range (Strict)
 // Added: Body Size > Min Pips
 dkoCover = (low > low[1]) and (close < open) and (high > high[1]) and (rangePos < (1.0 - rangePct)) and isBigEnough
 
 // PER (buy) pattern
 // Logic: Lower High, Close > Open (Bullish), Lower Low
-// Added: Close > 60% of range
+// Added: Close > 60% of range (Strict)
 // Added: Body Size > Min Pips
 dkoPer   = (high < high[1]) and (close > open) and (low < low[1]) and (rangePos > rangePct) and isBigEnough
 
@@ -74,22 +73,67 @@ dkoPer   = (high < high[1]) and (close > open) and (low < low[1]) and (rangePos 
 // 5. STRATEGY EXECUTION
 // ==========================================
 
+// Reversal ATR Target
+atr14 = ta.atr(14)
+
 // --- SELL LOGIC ---
-// Valid if: (Pattern AND Downtrend) OR (Pattern AND Highest High of last 20)
-// Note: We prioritize the Pattern logic.
-if (dkoCover and (isDowntrend or isHighest20))
-    strategy.entry("Sell", strategy.short, stop=low)
-    alert("Sell Signal (DKO Cover)", alert.freq_once_per_bar_close)
+// Priority 1: Reversal (Highest High of 20)
+if (dkoCover and isHighest20)
+    // Entry: Market order on next open (standard strategy behavior for 'process_orders_on_close=false')
+    // Stop Loss: 80% retracement into candle range.
+    // If candle is Bearish (High to Low), 80% up from Low = Low + 0.8 * Range
+    stopLevel = low + (candleRange * 0.80)
+    profitTarget = close - (atr14 * 2) // Target is 2 ATR down from close
+    strategy.entry("Sell Reversal", strategy.short)
+    strategy.exit("Exit Sell Rev", "Sell Reversal", stop=stopLevel, limit=profitTarget)
+    alert("Sell Reversal (Highest 20)", alert.freq_once_per_bar_close)
+
+// Priority 2: Trend Follow (Standard)
+else if (dkoCover and isDowntrend)
+    strategy.entry("Sell Trend", strategy.short, stop=low)
+    alert("Sell Trend", alert.freq_once_per_bar_close)
+
 
 // --- BUY LOGIC ---
-// Valid if: (Pattern AND Uptrend) OR (Pattern AND Lowest Low of last 20)
-if (dkoPer and (isUptrend or isLowest20))
-    strategy.entry("Buy", strategy.long, stop=high)
-    alert("Buy Signal (DKO Per)", alert.freq_once_per_bar_close)
+// Priority 1: Reversal (Lowest Low of 20)
+if (dkoPer and isLowest20)
+    // Stop Loss: 80% retracement into candle range.
+    // If candle is Bullish (Low to High), 80% down from High = High - 0.8 * Range (or Low + 0.2 * Range)
+    stopLevel = high - (candleRange * 0.80)
+    profitTarget = close + (atr14 * 2) // Target is 2 ATR up from close
+    strategy.entry("Buy Reversal", strategy.long)
+    strategy.exit("Exit Buy Rev", "Buy Reversal", stop=stopLevel, limit=profitTarget)
+    alert("Buy Reversal (Lowest 20)", alert.freq_once_per_bar_close)
+
+// Priority 2: Trend Follow (Standard)
+else if (dkoPer and isUptrend)
+    strategy.entry("Buy Trend", strategy.long, stop=high)
+    alert("Buy Trend", alert.freq_once_per_bar_close)
 
 
 // ==========================================
-// 6. VISUALS
+// 6. VISUALS (Signals)
 // ==========================================
-plotshape(dkoCover and (isDowntrend or isHighest20), title="Sell Pattern", location=location.abovebar, style=shape.triangledown, color=color.red, size=size.small, text="COVER")
-plotshape(dkoPer   and (isUptrend   or isLowest20),  title="Buy Pattern",  location=location.belowbar, style=shape.triangleup,   color=color.lime, size=size.small, text="PER")
+plotshape(dkoCover and isHighest20, title="Sell Rev", location=location.abovebar, style=shape.labeldown, color=color.maroon, size=size.small, text="REV\nSELL", textcolor=color.white)
+plotshape(dkoCover and isDowntrend and not isHighest20, title="Sell Trend", location=location.abovebar, style=shape.triangledown, color=color.red, size=size.small, text="COVER")
+
+plotshape(dkoPer and isLowest20, title="Buy Rev", location=location.belowbar, style=shape.labelup, color=color.green, size=size.small, text="REV\nBUY", textcolor=color.white)
+plotshape(dkoPer and isUptrend and not isLowest20, title="Buy Trend", location=location.belowbar, style=shape.triangleup, color=color.lime, size=size.small, text="PER")
+
+
+// ==========================================
+// 7. VISUALS (Win/Loss Labels)
+// ==========================================
+// We check if a trade closed on the current bar
+// 'strategy.closedtrades' increments when a trade closes.
+// We compare current count with previous count.
+if strategy.closedtrades > strategy.closedtrades[1]
+    // Get the profit of the most recently closed trade
+    // Index for strategy.closedtrades.entry_id is (strategy.closedtrades - 1)
+    pnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    isWin = pnl > 0
+    
+    // Plot label at the bar where trade closed
+    // We use label.new because plotshape can't easily access PnL dynamically in the same way for text
+    label.new(bar_index, high + syminfo.mintick*20, text = isWin ? "WIN" : "LOSS", color = isWin ? color.green : color.red, textcolor = color.white, style = label.style_label_down, size=size.small)
+
