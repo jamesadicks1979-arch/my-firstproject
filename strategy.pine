@@ -12,6 +12,7 @@ fastLen        = input.int(5, "Fast SMA Length", minval=1)
 slowLen        = input.int(9, "Slow SMA Length", minval=1)
 trendLen       = input.int(21, "Trend SMA Length", minval=1)
 rangePct       = input.float(0.60, "Min Candle Range Pct (0.60 = 60%)", minval=0.0, maxval=1.0)
+minPips        = input.float(20.0, "Min Body Size (Pips)", minval=0.0, tooltip="Difference between Open and Close in Pips (1 Pip = 10 Minticks)")
 extremeLen     = input.int(20, "Extreme Lookback Length", minval=1)
 
 
@@ -47,19 +48,26 @@ isHighest20 = (high >= ta.highest(high, extremeLen))
 // ==========================================
 
 // Helper: Calculate where the close is relative to the High-Low range (0.0 to 1.0)
-// 1.0 = Close at High, 0.0 = Close at Low
 candleRange = high - low
 rangePos    = (candleRange > 0) ? (close - low) / candleRange : 0.5
 
+// Helper: Body Size in Pips
+// We use syminfo.mintick * 10 to approximate 1 pip for most standard pairs
+pipSize     = syminfo.mintick * 10
+bodySize    = math.abs(close - open)
+isBigEnough = bodySize >= (minPips * pipSize)
+
 // COVER (sell) pattern
 // Logic: Higher Low, Close < Open (Bearish), Higher High
-// Added: Close must be in the lower part of the candle (Strong Bearish Close)
-dkoCover = (low > low[1]) and (close < open) and (high > high[1]) and (rangePos < (1.0 - rangePct))
+// Added: Close < 40% of range
+// Added: Body Size > Min Pips
+dkoCover = (low > low[1]) and (close < open) and (high > high[1]) and (rangePos < (1.0 - rangePct)) and isBigEnough
 
 // PER (buy) pattern
 // Logic: Lower High, Close > Open (Bullish), Lower Low
-// Added: Close must be in the upper part of the candle (Strong Bullish Close)
-dkoPer   = (high < high[1]) and (close > open) and (low < low[1]) and (rangePos > rangePct)
+// Added: Close > 60% of range
+// Added: Body Size > Min Pips
+dkoPer   = (high < high[1]) and (close > open) and (low < low[1]) and (rangePos > rangePct) and isBigEnough
 
 
 // ==========================================
