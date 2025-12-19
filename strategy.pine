@@ -65,21 +65,16 @@ mae = ta.sma(math.abs(src - out), 499) * mult
 
 upper = out + mae
 lower = out - mae
- 
-//Crossing Arrows
-plotshape(ta.crossunder(close, out - mae) ? low : na, "Crossunder", shape.labelup, location.absolute, color(na), 0 , text = '▲', textcolor = upCss, size = size.tiny)
-plotshape(ta.crossover(close, out + mae) ? high : na, "Crossover", shape.labeldown, location.absolute, color(na), 0 , text = '▼', textcolor = dnCss, size = size.tiny)
-length = input.int(9, minval=1)
-src1 = input(close, title="Source")
-hullma = ta.wma(2*ta.wma(src1, length/2)-ta.wma(src1, length), math.floor(math.sqrt(length)))
-plot(hullma)
-//-----------------------------------------------------------------------------}
 
 //-----------------------------------------------------------------------------}
 //Compute and display NWE
 //-----------------------------------------------------------------------------{
 float y2 = na
 float y1 = na
+
+// Arrays to store the smooth band values
+var float smooth_upper = na
+var float smooth_lower = na
 
 nwe = array.new<float>(0)
 if barstate.islast and repaint
@@ -127,6 +122,9 @@ if repaint
 //-----------------------------------------------------------------------------}
 //Plot
 //-----------------------------------------------------------------------------}
+// NOTE: For bands to be visible during backtesting/strategy execution, we should plot the NON-REPAINTING version 
+// unless 'repaint' is true. But strategy needs stable signals.
+// We plot the bands used for calculations to ensure they are visible.
 plot(out + mae, 'Upper Band (Non-Repainting)', upCss, linewidth=2)
 plot(out - mae, 'Lower Band (Non-Repainting)', dnCss, linewidth=2)
 
