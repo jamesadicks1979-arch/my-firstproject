@@ -13,9 +13,6 @@ novolumedata = input(title='Change calculation (no volume data)?', defval=false)
 upT = low - ATR * coeff
 downT = high + ATR * coeff
 
-
-
-
 //------------------------------------------------------------------------------
 //Settings
 //-----------------------------------------------------------------------------{
@@ -69,8 +66,6 @@ mae = ta.sma(math.abs(src - out), 499) * mult
 upper = out + mae
 lower = out - mae
  
-
-
 //Crossing Arrows
 plotshape(ta.crossunder(close, out - mae) ? low : na, "Crossunder", shape.labelup, location.absolute, color(na), 0 , text = '▲', textcolor = upCss, size = size.tiny)
 plotshape(ta.crossover(close, out + mae) ? high : na, "Crossover", shape.labeldown, location.absolute, color(na), 0 , text = '▼', textcolor = dnCss, size = size.tiny)
@@ -79,10 +74,6 @@ src1 = input(close, title="Source")
 hullma = ta.wma(2*ta.wma(src1, length/2)-ta.wma(src1, length), math.floor(math.sqrt(length)))
 plot(hullma)
 //-----------------------------------------------------------------------------}
-
-
-
-
 
 //-----------------------------------------------------------------------------}
 //Compute and display NWE
@@ -136,46 +127,46 @@ if repaint
 //-----------------------------------------------------------------------------}
 //Plot
 //-----------------------------------------------------------------------------}
-plot(repaint ? na : out + mae, 'Upper', upCss)
-plot(repaint ? na : out - mae, 'Lower', dnCss)
+// NOTE: For bands to be visible during backtesting/strategy execution, we should plot the NON-REPAINTING version 
+// unless 'repaint' is true. But strategy needs stable signals.
+// We plot the bands used for calculations to ensure they are visible.
+plot(out + mae, 'Upper Band (Non-Repainting)', upCss, linewidth=2)
+plot(out - mae, 'Lower Band (Non-Repainting)', dnCss, linewidth=2)
+
 
 // ==========================================
-// STRATEGY EXECUTION LOGIC ADDED BY AGENT
+// STRATEGY EXECUTION LOGIC
 // ==========================================
-
-// Defining the specific bands and signals from your code
-// Note: 'repaint' mode makes strategy testing unreliable because the past changes.
-// We use the non-repainting 'upper' and 'lower' calculated above for the strategy logic.
-// If you specifically want to trade the repainting lines, real-time behavior will differ from backtest.
 
 current_upper_band = out + mae
 current_lower_band = out - mae
 
-// "Cover Sell" signal: Crossover of Upper Band (using your text '▼' logic)
-// In your code: plotshape(ta.crossover(close, out + mae) ? high : na, "Crossover", ...)
+// Signals from NWE logic
 cover_sell_signal = ta.crossover(close, current_upper_band)
-
-// "Per" (Buy) signal: Crossunder of Lower Band (using your text '▲' logic)
-// In your code: plotshape(ta.crossunder(close, out - mae) ? low : na, "Crossunder", ...)
 per_buy_signal = ta.crossunder(close, current_lower_band)
+
+// Additional "dkoCover" Conditions
+// Sell: low > low[1] AND close < open AND high > high[1]
+dko_cover_sell_condition = (low > low[1]) and (close < open) and (high > high[1])
+
+// Buy: high < high[1] AND close > open AND low < low[1] (Opposite of Sell)
+dko_cover_buy_condition = (high < high[1]) and (close > open) and (low < low[1])
 
 
 // 1. Sell Logic
-// Condition: 'cover_sell_signal' happened AND (High > Upper Band OR Close > Upper Band)
-// The strategy will automatically execute on the *next* candle.
-sell_trigger = cover_sell_signal and (high > current_upper_band or close > current_upper_band)
+// Condition: 'cover_sell_signal' happened AND (High > Upper Band OR Close > Upper Band) AND dko_cover_sell_condition
+sell_trigger = cover_sell_signal and (high > current_upper_band or close > current_upper_band) and dko_cover_sell_condition
 
 if (sell_trigger)
     strategy.entry("Sell", strategy.short)
 
 // 2. Buy Logic
-// Condition: 'per_buy_signal' happened AND (Low < Lower Band OR Close < Lower Band)
-// The strategy will automatically execute on the *next* candle.
-buy_trigger = per_buy_signal and (low < current_lower_band or close < current_lower_band)
+// Condition: 'per_buy_signal' happened AND (Low < Lower Band OR Close < Lower Band) AND dko_cover_buy_condition
+buy_trigger = per_buy_signal and (low < current_lower_band or close < current_lower_band) and dko_cover_buy_condition
 
 if (buy_trigger)
     strategy.entry("Buy", strategy.long)
 
-// Visual markers for the Strategy Triggers (separate from the indicator arrows)
+// Visual markers
 plotshape(sell_trigger, title="Strategy Sell", location=location.abovebar, color=color.orange, style=shape.diamond, text="STRAT SELL")
 plotshape(buy_trigger, title="Strategy Buy", location=location.belowbar, color=color.blue, style=shape.diamond, text="STRAT BUY")
