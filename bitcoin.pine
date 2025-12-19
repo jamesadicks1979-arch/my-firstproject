@@ -89,6 +89,52 @@ if showCrosses and buySetup and not na(rngPrev)
         label.new(x=bar_index, y=low, text="BUY", style=label.style_label_up, color=color.new(color.green, 70), textcolor=color.green, size=size.tiny)
 
 // ============================================================================
+// DKO + HMA20 Filter (PER / COVER + Black Next Candle) (added)
+// ============================================================================
+
+// -------- INPUTS --------
+dko_hmaLength     = input.int(20, "HMA Length", group="DKO")
+dko_blackCandleOn = input.bool(true, "Color next candle black after signal?", group="DKO")
+dko_showLabels    = input.bool(true, "Show BUY/SELL Labels?", group="DKO")
+dko_showShapes    = input.bool(true, "Show PER/COVER shapes?", group="DKO")
+
+// -------- HMA (20) --------
+dko_hma20 = ta.hma(close, dko_hmaLength)
+plot(dko_hma20, title="DKO HMA", color=color.orange, linewidth=2)
+
+// -------- DKO candle pattern logic (same-TF) --------
+// COVER (sell) pattern
+dkoCover = (low > low[1]) and (close < open) and (high > high[1])
+// PER (buy) pattern
+dkoPer   = (high < high[1]) and (close > open) and (low < low[1])
+
+// -------- Trend filter using HMA --------
+dko_isBull = close > dko_hma20
+dko_isBear = close < dko_hma20
+
+// -------- Final filtered signals --------
+dko_finalPer   = dkoPer and dko_isBull
+dko_finalCover = dkoCover and dko_isBear
+
+// -------- Plot shapes --------
+plotshape(dko_showShapes and dko_finalPer,   title="PER (Buy)",   location=location.belowbar, style=shape.triangleup,   size=size.small, color=color.lime)
+plotshape(dko_showShapes and dko_finalCover, title="COVER (Sell)", location=location.abovebar, style=shape.triangledown, size=size.small, color=color.red)
+
+// -------- Labels --------
+if dko_showLabels and dko_finalPer
+    label.new(bar_index, low,  text="BUY",  style=label.style_label_up,   color=color.lime, textcolor=color.black, size=size.small)
+if dko_showLabels and dko_finalCover
+    label.new(bar_index, high, text="SELL", style=label.style_label_down, color=color.red,  textcolor=color.white, size=size.small)
+
+// -------- Black next candle (global) --------
+dko_blackNext = (dko_finalPer[1] or dko_finalCover[1]) and dko_blackCandleOn
+barcolor(dko_blackNext ? color.black : na)
+
+// -------- Alerts --------
+alertcondition(dko_finalPer,   title="PER (Buy)",   message="PER (Buy) — Close above HMA")
+alertcondition(dko_finalCover, title="COVER (Sell)", message="COVER (Sell) — Close below HMA")
+
+// ============================================================================
 // Nadaraya-Watson Envelope [LuxAlgo] (added)
 // This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
 // https://creativecommons.org/licenses/by-nc-sa/4.0/
