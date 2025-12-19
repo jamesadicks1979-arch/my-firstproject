@@ -10,6 +10,7 @@ strategy("DKO Pattern Strategy + SMA Filter", overlay = true, format=format.pric
 useTrendFilter = input.bool(true, "Use SMA Trend Filter?")
 fastLen        = input.int(5, "Fast SMA Length", minval=1)
 slowLen        = input.int(9, "Slow SMA Length", minval=1)
+rangePct       = input.float(0.60, "Min Candle Range Pct (0.60 = 60%)", minval=0.0, maxval=1.0)
 
 
 // ==========================================
@@ -33,13 +34,22 @@ isDowntrend = not useTrendFilter or (smaFast < smaSlow)
 // 3. PATTERN DEFINITIONS (DKO)
 // ==========================================
 
+// Helper: Calculate where the close is relative to the High-Low range (0.0 to 1.0)
+// 1.0 = Close at High, 0.0 = Close at Low
+candleRange = high - low
+rangePos    = (candleRange > 0) ? (close - low) / candleRange : 0.5
+
 // COVER (sell) pattern
 // Logic: Higher Low, Close < Open (Bearish), Higher High
-dkoCover = (low > low[1]) and (close < open) and (high > high[1])
+// Added: Close must be in the lower part of the candle (Strong Bearish Close)
+// If User wants "Above 60%", for a Sell that usually means < 40% (Inverse)
+dkoCover = (low > low[1]) and (close < open) and (high > high[1]) and (rangePos < (1.0 - rangePct))
 
 // PER (buy) pattern
 // Logic: Lower High, Close > Open (Bullish), Lower Low
-dkoPer   = (high < high[1]) and (close > open) and (low < low[1])
+// Added: Close must be in the upper part of the candle (Strong Bullish Close)
+// > 60%
+dkoPer   = (high < high[1]) and (close > open) and (low < low[1]) and (rangePos > rangePct)
 
 
 // ==========================================
