@@ -1,0 +1,156 @@
+//@version=5
+indicator("Outside AnyTimeframe (entries only)", overlay=true, max_labels_count=500)
+
+// ───────── Inputs ─────────
+count = input.int(1, "Number of Outside Bars", minval=1, maxval=10, step=1)
+
+highlightOutsideBar = input.bool(true, "Highlight outside bars")
+outsideBarColor = input.color(color.new(color.orange, 85), "Outside bar highlight")
+
+// Levels
+entryPct1 = input.float(0.40, "Entry 1 %", minval=0.0, maxval=1.0, step=0.01, group="Levels")
+entryPct2 = input.float(0.61, "Entry 2 %", minval=0.0, maxval=1.0, step=0.01, group="Levels")
+stopPct = input.float(0.80, "Stop % (of outside bar range)", minval=0.0, maxval=1.0, step=0.01, group="Levels")
+
+disableAfterBars = input.int(20, "Disable levels after N bars", minval=1, maxval=500, group="Levels")
+showCrosses = input.bool(true, "Show crosses on hit bars", group="Levels")
+
+// Direction
+enableSell = input.bool(true, "Enable SELL levels (bearish outside)", group="Direction")
+enableBuy  = input.bool(true, "Enable BUY levels (bullish outside)", group="Direction")
+
+// Wick projection
+enableWickProjection = input.bool(true, "Wick projection (cross)", group="Wick projection")
+
+// ───────── Outside bar detection (supports count consecutive) ─────────
+outsideCount = 0
+previousBar = 1
+for i = 0 to count - 1
+    if high[previousBar - 1 + i] > high[previousBar + i] and low[previousBar - 1 + i] < low[previousBar + i]
+        outsideCount += 1
+
+isOutsideUp = outsideCount >= count and close >= open
+isOutsideDown = outsideCount >= count and open > close
+isOutside = isOutsideUp or isOutsideDown
+
+bgcolor(highlightOutsideBar and isOutside ? outsideBarColor : na)
+
+// ───────── Helper: draw a single X label at price ─────────
+f_x(_y, _col) =>
+    label.new(x=bar_index, y=_y, text="X", style=label.style_label_center, color=color.new(_col, 100), textcolor=_col, size=size.tiny)
+
+// ───────── SELL state (bearish outside) ─────────
+var int lastSellSetupBar = na
+var float sellObHigh = na
+var float sellObLow = na
+var float sellObOpen = na
+var float sellEntry1 = na
+var float sellEntry2 = na
+var float sellStop = na
+var float sellWick = na
+var float sellWickProj = na
+var bool sellX40 = false
+var bool sellX61 = false
+var bool sellX80 = false
+var bool sellXWick = false
+
+newSellSetup = enableSell and isOutsideDown
+if newSellSetup
+    lastSellSetupBar := bar_index
+    sellObHigh := high
+    sellObLow := low
+    sellObOpen := open
+    rng = sellObHigh - sellObLow
+    sellEntry1 := sellObLow + entryPct1 * rng
+    sellEntry2 := sellObLow + entryPct2 * rng
+    sellStop := sellObLow + stopPct * rng
+    sellWick := sellObHigh - sellObOpen
+    sellWickProj := na
+    sellX40 := false
+    sellX61 := false
+    sellX80 := false
+    sellXWick := false
+
+// compute wick projection on the NEXT candle only
+if enableWickProjection and not na(lastSellSetupBar) and bar_index == lastSellSetupBar + 1 and not na(sellWick)
+    sellWickProj := open + sellWick
+
+// disable sell levels after N bars
+if not na(lastSellSetupBar) and bar_index > lastSellSetupBar + disableAfterBars
+    lastSellSetupBar := na
+    sellEntry1 := na
+    sellEntry2 := na
+    sellStop := na
+    sellWickProj := na
+
+// plot SELL crosses on hit bars (starting NEXT bar)
+if showCrosses and not na(lastSellSetupBar) and bar_index > lastSellSetupBar
+    if not sellX40 and not na(sellEntry1) and high >= sellEntry1
+        sellX40 := true
+        f_x(sellEntry1, color.red)
+    if not sellX61 and not na(sellEntry2) and high >= sellEntry2
+        sellX61 := true
+        f_x(sellEntry2, color.red)
+    if not sellX80 and not na(sellStop) and high >= sellStop
+        sellX80 := true
+        f_x(sellStop, color.orange)
+    if enableWickProjection and not sellXWick and not na(sellWickProj) and high >= sellWickProj
+        sellXWick := true
+        f_x(sellWickProj, color.purple)
+
+// ───────── BUY state (bullish outside) ─────────
+var int lastBuySetupBar = na
+var float buyObHigh = na
+var float buyObLow = na
+var float buyObOpen = na
+var float buyEntry1 = na
+var float buyEntry2 = na
+var float buyStop = na
+var float buyWick = na
+var float buyWickProj = na
+var bool buyX40 = false
+var bool buyX61 = false
+var bool buyX80 = false
+var bool buyXWick = false
+
+newBuySetup = enableBuy and isOutsideUp
+if newBuySetup
+    lastBuySetupBar := bar_index
+    buyObHigh := high
+    buyObLow := low
+    buyObOpen := open
+    rng = buyObHigh - buyObLow
+    // For BUY: retrace down from high
+    buyEntry1 := buyObHigh - entryPct1 * rng
+    buyEntry2 := buyObHigh - entryPct2 * rng
+    buyStop := buyObHigh - stopPct * rng
+    buyWick := buyObOpen - buyObLow
+    buyWickProj := na
+    buyX40 := false
+    buyX61 := false
+    buyX80 := false
+    buyXWick := false
+
+if enableWickProjection and not na(lastBuySetupBar) and bar_index == lastBuySetupBar + 1 and not na(buyWick)
+    buyWickProj := open - buyWick
+
+if not na(lastBuySetupBar) and bar_index > lastBuySetupBar + disableAfterBars
+    lastBuySetupBar := na
+    buyEntry1 := na
+    buyEntry2 := na
+    buyStop := na
+    buyWickProj := na
+
+if showCrosses and not na(lastBuySetupBar) and bar_index > lastBuySetupBar
+    if not buyX40 and not na(buyEntry1) and low <= buyEntry1
+        buyX40 := true
+        f_x(buyEntry1, color.green)
+    if not buyX61 and not na(buyEntry2) and low <= buyEntry2
+        buyX61 := true
+        f_x(buyEntry2, color.green)
+    if not buyX80 and not na(buyStop) and low <= buyStop
+        buyX80 := true
+        f_x(buyStop, color.orange)
+    if enableWickProjection and not buyXWick and not na(buyWickProj) and low <= buyWickProj
+        buyXWick := true
+        f_x(buyWickProj, color.purple)

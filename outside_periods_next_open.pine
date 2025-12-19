@@ -1,0 +1,45 @@
+//@version=5
+strategy("Outside Periods -> Buy/Sell Next Open", overlay=true, pyramiding=0, process_orders_on_close=false, max_bars_back=500)
+
+// ───────── Inputs ─────────
+insideSession = input.session("0800-1600", "Inside session")
+timezone = input.string("Etc/UTC", "Timezone")
+
+highlightOutside = input.bool(true, "Highlight outside period")
+outsideColor = input.color(color.new(color.orange, 85), "Outside highlight color")
+
+signalSide = input.string("Auto", "Signal side", options=["Auto", "Buy", "Sell"])
+oneTradePerOutsideBlock = input.bool(true, "Only one trade per outside block")
+plotLabels = input.bool(true, "Plot labels")
+
+// ───────── Session logic ─────────
+inSession = not na(time(timeframe.period, insideSession, timezone))
+outside = not inSession
+outsideStart = outside and not outside[1]
+
+// ───────── Highlight ─────────
+bgcolor(highlightOutside and outside ? outsideColor : na)
+
+// ───────── Signal direction ─────────
+int dir = signalSide == "Buy" ? 1 : signalSide == "Sell" ? -1 : close >= open ? 1 : -1
+
+// ───────── Gate signals ─────────
+var bool tradedThisOutside = false
+if outsideStart
+    tradedThisOutside := false
+
+canFire = outsideStart or (outside and not oneTradePerOutsideBlock)
+fire = outside and canFire and (not oneTradePerOutsideBlock or not tradedThisOutside)
+
+// ───────── Entries (execute next bar open) ─────────
+if fire
+    if dir == 1
+        strategy.entry("L", strategy.long)
+    else
+        strategy.entry("S", strategy.short)
+    tradedThisOutside := true
+
+// ───────── Labels (must be in global scope) ─────────
+plotshape(plotLabels and outsideStart, title="Outside start", style=shape.circle, location=location.top, size=size.tiny, color=color.new(color.gray, 0), text="OUT")
+plotshape(plotLabels and fire and dir == 1, title="BUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.green, 0), textcolor=color.white, text="BUY (next open)")
+plotshape(plotLabels and fire and dir == -1, title="SELL", style=shape.labeldown, location=location.abovebar, size=size.tiny, color=color.new(color.red, 0), textcolor=color.white, text="SELL (next open)")

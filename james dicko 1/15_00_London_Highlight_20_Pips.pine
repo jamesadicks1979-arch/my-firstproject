@@ -1,0 +1,35 @@
+//@version=5
+indicator("15:00 London Highlight + 20 Pips (Stop at 23:00)", overlay=true)
+
+// ───────── INPUTS ─────────
+pipDistance = input.int(20, "Pips from 15:00 Open")
+highlightColor = input.color(color.new(color.red, 80), "15:00 Highlight")
+lineColorUp = input.color(color.green, "Upper Line Color")
+lineColorDn = input.color(color.red, "Lower Line Color")
+
+// ───────── LONDON TIME ─────────
+londonHour = hour(time, "Europe/London")
+londonMinute = minute(time, "Europe/London")
+is1500 = (londonHour == 15) and (londonMinute == 0)
+
+// ───────── HIGHLIGHT 15:00 BAR ─────────
+bgcolor(is1500 ? highlightColor : na)
+
+// ───────── PIP SIZE ─────────
+pipSize = syminfo.currency == "JPY" ? syminfo.mintick : syminfo.mintick * 10
+
+// ───────── DRAW ±20 PIPS ─────────
+if is1500
+    baseOpen = open
+    upperPrice = baseOpen + pipDistance * pipSize
+    lowerPrice = baseOpen - pipDistance * pipSize
+
+    // Calculate 23:00 timestamp for the same day
+    yearT  = year(time, "Europe/London")
+    monthT = month(time, "Europe/London")
+    dayT   = dayofmonth(time, "Europe/London")
+    endTime1500 = int(timestamp("Europe/London", yearT, monthT, dayT, 23, 0))  // cast to int
+
+    // Draw lines from 15:00 to 23:00
+    line.new(x1=time, y1=upperPrice, x2=endTime1500, y2=upperPrice, xloc=xloc.bar_time, color=lineColorUp, width=2)
+    line.new(x1=time, y1=lowerPrice, x2=endTime1500, y2=lowerPrice, xloc=xloc.bar_time, color=lineColorDn, width=2)

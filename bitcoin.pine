@@ -1,0 +1,175 @@
+//@version=5
+indicator("DKO + NWE [LuxAlgo] (next candle)", overlay=true, max_labels_count=500, max_lines_count=500, max_bars_back=500, format=format.price, precision=2)
+
+// Note: the old "2D outside" (two-day outside) module has been removed per request.
+
+// ============================================================================
+// Nadaraya-Watson Envelope [LuxAlgo] (added)
+// This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
+// https://creativecommons.org/licenses/by-nc-sa/4.0/
+// © LuxAlgo
+// ============================================================================
+
+// ───────── NWE Inputs ─────────
+nwe_coeff = input.float(1, "Multiplier", step=0.1, group="NWE")
+nwe_AP = input.int(14, "Common Period", group="NWE")
+nwe_ATR = ta.sma(ta.tr, nwe_AP)
+nwe_src = input.source(close, "Source", group="NWE")
+nwe_showSignals = input.bool(true, "Show Signals?", group="NWE")
+nwe_noVolumeData = input.bool(false, "Change calculation (no volume data)?", group="NWE")
+_nwe_upT = low - nwe_ATR * nwe_coeff
+_nwe_downT = high + nwe_ATR * nwe_coeff
+
+// Settings
+nwe_h = input.float(8.0, "Bandwidth", minval=0, group="NWE")
+nwe_mult = input.float(3.0, "Error Mult", minval=0, group="NWE")
+nwe_repaint = input.bool(true, "Repainting Smoothing", group="NWE", tooltip="Repainting changes historical output. Disable for endpoint method.")
+
+// Style
+nwe_upCss = input.color(color.teal, "Colors", inline="c1", group="NWE Style")
+nwe_dnCss = input.color(color.red,  "", inline="c1", group="NWE Style")
+
+// Gaussian window
+nwe_gauss(x, h) => math.exp(-(math.pow(x, 2) / (h * h * 2)))
+
+// Append lines
+nwe_n = bar_index
+var nwe_ln = array.new_line(0)
+if barstate.isfirst and nwe_repaint
+    for _ = 0 to 499
+        array.push(nwe_ln, line.new(na, na, na, na))
+
+// End point method (non-repainting)
+var nwe_coefs = array.new_float(0)
+var float nwe_den = na
+if barstate.isfirst
+    // Precompute Gaussian weights once (used for non-repainting signals even when repainting is ON)
+    for i = 0 to 499
+        array.push(nwe_coefs, nwe_gauss(i, nwe_h))
+    nwe_den := array.sum(nwe_coefs)
+
+// Endpoint series (non-repainting) — always computed so BUY/SELL markers work
+float nwe_outNR = na
+if not na(nwe_den)
+    float acc = 0.0
+    for i = 0 to 499
+        acc += nwe_src[i] * array.get(nwe_coefs, i)
+    nwe_outNR := acc / nwe_den
+
+nwe_maeNR = ta.sma(math.abs(nwe_src - nwe_outNR), 499) * nwe_mult
+nwe_upperNR = nwe_outNR + nwe_maeNR
+nwe_lowerNR = nwe_outNR - nwe_maeNR
+
+// Signals
+nwe_buy = nwe_showSignals and ta.crossunder(close, nwe_lowerNR)
+nwe_sell = nwe_showSignals and ta.crossover(close, nwe_upperNR)
+
+showNweBuySell = input.bool(true, "Show BUY/SELL labels", group="NWE")
+plotshape(showNweBuySell and nwe_buy, title="NWE BUY", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, text="BUY", size=size.tiny)
+plotshape(showNweBuySell and nwe_sell, title="NWE SELL", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, text="SELL", size=size.tiny)
+
+// Original arrow markers (kept)
+plotshape(nwe_buy ? low : na, "NWE Crossunder", shape.labelup, location.absolute, color(na), 0, text="▲", textcolor=nwe_upCss, size=size.tiny)
+plotshape(nwe_sell ? high : na, "NWE Crossover", shape.labeldown, location.absolute, color(na), 0, text="▼", textcolor=nwe_dnCss, size=size.tiny)
+
+// Hull MA (as in pasted code)
+nwe_hmaLen = input.int(9, "Hull MA Length", minval=1, group="NWE")
+nwe_hmaSrc = input.source(close, "Hull MA Source", group="NWE")
+nwe_hullma = ta.wma(2 * ta.wma(nwe_hmaSrc, nwe_hmaLen / 2) - ta.wma(nwe_hmaSrc, nwe_hmaLen), math.floor(math.sqrt(nwe_hmaLen)))
+plot(nwe_hullma, "Hull MA", color=color.new(color.blue, 0))
+
+// Compute and display NWE (repainting)
+float nwe_y2 = na
+float nwe_y1 = na
+
+var nwe_pts = array.new_float(0)
+if barstate.islast and nwe_repaint
+    array.clear(nwe_pts)
+    sae = 0.0
+    maxN = math.min(499, nwe_n - 1)
+    for i = 0 to maxN
+        sum = 0.0
+        sumw = 0.0
+        for j = 0 to maxN
+            w = nwe_gauss(i - j, nwe_h)
+            sum += nwe_src[j] * w
+            sumw += w
+        nwe_y2 := sum / sumw
+        sae += math.abs(nwe_src[i] - nwe_y2)
+        array.push(nwe_pts, nwe_y2)
+
+    sae := (sae / math.max(1, maxN)) * nwe_mult
+    for i = 0 to maxN
+        if i % 2
+            line.new(nwe_n - i + 1, nwe_y1 + sae, nwe_n - i, array.get(nwe_pts, i) + sae, color=nwe_upCss)
+            line.new(nwe_n - i + 1, nwe_y1 - sae, nwe_n - i, array.get(nwe_pts, i) - sae, color=nwe_dnCss)
+
+        if i < maxN and nwe_src[i] > array.get(nwe_pts, i) + sae and nwe_src[i + 1] < array.get(nwe_pts, i) + sae
+            label.new(nwe_n - i, nwe_src[i], "▼", color=color(na), style=label.style_label_down, textcolor=nwe_dnCss, textalign=text.align_center)
+        if i < maxN and nwe_src[i] < array.get(nwe_pts, i) - sae and nwe_src[i + 1] > array.get(nwe_pts, i) - sae
+            label.new(nwe_n - i, nwe_src[i], "▲", color=color(na), style=label.style_label_up, textcolor=nwe_upCss, textalign=text.align_center)
+        nwe_y1 := array.get(nwe_pts, i)
+
+// Dashboard
+var nwe_tb = table.new(position.top_right, 1, 1, bgcolor=#1e222d, border_color=#373a46, border_width=1, frame_color=#373a46, frame_width=1)
+if nwe_repaint
+    nwe_tb.cell(0, 0, "Repainting Mode Enabled", text_color=color.white, text_size=size.small)
+
+// Plot endpoint bands when not repainting (matches LuxAlgo)
+plot(nwe_repaint ? na : nwe_upperNR, "NWE Upper", nwe_upCss)
+plot(nwe_repaint ? na : nwe_lowerNR, "NWE Lower", nwe_dnCss)
+
+// Example sell signal from pasted code
+_nwe_sellSignal = close < nwe_hullma
+
+// ============================================================================
+// DKO + HMA Filter + NWE Band Touch + NEXT-CANDLE Entry (updated)
+// ============================================================================
+
+// -------- INPUTS --------
+dko_hmaLength        = input.int(20, "HMA Length", group="DKO")
+dko_blackCandleOn    = input.bool(true, "Color next candle black after signal?", group="DKO")
+dko_showSignalLabels = input.bool(true, "Show BUY/SELL on next candle?", group="DKO")
+dko_showBandTouchDbg = input.bool(false, "Debug: show PER/COVER on trigger candle?", group="DKO")
+
+// -------- HMA --------
+dko_hma = ta.hma(close, dko_hmaLength)
+plot(dko_hma, title="DKO HMA", color=color.orange, linewidth=2)
+
+// -------- DKO candle pattern logic (trigger candle) --------
+// COVER (sell) pattern
+dko_cover = (low > low[1]) and (close < open) and (high > high[1])
+// PER (buy) pattern
+dko_per   = (high < high[1]) and (close > open) and (low < low[1])
+
+// -------- Trend filter using HMA --------
+dko_isBull = close > dko_hma
+dko_isBear = close < dko_hma
+
+// -------- NWE band touch filter (TRIGGER candle = previous bar) --------
+// If the previous candle traded outside the bands:
+// - then a COVER on THIS candle prints a SELL
+// - then a PER   on THIS candle prints a BUY
+dko_hasBands = not na(nwe_upperNR) and not na(nwe_lowerNR)
+dko_prevTradedAboveUpper = dko_hasBands and (high[1] > nwe_upperNR[1])
+dko_prevTradedBelowLower = dko_hasBands and (low[1]  < nwe_lowerNR[1])
+
+// -------- Signals (on the NEXT candle) --------
+dko_sellSignal = dko_prevTradedAboveUpper and dko_cover and dko_isBear
+dko_buySignal  = dko_prevTradedBelowLower and dko_per   and dko_isBull
+
+// -------- Plot (signal candle = next candle after band-touch) --------
+plotshape(dko_showSignalLabels and dko_buySignal,  title="DKO BUY (next candle)",  style=shape.labelup,   location=location.belowbar, color=color.new(color.lime, 0), textcolor=color.black, text="BUY",  size=size.tiny)
+plotshape(dko_showSignalLabels and dko_sellSignal, title="DKO SELL (next candle)", style=shape.labeldown, location=location.abovebar, color=color.new(color.red,  0), textcolor=color.white, text="SELL", size=size.tiny)
+
+// Optional debug markers on the TRIGGER candle (previous bar that touched bands)
+plotshape(dko_showBandTouchDbg and dko_prevTradedBelowLower, title="Prev bar < Lower (trigger)", location=location.belowbar, style=shape.triangleup,   size=size.tiny, color=color.new(color.lime, 0), offset=-1)
+plotshape(dko_showBandTouchDbg and dko_prevTradedAboveUpper, title="Prev bar > Upper (trigger)", location=location.abovebar, style=shape.triangledown, size=size.tiny, color=color.new(color.red,  0), offset=-1)
+
+// -------- Black next candle --------
+dko_blackNext = (dko_buySignal[1] or dko_sellSignal[1]) and dko_blackCandleOn
+barcolor(dko_blackNext ? color.black : na)
+
+// -------- Alerts (fire on the next candle) --------
+alertcondition(dko_buySignal,  title="DKO BUY (next candle)",  message="DKO BUY: previous bar traded below NWE lower band, and this bar is PER (HMA bull).")
+alertcondition(dko_sellSignal, title="DKO SELL (next candle)", message="DKO SELL: previous bar traded above NWE upper band, and this bar is COVER (HMA bear).")

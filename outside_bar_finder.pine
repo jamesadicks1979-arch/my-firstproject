@@ -1,0 +1,27 @@
+//@version=5
+indicator("Outside Bar Finder", overlay=true)
+
+count = input.int(1, "Number of Outside Bars", minval=1, maxval=10, step=1, tooltip="The number of consecutive outside bars")
+showArrow = input.bool(true, "Show Arrow", tooltip="Show an arrow indicating whether the outside bar is bullish or bearish")
+showLine = input.bool(false, "Show Signal Lines", tooltip="Show horizontal lines at the high and low of the outside bar")
+lineExtension = input.int(5, "Signal Line Extension Length", tooltip="The number of bars to extend the signal lines beyond the outside bar")
+lineColor = input.color(color.new(color.blue, 0), title="Signal Line Color")
+
+outsideCount = 0
+previousBar = 1
+
+for i = 0 to count - 1
+    if high[previousBar - 1 + i] > high[previousBar + i] and low[previousBar - 1 + i] < low[previousBar + i]
+        outsideCount += 1
+
+isOutsideUp = outsideCount >= count and close >= open
+isOutsideDown = outsideCount >= count and open > close
+isOutside = isOutsideUp or isOutsideDown
+
+if isOutside and showLine
+    dt = time - time[1]
+    line.new(x1=time, y1=high, x2=time + dt * lineExtension, y2=high, color=lineColor, style=line.style_solid, width=1, xloc=xloc.bar_time)
+    line.new(x1=time, y1=low, x2=time + dt * lineExtension, y2=low, color=lineColor, style=line.style_solid, width=1, xloc=xloc.bar_time)
+
+plotshape(showArrow and isOutsideUp, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.normal)
+plotshape(showArrow and isOutsideDown, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.normal)
