@@ -1,40 +1,53 @@
 //@version=5
 strategy("Band Breakout Strategy", overlay=true)
 
-// --- INPUTS & PLACEHOLDERS ---
-// Replace these with your actual band and signal calculations
-length = input.int(20, "Band Length")
-mult = input.float(2.0, "Band Multiplier")
+// ==========================================
+// 1. BAND DEFINITIONS
+// (I have used standard Bollinger Bands as a placeholder. 
+//  REPLACE this section with your specific band code if different.)
+// ==========================================
+length = input.int(20, "Length")
+mult = input.float(2.0, "Multiplier")
 src = input(close, "Source")
 
-// Calculating Bands (Example: Bollinger Bands)
 basis = ta.sma(src, length)
 dev = mult * ta.stdev(src, length)
+
 upper_band = basis + dev
 lower_band = basis - dev
 
-plot(upper_band, "Upper Band", color=color.red)
-plot(lower_band, "Lower Band", color=color.green)
+// Plot the bands so they are visible on the chart
+plot(upper_band, "Upper Band", color=color.red, linewidth=2)
+plot(lower_band, "Lower Band", color=color.green, linewidth=2)
 
-// Dummy signals - REPLACE these with your actual 'cover_sell' and 'per_signal' logic
-// For demonstration, I'm just using random crossovers
+// ==========================================
+// 2. SIGNAL DEFINITIONS
+// (REPLACE these lines with your actual 'cover_sell' and 'per_signal' logic)
+// ==========================================
+// Currently using dummy logic so you can see it works on the chart
 cover_sell = ta.crossover(high, upper_band) 
-per_signal = ta.crossunder(low, lower_band)
+per_signal = ta.crossunder(low, lower_band) 
 
-// --- STRATEGY LOGIC ---
+// ==========================================
+// 3. STRATEGY EXECUTION LOGIC
+// ==========================================
 
-// 1. Sell Condition
-// Logic: If 'cover_sell' is active AND (High > Upper Band OR Close > Upper Band)
-// The strategy will automatically execute on the *next* candle after the condition is met.
+// Sell Logic:
+// Trigger if we have a 'cover_sell' signal AND (High > Upper Band OR Close > Upper Band)
+// The strategy will execute the trade on the NEXT candle.
 sell_condition = cover_sell and (high > upper_band or close > upper_band)
 
 if (sell_condition)
     strategy.entry("Sell", strategy.short)
 
-// 2. Buy Condition
-// Logic: If 'per_signal' is active AND (Low < Lower Band OR Close < Lower Band)
-// The strategy will automatically execute on the *next* candle after the condition is met.
+// Buy Logic:
+// Trigger if we have a 'per_signal' AND (Low < Lower Band OR Close < Lower Band)
+// The strategy will execute the trade on the NEXT candle.
 buy_condition = per_signal and (low < lower_band or close < lower_band)
 
 if (buy_condition)
     strategy.entry("Buy", strategy.long)
+
+// Visual markers for when the conditions are met
+plotshape(sell_condition, title="Sell Trigger", location=location.abovebar, color=color.red, style=shape.labeldown, text="SELL")
+plotshape(buy_condition, title="Buy Trigger", location=location.belowbar, color=color.green, style=shape.labelup, text="BUY")
