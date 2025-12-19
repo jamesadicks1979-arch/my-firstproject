@@ -89,52 +89,6 @@ if showCrosses and buySetup and not na(rngPrev)
         label.new(x=bar_index, y=low, text="BUY", style=label.style_label_up, color=color.new(color.green, 70), textcolor=color.green, size=size.tiny)
 
 // ============================================================================
-// DKO + HMA20 Filter (PER / COVER + Black Next Candle) (added)
-// ============================================================================
-
-// -------- INPUTS --------
-dko_hmaLength     = input.int(20, "HMA Length", group="DKO")
-dko_blackCandleOn = input.bool(true, "Color next candle black after signal?", group="DKO")
-dko_showLabels    = input.bool(true, "Show BUY/SELL Labels?", group="DKO")
-dko_showShapes    = input.bool(true, "Show PER/COVER shapes?", group="DKO")
-
-// -------- HMA (20) --------
-dko_hma20 = ta.hma(close, dko_hmaLength)
-plot(dko_hma20, title="DKO HMA", color=color.orange, linewidth=2)
-
-// -------- DKO candle pattern logic (same-TF) --------
-// COVER (sell) pattern
-dkoCover = (low > low[1]) and (close < open) and (high > high[1])
-// PER (buy) pattern
-dkoPer   = (high < high[1]) and (close > open) and (low < low[1])
-
-// -------- Trend filter using HMA --------
-dko_isBull = close > dko_hma20
-dko_isBear = close < dko_hma20
-
-// -------- Final filtered signals --------
-dko_finalPer   = dkoPer and dko_isBull
-dko_finalCover = dkoCover and dko_isBear
-
-// -------- Plot shapes --------
-plotshape(dko_showShapes and dko_finalPer,   title="PER (Buy)",   location=location.belowbar, style=shape.triangleup,   size=size.small, color=color.lime)
-plotshape(dko_showShapes and dko_finalCover, title="COVER (Sell)", location=location.abovebar, style=shape.triangledown, size=size.small, color=color.red)
-
-// -------- Labels --------
-if dko_showLabels and dko_finalPer
-    label.new(bar_index, low,  text="BUY",  style=label.style_label_up,   color=color.lime, textcolor=color.black, size=size.small)
-if dko_showLabels and dko_finalCover
-    label.new(bar_index, high, text="SELL", style=label.style_label_down, color=color.red,  textcolor=color.white, size=size.small)
-
-// -------- Black next candle (global) --------
-dko_blackNext = (dko_finalPer[1] or dko_finalCover[1]) and dko_blackCandleOn
-barcolor(dko_blackNext ? color.black : na)
-
-// -------- Alerts --------
-alertcondition(dko_finalPer,   title="PER (Buy)",   message="PER (Buy) — Close above HMA")
-alertcondition(dko_finalCover, title="COVER (Sell)", message="COVER (Sell) — Close below HMA")
-
-// ============================================================================
 // Nadaraya-Watson Envelope [LuxAlgo] (added)
 // This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0)
 // https://creativecommons.org/licenses/by-nc-sa/4.0/
@@ -252,3 +206,54 @@ plot(nwe_repaint ? na : nwe_lowerNR, "NWE Lower", nwe_dnCss)
 
 // Example sell signal from pasted code
 _nwe_sellSignal = close < nwe_hullma
+
+// ============================================================================
+// DKO + HMA Filter + NWE Band Touch + NEXT-CANDLE Entry (updated)
+// ============================================================================
+
+// -------- INPUTS --------
+dko_hmaLength        = input.int(20, "HMA Length", group="DKO")
+dko_blackCandleOn    = input.bool(true, "Color next candle black after signal?", group="DKO")
+dko_showSignalLabels = input.bool(true, "Show BUY/SELL on next candle?", group="DKO")
+dko_showBandTouchDbg = input.bool(false, "Debug: show PER/COVER on trigger candle?", group="DKO")
+
+// -------- HMA --------
+dko_hma = ta.hma(close, dko_hmaLength)
+plot(dko_hma, title="DKO HMA", color=color.orange, linewidth=2)
+
+// -------- DKO candle pattern logic (trigger candle) --------
+// COVER (sell) pattern
+dko_cover = (low > low[1]) and (close < open) and (high > high[1])
+// PER (buy) pattern
+dko_per   = (high < high[1]) and (close > open) and (low < low[1])
+
+// -------- Trend filter using HMA --------
+dko_isBull = close > dko_hma
+dko_isBear = close < dko_hma
+
+// -------- NWE band touch filter (trigger candle) --------
+// Sell only if price traded ABOVE upper band, then COVER -> sell NEXT candle
+// Buy only if price traded BELOW lower band, then PER -> buy NEXT candle
+dko_hasBands = not na(nwe_upperNR) and not na(nwe_lowerNR)
+dko_coverAtBand = dko_hasBands and dko_cover and dko_isBear and (high > nwe_upperNR)
+dko_perAtBand   = dko_hasBands and dko_per   and dko_isBull and (low  < nwe_lowerNR)
+
+// -------- NEXT candle signals --------
+dko_sellNext = dko_coverAtBand[1]
+dko_buyNext  = dko_perAtBand[1]
+
+// -------- Plot (next candle) --------
+plotshape(dko_showSignalLabels and dko_buyNext,  title="DKO BUY (next candle)",  style=shape.labelup,   location=location.belowbar, color=color.new(color.lime, 0), textcolor=color.black, text="BUY",  size=size.tiny)
+plotshape(dko_showSignalLabels and dko_sellNext, title="DKO SELL (next candle)", style=shape.labeldown, location=location.abovebar, color=color.new(color.red,  0), textcolor=color.white, text="SELL", size=size.tiny)
+
+// Optional debug markers on the trigger candle (where PER/COVER + band-touch happened)
+plotshape(dko_showBandTouchDbg and dko_perAtBand,   title="DKO PER @ Band (trigger)",   location=location.belowbar, style=shape.triangleup,   size=size.tiny, color=color.new(color.lime, 0))
+plotshape(dko_showBandTouchDbg and dko_coverAtBand, title="DKO COVER @ Band (trigger)", location=location.abovebar, style=shape.triangledown, size=size.tiny, color=color.new(color.red,  0))
+
+// -------- Black next candle --------
+dko_blackNext = (dko_buyNext or dko_sellNext) and dko_blackCandleOn
+barcolor(dko_blackNext ? color.black : na)
+
+// -------- Alerts (fire on the next candle) --------
+alertcondition(dko_buyNext,  title="DKO BUY (next candle)",  message="DKO BUY next candle: prior bar had PER + low below NWE lower band (and HMA bull).")
+alertcondition(dko_sellNext, title="DKO SELL (next candle)", message="DKO SELL next candle: prior bar had COVER + high above NWE upper band (and HMA bear).")
