@@ -215,9 +215,8 @@ bgBearColor = input.color(color.new(color.red, 90), "Bearish Prev BG", group="MT
 //──────────────── DATA FETCHING ────────────────
 string tf = autoTF ? "1D" : tfInput
 
-// Get Previous Day's OHLC and ATR using request.security
-// We use [1] to get the COMPLETED previous period values.
-[pOpen, pHigh, pLow, pClose, htfATR] = request.security(syminfo.tickerid, tf, [open[1], high[1], low[1], close[1], ta.atr(atrLen)], lookahead=barmerge.lookahead_on)
+// Get Previous Day's OHLC and ATR using request.security (Default lookahead = Yesterday's completed data during today)
+[pOpen, pHigh, pLow, pClose, htfATR] = request.security(syminfo.tickerid, tf, [open, high, low, close, ta.atr(atrLen)])
 
 // Determine Trend
 bool prevBullish = (pClose > pOpen)
