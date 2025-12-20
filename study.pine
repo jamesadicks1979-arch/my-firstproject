@@ -276,23 +276,37 @@ if not na(mpStart) and not na(pHigh)
         box.set_right(fibPocket, right)
         line.set_x2(atrLine, right)
 
-//──────────────── OPTIONAL: CURRENT DEVELOPING RANGE BOX ────────────────
-// Drawn from start of day to current bar, showing High/Low of TODAY
+//──────────────── DAILY RANGE BOX (Colored by Daily Trend) ────────────────
 var box mpBox = na
 var float currHigh = na
 var float currLow = na
+var float dayOpen = na
+
+// Inputs for Daily Box
+dBoxBullColor = input.color(color.new(color.green, 80), "Daily Box Bullish", group="MTPC DKO")
+dBoxBearColor = input.color(color.new(color.red, 80), "Daily Box Bearish", group="MTPC DKO")
 
 if newMP
     currHigh := high
     currLow := low
-    mpBox := box.new(bar_index, currHigh, bar_index, currLow, border_color = color.new(color.gray, 50), bgcolor = na, border_style = line.style_dashed)
+    dayOpen := open
+    // Start new box for the day
+    mpBox := box.new(bar_index, currHigh, bar_index, currLow, 
+         border_color = na, 
+         bgcolor = na) 
 else
     currHigh := math.max(nz(currHigh, high), high)
     currLow := math.min(nz(currLow, low), low)
+    
     if not na(mpBox)
         box.set_right(mpBox, bar_index)
         box.set_top(mpBox, currHigh)
         box.set_bottom(mpBox, currLow)
+        
+        // Update color based on developing trend
+        bool isBull = close > dayOpen
+        box.set_bgcolor(mpBox, isBull ? dBoxBullColor : dBoxBearColor)
+
 
 // ==========================================
 // 3. WEEKLY RANGE BOX (Historical & Developing)
