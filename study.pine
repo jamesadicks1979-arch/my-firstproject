@@ -1,16 +1,20 @@
 //@version=5
-indicator("Triple SMA with Session & Fibs (Simple Dynamic)", overlay=true)
+indicator("Triple SMA with Session & Fibs (Simple Dynamic) + MTPC DKO", overlay=true, max_lines_count=500, max_boxes_count=500)
+
+// ==========================================
+// 1. TRIPLE SMA & SESSION FIBS
+// ==========================================
 
 // Input parameters
-len1 = input.int(50, "Length SMA 1", minval=1)
-len2 = input.int(21, "Length SMA 2", minval=1)
-len3 = input.int(9, "Length SMA 3", minval=1)
-src = input.source(close, "Source")
+len1 = input.int(50, "Length SMA 1", minval=1, group="Triple SMA")
+len2 = input.int(21, "Length SMA 2", minval=1, group="Triple SMA")
+len3 = input.int(9, "Length SMA 3", minval=1, group="Triple SMA")
+src = input.source(close, "Source", group="Triple SMA")
 
 // Session Inputs
-monitoringTime = input.session("1230-1430", "High/Low Monitoring Period") 
-fibLookPeriod = input.session("1430-1630", "Fib Trigger Period")
-sessionZone = input.string("Europe/London", "Timezone")
+monitoringTime = input.session("1230-1430", "High/Low Monitoring Period", group="Intraday Session") 
+fibLookPeriod = input.session("1430-1630", "Fib Trigger Period", group="Intraday Session")
+sessionZone = input.string("Europe/London", "Timezone", group="Intraday Session")
 
 // Calculation
 sma50 = ta.sma(src, len1)
@@ -22,9 +26,9 @@ plot(sma50, "SMA 50", color=color.green, linewidth=2)
 plot(sma21, "SMA 21", color=color.blue, linewidth=2)
 plot(sma9, "SMA 9", color=color.red, linewidth=3)
 
-// ==========================================
-// LOGIC
-// ==========================================
+// ------------------------------------------
+// INTRADAY FIB LOGIC
+// ------------------------------------------
 
 // 1. Monitor High/Low (12:30 - 14:30)
 inMonitoringWindow = not na(time(timeframe.period, monitoringTime, sessionZone))
@@ -188,3 +192,95 @@ if barstate.islast
     l_sma50 := label.new(bar_index + 8, sma50, "SMA 50: " + str.tostring(sma50, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
     l_sma21 := label.new(bar_index + 8, sma21, "SMA 21: " + str.tostring(sma21, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
     l_sma9 := label.new(bar_index + 8, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+
+// ==========================================
+// 2. MTPC DKO LOGIC
+// ==========================================
+
+//──────────────── INPUTS ────────────────
+autoTF  = input.bool(true, "Auto Timeframe", group="MTPC DKO")
+tfInput = input.timeframe("1D", "Manual Timeframe", active = not autoTF, group="MTPC DKO")
+
+fibColor50  = input.color(color.blue, "50% Fib", group="MTPC DKO")
+fibColor618 = input.color(color.orange, "61.8% Fib", group="MTPC DKO")
+pocketColor = input.color(color.new(color.purple, 80), "Fib Pocket", group="MTPC DKO")
+
+//──────────────── TIMEFRAME SELECTION ────────────────
+string tf = autoTF ? "1D" : tfInput
+
+//──────────────── NEW MP DETECTION ────────────────
+bool newMP = timeframe.change(tf)
+
+//──────────────── MP RANGE TRACKING ────────────────
+var float mpHigh = na
+var float mpLow  = na
+
+var float prevHigh = na
+var float prevLow  = na
+
+var int mpStart = na
+
+if newMP
+    prevHigh := mpHigh
+    prevLow  := mpLow
+
+    mpHigh := high
+    mpLow  := low
+    mpStart := bar_index
+else
+    mpHigh := na(mpHigh) ? high : math.max(mpHigh, high)
+    mpLow  := na(mpLow)  ? low  : math.min(mpLow, low)
+
+//──────────────── FIB OBJECTS ────────────────
+var line fib50  = na
+var line fib618 = na
+var box  fibBox = na
+
+//──────────────── DRAW FIBS ACROSS CURRENT MP ────────────────
+bool canDraw = not na(prevHigh) and not na(prevLow)
+
+if newMP
+    fib50  := na
+    fib618 := na
+    fibBox := na
+
+if canDraw
+    float f50  = prevLow + (prevHigh - prevLow) * 0.50
+    float f618 = prevLow + (prevHigh - prevLow) * 0.618
+
+    int left  = mpStart
+    int right = bar_index
+
+    if na(fib50)
+        fib50 := line.new(left, f50, right, f50, color=fibColor50, width=2)
+        fib618 := line.new(left, f618, right, f618, color=fibColor618, width=2)
+
+        fibBox := box.new(
+            left   = left,
+            right  = right,
+            top    = math.max(f50, f618),
+            bottom = math.min(f50, f618),
+            bgcolor = pocketColor,
+            border_color = na
+        )
+    else
+        line.set_x2(fib50, right)
+        line.set_x2(fib618, right)
+        box.set_right(fibBox, right)
+
+//──────────────── OPTIONAL MP BOX ────────────────
+var box mpBox = na
+
+if newMP
+    mpBox := box.new(
+        left   = mpStart,
+        right  = bar_index,
+        top    = mpHigh,
+        bottom = mpLow,
+        bgcolor = color.new(color.gray, 90),
+        border_color = color.gray
+    )
+else if not na(mpBox)
+    box.set_right(mpBox, bar_index)
+    box.set_top(mpBox, mpHigh)
+    box.set_bottom(mpBox, mpLow)
