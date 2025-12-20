@@ -1,5 +1,5 @@
 //@version=5
-indicator("Triple SMA", overlay=true)
+indicator("Triple SMA with Dashboard", overlay=true)
 
 // Input parameters
 len1 = input.int(5, "Length SMA 1", minval=1)
@@ -13,23 +13,24 @@ sma2 = ta.sma(src, len2)
 sma3 = ta.sma(src, len3)
 
 // Plotting
-plot(sma1, "SMA 5", color=color.green, linewidth=2)
-plot(sma2, "SMA 9", color=color.blue, linewidth=2)
-plot(sma3, "SMA 21", color=color.red, linewidth=3)
+p1 = plot(sma1, "SMA 5", color=color.green, linewidth=2)
+p2 = plot(sma2, "SMA 9", color=color.blue, linewidth=2)
+p3 = plot(sma3, "SMA 21", color=color.fuchsia, linewidth=4) // Changed to Fuchsia and thicker
 
-// Labels
-// We use persistent variables to track labels and delete the old ones so we don't spam the chart.
-var label l1 = na
-var label l2 = na
-var label l3 = na
+// Debugging / Dashboard
+var table dashboard = table.new(position.top_right, 2, 4, border_width=1)
 
 if barstate.islast
-    label.delete(l1)
-    label.delete(l2)
-    label.delete(l3)
+    table.cell(dashboard, 0, 0, "Indicator", bgcolor=color.gray, text_color=color.white)
+    table.cell(dashboard, 1, 0, "Value", bgcolor=color.gray, text_color=color.white)
     
-    // style_label_lower_left places the label to the upper-right of the point (pointer at bottom-left)
-    // effectively putting the text to the RIGHT of the chart.
-    l1 := label.new(bar_index, sma1, "SMA 5: " + str.tostring(sma1, "#.##"), color=color.green, style=label.style_label_lower_left, textcolor=color.white, size=size.small)
-    l2 := label.new(bar_index, sma2, "SMA 9: " + str.tostring(sma2, "#.##"), color=color.blue, style=label.style_label_lower_left, textcolor=color.white, size=size.small)
-    l3 := label.new(bar_index, sma3, "SMA 21: " + str.tostring(sma3, "#.##"), color=color.red, style=label.style_label_lower_left, textcolor=color.white, size=size.small)
+    table.cell(dashboard, 0, 1, "SMA 5", bgcolor=color.green, text_color=color.white)
+    table.cell(dashboard, 1, 1, str.tostring(sma1, "#.##"), bgcolor=color.new(color.green, 90))
+    
+    table.cell(dashboard, 0, 2, "SMA 9", bgcolor=color.blue, text_color=color.white)
+    table.cell(dashboard, 1, 2, str.tostring(sma2, "#.##"), bgcolor=color.new(color.blue, 90))
+    
+    // Explicit check for SMA 21
+    table.cell(dashboard, 0, 3, "SMA 21", bgcolor=color.fuchsia, text_color=color.white)
+    val3 = na(sma3) ? "NaN" : str.tostring(sma3, "#.##")
+    table.cell(dashboard, 1, 3, val3, bgcolor=color.new(color.fuchsia, 90))
