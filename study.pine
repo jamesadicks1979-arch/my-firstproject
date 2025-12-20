@@ -183,7 +183,7 @@ if inFibWindow
                 isLocked := true
 
 // Backgrounds
-bgcolor(inMonitoringWindow ? color.new(color.yellow, 90) : na, title="Monitoring")
+// bgcolor(inMonitoringWindow ? color.new(color.yellow, 90) : na, title="Monitoring")
 
 // Labels on right (SMA)
 var label l_sma50 = na
@@ -276,7 +276,7 @@ if not na(mpStart) and not na(pHigh)
     var line fib618 = na
     var box  fibPocket = na
     var line atrLine = na
-    var box  prevRangeBox = na // New Background Box
+    // var box  prevRangeBox = na // Removed Background Box
     
     // On new MP, reset objects (so we start fresh lines for the new day)
     if newMP
@@ -284,7 +284,7 @@ if not na(mpStart) and not na(pHigh)
         fib618 := na
         fibPocket := na
         atrLine := na
-        prevRangeBox := na
+        // prevRangeBox := na
     
     // Create or Update
     if na(fib50)
@@ -295,17 +295,16 @@ if not na(mpStart) and not na(pHigh)
         
         // atrLine moved to Developing Daily Box section
         
-        // PREVIOUS RANGE BOX (Replacing bgcolor)
-        // Fills the Previous Period's High-Low Range across the current period
-        prevRangeBox := box.new(left, pHigh, right, pLow, 
-             border_color = na, 
-             bgcolor = prevBullish ? bgBullColor : bgBearColor)
+        // PREVIOUS RANGE BOX (Replacing bgcolor) - REMOVED
+        // prevRangeBox := box.new(left, pHigh, right, pLow, 
+        //      border_color = na, 
+        //      bgcolor = prevBullish ? bgBullColor : bgBearColor)
     else
         line.set_x2(fib50, right)
         line.set_x2(fib618, right)
         box.set_right(fibPocket, right)
         // line.set_x2(atrLine, right) // Removed from here
-        box.set_right(prevRangeBox, right)
+        // box.set_right(prevRangeBox, right)
 
 
 //──────────────── DAILY RANGE BOX (Colored by Daily Trend) ────────────────
