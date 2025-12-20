@@ -194,7 +194,7 @@ if barstate.islast
     l_sma9 := label.new(bar_index + 20, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
 
 // ==========================================
-// 2. MTPC DKO LOGIC (Updated with request.security for reliability)
+// 2. MTPC DKO LOGIC (Robust "Previous Day" Fetching)
 // ==========================================
 
 //──────────────── INPUTS ────────────────
@@ -215,19 +215,18 @@ bgBearColor = input.color(color.new(color.red, 90), "Bearish Prev BG", group="MT
 //──────────────── DATA FETCHING ────────────────
 string tf = autoTF ? "1D" : tfInput
 
-// Get Previous Day's OHLC and ATR using request.security (Default lookahead = Yesterday's completed data during today)
-[pOpen, pHigh, pLow, pClose, htfATR] = request.security(syminfo.tickerid, tf, [open, high, low, close, ta.atr(atrLen)])
+// Get Previous Day's OHLC and ATR using request.security
+// Using [1] and lookahead_on ensures we get the COMPLETED yesterday's data from the moment today starts.
+[pOpen, pHigh, pLow, pClose, htfATR] = request.security(syminfo.tickerid, tf, [open[1], high[1], low[1], close[1], ta.atr(atrLen)], lookahead=barmerge.lookahead_on)
 
-// Determine Trend
+// Determine Trend (of Yesterday)
 bool prevBullish = (pClose > pOpen)
 bool prevBearish = (pClose < pOpen)
 
-// Draw Background
+// Draw Background based on PREVIOUS Day Trend
 bgcolor(prevBullish ? bgBullColor : prevBearish ? bgBearColor : na, title="MTPC Background")
 
 //──────────────── DRAWING LOGIC ────────────────
-// We draw lines that span the CURRENT day (from where the new TF started).
-// We need to find the start of the current period.
 bool newMP = timeframe.change(tf)
 var int mpStart = na
 
@@ -244,6 +243,7 @@ if not na(mpStart) and not na(pHigh)
     float f618 = pLow + (pHigh - pLow) * 0.618
     
     // Calc ATR Target (Low + ATR)
+    // Note: User asked for "added on to the low".
     float targetLevel = pLow + (htfATR * atrMult)
 
     // Objects
@@ -273,3 +273,27 @@ if not na(mpStart) and not na(pHigh)
     
     // Optional: Update y-values if needed (though previous day stats are constant for the day)
     // No need to update Y, they are static for the day.
+    
+//──────────────── OPTIONAL MP BOX ────────────────
+var box mpBox = na
+
+// Calculate CURRENT DAY developing range for the box?
+// The original code was tracking "mpHigh" which was accumulating during the day.
+// We can use request.security for current data or manual tracking.
+// Manual tracking matches the "MTPC DKO" style of showing the developing range.
+
+var float currHigh = na
+var float currLow = na
+
+if newMP
+    currHigh := high
+    currLow := low
+    // Create new box
+    mpBox := box.new(mpStart, currHigh, bar_index, currLow, border_color = color.gray, bgcolor = na)
+else
+    currHigh := math.max(nz(currHigh, high), high)
+    currLow := math.min(nz(currLow, low), low)
+    if not na(mpBox)
+        box.set_right(mpBox, bar_index)
+        box.set_top(mpBox, currHigh)
+        box.set_bottom(mpBox, currLow)
