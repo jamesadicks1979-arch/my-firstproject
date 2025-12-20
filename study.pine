@@ -26,14 +26,7 @@ plot(sma9, "SMA 9", color=color.red, linewidth=3)
 // LOGIC
 // ==========================================
 
-// 1. Monitor High/Low (14:30 - ...)
-// User said "start tracking the high or low from 2.30 instead"
-// Usually this implies we track for a bit, then look for a setup.
-// Let's assume tracking 14:30 to 15:30, then look for fibs?
-// Or maybe track from 14:30 and trigger immediately?
-// Let's stick to the previous pattern: Track Period -> Trigger Period.
-// If user says "start tracking from 2.30", I'll set monitoring to 14:30-15:30.
-
+// 1. Monitor High/Low (12:30 - 14:30)
 inMonitoringWindow = not na(time(timeframe.period, monitoringTime, sessionZone))
 
 var float monitorHigh = na
@@ -47,7 +40,7 @@ if inMonitoringWindow
         monitorHigh := math.max(monitorHigh, high)
         monitorLow := math.min(monitorLow, low)
 
-// 2. Trigger & Dynamic Updates (15:30 - ...)
+// 2. Trigger & Dynamic Updates (14:30 - 16:30)
 inFibWindow = not na(time(timeframe.period, fibLookPeriod, sessionZone))
 
 // State Variables
