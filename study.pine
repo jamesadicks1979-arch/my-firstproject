@@ -295,36 +295,50 @@ else
         box.set_bottom(mpBox, currLow)
 
 // ==========================================
-// 3. WEEKLY RANGE BOX
+// 3. WEEKLY RANGE BOX (Historical & Developing)
 // ==========================================
 
 // Inputs
-showWeekly    = input.bool(true, "Show Previous Week Box", group="Weekly Range")
-wBoxBullColor = input.color(color.new(color.green, 92), "Weekly Bullish Fill", group="Weekly Range")
-wBoxBearColor = input.color(color.new(color.red, 92), "Weekly Bearish Fill", group="Weekly Range")
+showWeekly    = input.bool(true, "Show Weekly Box", group="Weekly Range")
+wBoxBullColor = input.color(color.new(color.green, 95), "Weekly Bullish Fill", group="Weekly Range")
+wBoxBearColor = input.color(color.new(color.red, 95), "Weekly Bearish Fill", group="Weekly Range")
 wBorderColor  = input.color(color.new(color.gray, 60), "Weekly Border Color", group="Weekly Range")
 
-// Data Fetching (Previous Week)
-// We use the same tickerId (Normal or HA) as defined above
-[wpOpen, wpHigh, wpLow, wpClose] = request.security(tickerId, "1W", [open[1], high[1], low[1], close[1]], lookahead=barmerge.lookahead_on)
-
-// Weekly Trend
-bool wBull = (wpClose > wpOpen)
-
-// Drawing Logic
+// Logic
+// We track the Developing Weekly Range directly on the chart
 bool newWeek = timeframe.change("1W")
-var box wBox = na
 
-if showWeekly and not na(wpHigh)
-    // On new week, create a new box representing the PREVIOUS week's range
+var box currentWBox = na
+var float wOpen = na
+var float wHigh = na
+var float wLow = na
+
+if showWeekly
     if newWeek
-        wBox := box.new(bar_index, wpHigh, bar_index, wpLow, 
+        // START of a new week
+        wOpen := open
+        wHigh := high
+        wLow := low
+        
+        // Create the box for THIS new week
+        currentWBox := box.new(bar_index, wHigh, bar_index, wLow, 
              border_color = wBorderColor, 
-             bgcolor = wBull ? wBoxBullColor : wBoxBearColor,
-             border_style = line.style_dotted,
+             bgcolor = na, 
+             border_style = line.style_dotted, 
              border_width = 1)
     else
-        // Extend the box to the right as the week progresses
-        if not na(wBox)
-            box.set_right(wBox, bar_index)
+        // CONTINUE current week
+        wHigh := math.max(nz(wHigh, high), high)
+        wLow := math.min(nz(wLow, low), low)
+
+    // Update the box dimensions and color every bar
+    if not na(currentWBox)
+        box.set_top(currentWBox, wHigh)
+        box.set_bottom(currentWBox, wLow)
+        box.set_right(currentWBox, bar_index)
+        
+        // Color based on performance so far (Current Close vs Weekly Open)
+        bool isBull = close > wOpen
+        box.set_bgcolor(currentWBox, isBull ? wBoxBullColor : wBoxBearColor)
+
 
