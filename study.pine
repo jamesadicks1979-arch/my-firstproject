@@ -367,11 +367,15 @@ if showWeekly
             bool prevWBull = prevWClose > prevWOpen
             
             if prevWBull
-                // Bullish Week -> Buying Pullback -> Pocket is High - 0.618 to High - 0.5
+                // Bullish Week -> Buying Pullback
+                // Pocket is between High - 50% (Higher Price) and High - 61.8% (Lower Price)
+                // 50% Retracement Level
                 wf50 = prevWHigh - (prevWHigh - prevWLow) * 0.50
+                // 61.8% Retracement Level (Deeper pullback, so lower price)
                 wf618 = prevWHigh - (prevWHigh - prevWLow) * 0.618
             else
-                // Bearish Week -> Selling Pullback -> Pocket is Low + 0.618 to Low + 0.5
+                // Bearish Week -> Selling Pullback
+                // Pocket is between Low + 50% (Lower Price) and Low + 61.8% (Higher Price)
                 wf50 = prevWLow + (prevWHigh - prevWLow) * 0.50
                 wf618 = prevWLow + (prevWHigh - prevWLow) * 0.618
             
