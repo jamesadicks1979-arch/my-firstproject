@@ -242,9 +242,18 @@ if not na(mpStart) and not na(pHigh)
     int left  = mpStart
     int right = bar_index
     
-    // Calc Fibs based on PREVIOUS Range
-    float f50  = pLow + (pHigh - pLow) * 0.50
-    float f618 = pLow + (pHigh - pLow) * 0.618
+    // Calc Fibs based on PREVIOUS Range (Directional)
+    // If Bullish: Retrace from High Down (61.8% is BELOW 50%)
+    // If Bearish: Retrace from Low Up (61.8% is ABOVE 50%)
+    float f50  = na
+    float f618 = na
+    
+    if prevBullish
+        f50  := pHigh - (pHigh - pLow) * 0.50
+        f618 := pHigh - (pHigh - pLow) * 0.618
+    else
+        f50  := pLow + (pHigh - pLow) * 0.50
+        f618 := pLow + (pHigh - pLow) * 0.618
     
     // Calc ATR Target (Low + ATR)
     float targetLevel = pLow + (htfATR * atrMult)
