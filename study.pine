@@ -361,9 +361,7 @@ if showWeekly
         if not na(prevWHigh)
             wf50 = prevWLow + (prevWHigh - prevWLow) * 0.50
             wf618 = prevWLow + (prevWHigh - prevWLow) * 0.618
-            wFibPocketBox := box.new(bar_index, math.max(wf50, wf618), bar_index, math.min(wf50, wf618),
-                border_color = na,
-                bgcolor = wFibColor)
+            wFibPocketBox := box.new(bar_index, math.max(wf50, wf618), bar_index, math.min(wf50, wf618), border_color = na, bgcolor = wFibColor)
     else
         // CONTINUE current week
         wHigh := math.max(nz(wHigh, high), high)
