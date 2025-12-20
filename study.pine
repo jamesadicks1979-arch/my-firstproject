@@ -293,3 +293,38 @@ else
         box.set_right(mpBox, bar_index)
         box.set_top(mpBox, currHigh)
         box.set_bottom(mpBox, currLow)
+
+// ==========================================
+// 3. WEEKLY RANGE BOX
+// ==========================================
+
+// Inputs
+showWeekly    = input.bool(true, "Show Previous Week Box", group="Weekly Range")
+wBoxBullColor = input.color(color.new(color.green, 92), "Weekly Bullish Fill", group="Weekly Range")
+wBoxBearColor = input.color(color.new(color.red, 92), "Weekly Bearish Fill", group="Weekly Range")
+wBorderColor  = input.color(color.new(color.gray, 60), "Weekly Border Color", group="Weekly Range")
+
+// Data Fetching (Previous Week)
+// We use the same tickerId (Normal or HA) as defined above
+[wpOpen, wpHigh, wpLow, wpClose] = request.security(tickerId, "1W", [open[1], high[1], low[1], close[1]], lookahead=barmerge.lookahead_on)
+
+// Weekly Trend
+bool wBull = (wpClose > wpOpen)
+
+// Drawing Logic
+bool newWeek = timeframe.change("1W")
+var box wBox = na
+
+if showWeekly and not na(wpHigh)
+    // On new week, create a new box representing the PREVIOUS week's range
+    if newWeek
+        wBox := box.new(bar_index, wpHigh, bar_index, wpLow, 
+             border_color = wBorderColor, 
+             bgcolor = wBull ? wBoxBullColor : wBoxBearColor,
+             border_style = line.style_dotted,
+             border_width = 1)
+    else
+        // Extend the box to the right as the week progresses
+        if not na(wBox)
+            box.set_right(wBox, bar_index)
+
