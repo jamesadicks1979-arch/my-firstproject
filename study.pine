@@ -12,15 +12,24 @@ sma1 = ta.sma(src, len1)
 sma2 = ta.sma(src, len2)
 sma3 = ta.sma(src, len3)
 
-// Plotting - Using distinct colors and ensuring visibility
-// Note: If you don't see the line, ensure your chart has enough historical bars (at least 21).
+// Plotting
 plot(sma1, "SMA 5", color=color.green, linewidth=2)
 plot(sma2, "SMA 9", color=color.blue, linewidth=2)
-plot(sma3, "SMA 21", color=color.red, linewidth=3) // Made slightly thicker
+plot(sma3, "SMA 21", color=color.red, linewidth=3)
 
-// Labels on the right side for better visibility
+// Labels
+// We use persistent variables to track labels and delete the old ones so we don't spam the chart.
+var label l1 = na
+var label l2 = na
+var label l3 = na
+
 if barstate.islast
-    label.new(bar_index, sma1, "SMA 5: " + str.tostring(sma1, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
-    label.new(bar_index, sma2, "SMA 9: " + str.tostring(sma2, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
-    label.new(bar_index, sma3, "SMA 21: " + str.tostring(sma3, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
-
+    label.delete(l1)
+    label.delete(l2)
+    label.delete(l3)
+    
+    // style_label_lower_left places the label to the upper-right of the point (pointer at bottom-left)
+    // effectively putting the text to the RIGHT of the chart.
+    l1 := label.new(bar_index, sma1, "SMA 5: " + str.tostring(sma1, "#.##"), color=color.green, style=label.style_label_lower_left, textcolor=color.white, size=size.small)
+    l2 := label.new(bar_index, sma2, "SMA 9: " + str.tostring(sma2, "#.##"), color=color.blue, style=label.style_label_lower_left, textcolor=color.white, size=size.small)
+    l3 := label.new(bar_index, sma3, "SMA 21: " + str.tostring(sma3, "#.##"), color=color.red, style=label.style_label_lower_left, textcolor=color.white, size=size.small)
