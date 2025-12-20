@@ -359,9 +359,9 @@ if showWeekly
              
         // Create Weekly Fib Pocket (Fixed range from PREVIOUS week)
         if not na(prevWHigh)
-             float wf50 = prevWLow + (prevWHigh - prevWLow) * 0.50
-             float wf618 = prevWLow + (prevWHigh - prevWLow) * 0.618
-             wFibPocketBox := box.new(bar_index, math.max(wf50, wf618), bar_index, math.min(wf50, wf618),
+            wf50 = prevWLow + (prevWHigh - prevWLow) * 0.50
+            wf618 = prevWLow + (prevWHigh - prevWLow) * 0.618
+            wFibPocketBox := box.new(bar_index, math.max(wf50, wf618), bar_index, math.min(wf50, wf618),
                 border_color = na,
                 bgcolor = wFibColor)
     else
