@@ -280,7 +280,7 @@ if not na(mpStart) and not na(pHigh)
         // Pocket between 50 and 618
         fibPocket := box.new(left, math.max(f50, f618), right, math.min(f50, f618), border_color = na, bgcolor = pocketColor)
         
-        atrLine := line.new(left, targetLevel, right, targetLevel, color=atrColor, width=2, style=line.style_solid)
+        // atrLine moved to Developing Daily Box section
         
         // PREVIOUS RANGE BOX (Replacing bgcolor)
         // Fills the Previous Period's High-Low Range across the current period
@@ -291,7 +291,7 @@ if not na(mpStart) and not na(pHigh)
         line.set_x2(fib50, right)
         line.set_x2(fib618, right)
         box.set_right(fibPocket, right)
-        line.set_x2(atrLine, right)
+        // line.set_x2(atrLine, right) // Removed from here
         box.set_right(prevRangeBox, right)
 
 
@@ -305,6 +305,13 @@ var float dayOpen = na
 dBoxBullColor = input.color(color.new(color.green, 80), "Daily Box Bullish", group="MTPC DKO")
 dBoxBearColor = input.color(color.new(color.red, 80), "Daily Box Bearish", group="MTPC DKO")
 
+// Daily ATR Target Calc (Directional based on Prev Trend)
+float dTarget = na
+if prevBullish
+    dTarget := nz(currLow, low) + (htfATR * atrMult)
+else
+    dTarget := nz(currHigh, high) - (htfATR * atrMult)
+
 if newMP
     currHigh := high
     currLow := low
@@ -313,9 +320,18 @@ if newMP
     mpBox := box.new(bar_index, currHigh, bar_index, currLow, 
          border_color = na, 
          bgcolor = na) 
+         
+    // Start new ATR Line
+    atrLine := line.new(bar_index, dTarget, bar_index, dTarget, color=atrColor, width=2)
 else
     currHigh := math.max(nz(currHigh, high), high)
     currLow := math.min(nz(currLow, low), low)
+    
+    // Re-calc target with updated High/Low
+    if prevBullish
+        dTarget := currLow + (htfATR * atrMult)
+    else
+        dTarget := currHigh - (htfATR * atrMult)
     
     if not na(mpBox)
         box.set_right(mpBox, bar_index)
@@ -325,6 +341,12 @@ else
         // Update color based on developing trend
         bool isBull = close > dayOpen
         box.set_bgcolor(mpBox, isBull ? dBoxBullColor : dBoxBearColor)
+
+    // Update ATR Line
+    if not na(atrLine)
+        line.set_y1(atrLine, dTarget)
+        line.set_y2(atrLine, dTarget)
+        line.set_x2(atrLine, bar_index)
 
 
 // ==========================================
@@ -393,15 +415,21 @@ if showWeekly
                  bgcolor = input.color(color.new(color.navy, 60), "Weekly Fib Pocket Color", group="Weekly Range"))
 
         // Create Weekly ATR Target Line (Purple)
-        // Added onto the Low of the Previous Week (as per Daily logic)
-        if not na(wAtr)
-            float wTargetLev = prevWLow + wAtr
-            wAtrLine := line.new(bar_index, wTargetLev, bar_index, wTargetLev, color=color.purple, width=2)
+        // Added onto the Low/High of the CURRENT Developing Week (Directional)
+        // We initialize it here, and update it in the 'else' block
+        float initialWTarget = prevWBull ? (wLow + wAtr) : (wHigh - wAtr)
+        wAtrLine := line.new(bar_index, initialWTarget, bar_index, initialWTarget, color=color.purple, width=2)
             
     else
         // CONTINUE current week
         wHigh := math.max(nz(wHigh, high), high)
         wLow := math.min(nz(wLow, low), low)
+        
+        // Re-calc Weekly Target based on PREVIOUS Week's Direction
+        // If Prev Week Bullish -> Target = Current Week Low + ATR
+        // If Prev Week Bearish -> Target = Current Week High - ATR
+        bool prevWBull = prevWClose > prevWOpen
+        float wTarget = prevWBull ? (wLow + wAtr) : (wHigh - wAtr)
 
     // Update the box dimensions and color every bar
     if not na(currentWBox)
@@ -417,6 +445,8 @@ if showWeekly
     if not na(wFibPocketBox)
         box.set_right(wFibPocketBox, bar_index)
     if not na(wAtrLine)
+        line.set_y1(wAtrLine, wTarget)
+        line.set_y2(wAtrLine, wTarget)
         line.set_x2(wAtrLine, bar_index)
 
 
