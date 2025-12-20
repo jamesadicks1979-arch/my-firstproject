@@ -285,7 +285,7 @@ var float currLow = na
 if newMP
     currHigh := high
     currLow := low
-    mpBox := box.new(bar_index, currHigh, bar_index, currLow, border_color = color.new(color.gray, 50), bgcolor = na, style = line.style_dashed)
+    mpBox := box.new(bar_index, currHigh, bar_index, currLow, border_color = color.new(color.gray, 50), bgcolor = na, border_style = line.style_dashed)
 else
     currHigh := math.max(nz(currHigh, high), high)
     currLow := math.min(nz(currLow, low), low)
