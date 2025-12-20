@@ -301,7 +301,7 @@ if inFibWindow
 // Backgrounds
 bgcolor(inMonitoringWindow ? color.new(color.yellow, 90) : na, title="Monitoring")
 
-// Labels on right
+// Labels on right (SMA)
 var label l_sma50 = na
 var label l_sma21 = na
 var label l_sma9 = na
