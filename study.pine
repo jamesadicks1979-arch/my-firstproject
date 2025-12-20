@@ -359,6 +359,9 @@ bool newWeek = timeframe.change("1W")
 // Fetch Previous Week's Data (High, Low, Open, Close, ATR)
 [prevWHigh, prevWLow, prevWOpen, prevWClose, wAtr] = request.security(tickerId, "1W", [high[1], low[1], open[1], close[1], ta.atr(14)], lookahead=barmerge.lookahead_on)
 
+// Determine Previous Week's Trend here so it's available globally in this block
+bool prevWBull = prevWClose > prevWOpen
+
 var box currentWBox = na
 var box wFibPocketBox = na 
 var line wAtrLine = na // New Weekly ATR Target Line
@@ -387,7 +390,7 @@ if showWeekly
         if not na(prevWHigh)
             float wf50 = na
             float wf618 = na
-            bool prevWBull = prevWClose > prevWOpen
+            // bool prevWBull = prevWClose > prevWOpen // Removed local declaration
             
             if prevWBull
                 // Bullish Week -> Buying Pullback
@@ -420,7 +423,7 @@ if showWeekly
         // Re-calc Weekly Target based on PREVIOUS Week's Direction
         // If Prev Week Bullish -> Target = Current Week Low + ATR
         // If Prev Week Bearish -> Target = Current Week High - ATR
-        bool prevWBull = prevWClose > prevWOpen
+        // bool prevWBull = prevWClose > prevWOpen // Removed local declaration
         float wTarget = prevWBull ? (wLow + wAtr) : (wHigh - wAtr)
 
     // Update the box dimensions and color every bar
