@@ -12,7 +12,8 @@ sma1 = ta.sma(src, len1)
 sma2 = ta.sma(src, len2)
 sma3 = ta.sma(src, len3)
 
-// Plotting
+// Plotting - Using distinct colors and ensuring visibility
+// Note: If you don't see the line, ensure your chart has enough historical bars (at least 21).
 plot(sma1, "SMA 5", color=color.green, linewidth=2)
 plot(sma2, "SMA 9", color=color.blue, linewidth=2)
-plot(sma3, "SMA 21", color=color.red, linewidth=2)
+plot(sma3, "SMA 21", color=color.red, linewidth=3) // Made slightly thicker
