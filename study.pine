@@ -42,7 +42,6 @@ if inMonitoringWindow
 inFibWindow = not na(time(timeframe.period, fibLookPeriod, sessionZone))
 
 // We only want to draw the fibs ONCE per session.
-// So we use a variable to track if we've already drawn for the day.
 var bool fibsDrawn = false
 
 // Reset flag at start of new monitoring period (next day)
@@ -52,23 +51,18 @@ if inMonitoringWindow and not inMonitoringWindow[1]
 // Check Logic inside the 14:30 - 16:30 window
 if inFibWindow and not fibsDrawn
     // Condition 1: MAs above market (Sell Scenario)
-    // "MAs above market" usually means Price < SMA9, SMA21, SMA50 OR SMAs are arranged in bearish order.
-    // Based on user request: "if at 14.30 the ma are above market" -> assume Bearish setup
-    // Interpreting "ma are above market" as Close < SMAs or SMA9 < SMA21 < SMA50.
-    // Let's stick to the previous logic interpretation but refined:
-    // SELL setup: SMA9 < SMA21 and SMA9 < SMA50 (Bearish Alignment)
     if (sma9 < sma21 and sma9 < sma50)
         rangeVal = periodHigh - periodLow
-        // Sell Fibs (High to Low): Retracements go UP from Low
-        // 0% at Low, 100% at High. 
-        // 50% retracement level = Low + 0.5 * Range (Same as High - 0.5 * Range)
         fib50 = periodHigh - (rangeVal * 0.50)
         fib61 = periodHigh - (rangeVal * 0.618)
-        fib80 = periodHigh - (rangeVal * 0.80) // Deep retracement
+        fib80 = periodHigh - (rangeVal * 0.80) 
         
-        line.new(bar_index, fib50, bar_index + 10, fib50, color=color.gray, width=1, style=line.style_dashed)
-        line.new(bar_index, fib61, bar_index + 10, fib61, color=color.gray, width=1, style=line.style_dashed)
-        line.new(bar_index, fib80, bar_index + 10, fib80, color=color.red, width=2)
+        // Fill box between 50% and 61.8%
+        box.new(bar_index, fib50, bar_index + 20, fib61, border_width=0, bgcolor=color.new(color.red, 85))
+        
+        line.new(bar_index, fib50, bar_index + 20, fib50, color=color.gray, width=1, style=line.style_dashed)
+        line.new(bar_index, fib61, bar_index + 20, fib61, color=color.gray, width=1, style=line.style_dashed)
+        line.new(bar_index, fib80, bar_index + 20, fib80, color=color.red, width=2)
         
         label.new(bar_index, fib50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
         label.new(bar_index, fib80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
@@ -76,22 +70,55 @@ if inFibWindow and not fibsDrawn
         fibsDrawn := true
 
     // Condition 2: Market closes above 50 SMA (Buy Scenario)
-    // "if the market closes above the 50 sma then look for a low to high fib"
     else if (close > sma50)
         rangeVal = periodHigh - periodLow
-        // Buy Fibs (Low to High): Retracements go DOWN from High
-        // 0% at High, 100% at Low.
-        // 50% retracement level = High - 0.5 * Range (Same as Low + 0.5 * Range)
-        fib50 = periodLow + (rangeVal * 0.50) 
+        // Buy Fibs: 0% at High, 100% at Low.
+        // 50% is midpoint.
+        // 80% retracement: "put the 80% below when buying"
+        // Retracement moves from High down to Low. 
+        // 50% level = High - (Range * 0.5)
+        // 61.8% level = High - (Range * 0.618)
+        // 80% level = High - (Range * 0.8) -> This is effectively "below" the 50/61 levels.
+        
+        fib50 = periodLow + (rangeVal * 0.50)
         fib61 = periodLow + (rangeVal * 0.618)
-        fib80 = periodLow + (rangeVal * 0.80)
+        fib80 = periodLow + (rangeVal * 0.80) // Standard 80% calc from low (Wait, for retracement from high?)
+
+        // Let's clarify standard retracement:
+        // Buy Trend: We measure Low to High. We expect price to retrace DOWN.
+        // 0% at High. 100% at Low.
+        // 50% Level = High - (Range * 0.5) = Low + (Range * 0.5)
+        // 80% Level (Deep retracement) = High - (Range * 0.8) = Low + (Range * 0.2)
+        // BUT, often people refer to "80%" as the level closer to the stop/low.
+        // Formula: Level = Low + (Range * (1 - 0.8)) ?? Or Level = Low + (Range * 0.8)?
+        // Usually, 61.8% retracement means price dropped 61.8% of the move.
+        // Level = High - (Range * 0.618).
+        // If the user wants 80% "below", they likely mean the 80% retracement level.
+        // Level = High - (Range * 0.80). 
+        // In the previous code (Buy Scenario), I used: periodLow + (rangeVal * 0.80)
+        // This is actually a 20% retracement from High (High - 0.2*Range = Low + 0.8*Range).
+        // Let's correct this to be consistent with "Deep Retracement" logic (Pullback).
         
-        line.new(bar_index, fib50, bar_index + 10, fib50, color=color.gray, width=1, style=line.style_dashed)
-        line.new(bar_index, fib61, bar_index + 10, fib61, color=color.gray, width=1, style=line.style_dashed)
-        line.new(bar_index, fib80, bar_index + 10, fib80, color=color.red, width=2)
+        // CORRECTION For Buy Scenario (Retracement of the UP move):
+        // We want to buy the dip.
+        // 50% dip = High - 0.5*Range
+        // 61% dip = High - 0.618*Range
+        // 80% dip = High - 0.80*Range (This is lower than 61%)
         
-        label.new(bar_index, fib50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
-        label.new(bar_index, fib80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+        buyFib50 = periodHigh - (rangeVal * 0.50)
+        buyFib61 = periodHigh - (rangeVal * 0.618)
+        buyFib80 = periodHigh - (rangeVal * 0.80)
+
+        // Fill box between 50% and 61.8%
+        // Note: buyFib61 is lower than buyFib50
+        box.new(bar_index, buyFib50, bar_index + 20, buyFib61, border_width=0, bgcolor=color.new(color.green, 85))
+        
+        line.new(bar_index, buyFib50, bar_index + 20, buyFib50, color=color.gray, width=1, style=line.style_dashed)
+        line.new(bar_index, buyFib61, bar_index + 20, buyFib61, color=color.gray, width=1, style=line.style_dashed)
+        line.new(bar_index, buyFib80, bar_index + 20, buyFib80, color=color.red, width=2)
+        
+        label.new(bar_index, buyFib50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+        label.new(bar_index, buyFib80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
         
         fibsDrawn := true
 
