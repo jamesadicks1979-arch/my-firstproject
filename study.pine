@@ -194,12 +194,13 @@ if barstate.islast
     l_sma9 := label.new(bar_index + 20, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
 
 // ==========================================
-// 2. MTPC DKO LOGIC (Robust "Previous Day" Fetching)
+// 2. MTPC DKO LOGIC (Robust Previous Day)
 // ==========================================
 
 //──────────────── INPUTS ────────────────
 autoTF  = input.bool(true, "Auto Timeframe", group="MTPC DKO")
 tfInput = input.timeframe("1D", "Manual Timeframe", group="MTPC DKO")
+useHA   = input.bool(false, "Use Heikin Ashi Calculation?", group="MTPC DKO")
 
 fibColor50  = input.color(color.blue, "50% Fib", group="MTPC DKO")
 fibColor618 = input.color(color.orange, "61.8% Fib", group="MTPC DKO")
@@ -214,24 +215,22 @@ bgBearColor = input.color(color.new(color.red, 90), "Bearish Prev BG", group="MT
 
 //──────────────── DATA FETCHING ────────────────
 string tf = autoTF ? "1D" : tfInput
+// Helper to choose ticker based on HA input
+string tickerId = useHA ? ticker.heikinashi(syminfo.tickerid) : syminfo.tickerid
 
-// 1. Get Previous Day's High/Low/ATR for FIBS (Yesterday's Range)
-[pHigh, pLow, htfATR] = request.security(syminfo.tickerid, tf, [high[1], low[1], ta.atr(atrLen)], lookahead=barmerge.lookahead_on)
+// Fetch Previous Day's Data (Yesterday's Completed Candle)
+// We request Open, High, Low, Close, and ATR for the PREVIOUS period [1]
+// lookahead_on ensures we get the static values for the entire day
+[pOpen, pHigh, pLow, pClose, htfATR] = request.security(tickerId, tf, [open[1], high[1], low[1], close[1], ta.atr(atrLen)], lookahead=barmerge.lookahead_on)
 
-// 2. Get CURRENT Day's Open/Close for BACKGROUND (Today's Trend)
-// We use lookahead=on to get the 'daily' view.
-// On historical bars, this returns the Close of that day.
-// On real-time bars, this returns the Current Price.
-[dOpen, dClose] = request.security(syminfo.tickerid, tf, [open, close], lookahead=barmerge.lookahead_on)
+// Determine Trend of YESTERDAY
+bool prevBullish = (pClose > pOpen)
+bool prevBearish = (pClose < pOpen)
 
-// Determine Trend (of THE DAY WE ARE LOOKING AT)
-bool dayBullish = (dClose > dOpen)
-bool dayBearish = (dClose < dOpen)
+// Draw Background based on YESTERDAY'S Trend
+bgcolor(prevBullish ? bgBullColor : prevBearish ? bgBearColor : na, title="MTPC Background")
 
-// Draw Background based on CURRENT Day Trend
-bgcolor(dayBullish ? bgBullColor : dayBearish ? bgBearColor : na, title="MTPC Background")
-
-//──────────────── DRAWING LOGIC ────────────────
+//──────────────── DRAWING LOGIC (FIBS & POCKET) ────────────────
 bool newMP = timeframe.change(tf)
 var int mpStart = na
 
@@ -253,39 +252,40 @@ if not na(mpStart) and not na(pHigh)
     // Objects
     var line fib50  = na
     var line fib618 = na
-    var box  fibBox = na
+    var box  fibPocket = na
     var line atrLine = na
     
     // On new MP, reset objects (so we start fresh lines for the new day)
     if newMP
         fib50 := na
         fib618 := na
-        fibBox := na
+        fibPocket := na
         atrLine := na
     
     // Create or Update
     if na(fib50)
         fib50 := line.new(left, f50, right, f50, color=fibColor50, width=2)
         fib618 := line.new(left, f618, right, f618, color=fibColor618, width=2)
-        fibBox := box.new(left, math.max(f50, f618), right, math.min(f50, f618), border_color = na, bgcolor = pocketColor)
+        // Pocket between 50 and 618
+        fibPocket := box.new(left, math.max(f50, f618), right, math.min(f50, f618), border_color = na, bgcolor = pocketColor)
+        
         atrLine := line.new(left, targetLevel, right, targetLevel, color=atrColor, width=2, style=line.style_solid)
     else
         line.set_x2(fib50, right)
         line.set_x2(fib618, right)
-        box.set_right(fibBox, right)
+        box.set_right(fibPocket, right)
         line.set_x2(atrLine, right)
-    
-//──────────────── OPTIONAL MP BOX ────────────────
-var box mpBox = na
 
+//──────────────── OPTIONAL: CURRENT DEVELOPING RANGE BOX ────────────────
+// Drawn from start of day to current bar, showing High/Low of TODAY
+var box mpBox = na
 var float currHigh = na
 var float currLow = na
 
 if newMP
     currHigh := high
     currLow := low
-    // Create new box
-    mpBox := box.new(mpStart, currHigh, bar_index, currLow, border_color = color.gray, bgcolor = na)
+    mpBox := box.new(bar_index, currHigh, bar_index, currLow, border_color = color.new(color.gray, 50), bgcolor = na, style = line.style_dashed)
 else
     currHigh := math.max(nz(currHigh, high), high)
     currLow := math.min(nz(currLow, low), low)
