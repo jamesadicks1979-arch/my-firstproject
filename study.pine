@@ -1,0 +1,451 @@
+//@version=5
+indicator("Triple SMA with Session & Fibs (Simple Dynamic) + MTPC DKO", overlay=true, max_lines_count=500, max_boxes_count=500)
+
+// ==========================================
+// 1. TRIPLE SMA & SESSION FIBS
+// ==========================================
+
+// Input parameters
+len1 = input.int(50, "Length SMA 1", minval=1, group="Triple SMA")
+len2 = input.int(21, "Length SMA 2", minval=1, group="Triple SMA")
+len3 = input.int(9, "Length SMA 3", minval=1, group="Triple SMA")
+len4 = input.int(100, "Length SMA 4", minval=1, group="Triple SMA")
+len5 = input.int(200, "Length SMA 5", minval=1, group="Triple SMA")
+src = input.source(close, "Source", group="Triple SMA")
+
+// Session Inputs
+monitoringTime = input.session("1230-1430", "High/Low Monitoring Period", group="Intraday Session") 
+fibLookPeriod = input.session("1430-1630", "Fib Trigger Period", group="Intraday Session")
+sessionZone = input.string("Europe/London", "Timezone", group="Intraday Session")
+
+// Calculation
+sma50 = ta.sma(src, len1)
+sma21 = ta.sma(src, len2)
+sma9 = ta.sma(src, len3)
+sma100 = ta.sma(src, len4)
+sma200 = ta.sma(src, len5)
+
+// Plotting SMAs
+plot(sma50, "SMA 50", color=color.green, linewidth=2)
+plot(sma21, "SMA 21", color=color.blue, linewidth=2)
+plot(sma9, "SMA 9", color=color.red, linewidth=3)
+plot(sma100, "SMA 100", color=color.orange, linewidth=2)
+plot(sma200, "SMA 200", color=color.purple, linewidth=2)
+
+// ------------------------------------------
+// INTRADAY FIB LOGIC
+// ------------------------------------------
+
+// 1. Monitor High/Low (12:30 - 14:30)
+inMonitoringWindow = not na(time(timeframe.period, monitoringTime, sessionZone))
+
+var float monitorHigh = na
+var float monitorLow = na
+
+if inMonitoringWindow
+    if not inMonitoringWindow[1]
+        monitorHigh := high
+        monitorLow := low
+    else
+        monitorHigh := math.max(monitorHigh, high)
+        monitorLow := math.min(monitorLow, low)
+
+// 2. Trigger & Dynamic Updates (14:30 - 16:30)
+inFibWindow = not na(time(timeframe.period, fibLookPeriod, sessionZone))
+
+// State Variables
+var int tradeMode = 0 
+var bool isLocked = false 
+
+// Active Anchors
+var float activeHigh = na
+var float activeLow = na
+
+// Drawing References
+var line l50 = na
+var line l61 = na
+var line l80 = na
+var box bZone = na
+var label lb50 = na
+var label lb80 = na
+
+// RESET at start of new day/monitoring cycle
+if inMonitoringWindow and not inMonitoringWindow[1]
+    tradeMode := 0
+    isLocked := false
+    activeHigh := na
+    activeLow := na
+    l50 := na
+    l61 := na
+    l80 := na
+    bZone := na
+    lb50 := na
+    lb80 := na
+
+// PROCESSING inside Trigger Window
+if inFibWindow
+    // 1. Initial Trigger (Enter Mode)
+    if tradeMode == 0
+        // Sell Trigger: MAs bearish
+        if (sma9 < sma21 and sma9 < sma50)
+            tradeMode := 1 // Sell Mode
+            activeHigh := monitorHigh // Fixed High
+            activeLow := monitorLow   // Dynamic Low
+            
+            // Draw Sell Fibs
+            rangeVal = activeHigh - activeLow
+            lev50 = activeLow + (rangeVal * 0.50)
+            lev61 = activeLow + (rangeVal * 0.618)
+            lev80 = activeLow + (rangeVal * 0.80)
+            
+            bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.red, 85))
+            l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+            l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+            l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+            lb50 := label.new(bar_index, lev50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+            lb80 := label.new(bar_index, lev80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+
+        // Buy Trigger: Market closes above SMA 50
+        else if (close > sma50)
+            tradeMode := 2 // Buy Mode
+            activeLow := monitorLow   // Fixed Low
+            activeHigh := monitorHigh // Dynamic High
+            
+            // Draw Buy Fibs
+            rangeVal = activeHigh - activeLow
+            lev50 = activeHigh - (rangeVal * 0.50)
+            lev61 = activeHigh - (rangeVal * 0.618)
+            lev80 = activeHigh - (rangeVal * 0.80)
+            
+            bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.green, 85))
+            l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+            l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+            l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+            lb50 := label.new(bar_index, lev50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+            lb80 := label.new(bar_index, lev80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+            
+    // 2. Update Logic (if not locked)
+    else if not isLocked
+        // Normal Sell Mode (Mode 1)
+        if tradeMode == 1
+            if low < activeLow
+                activeLow := low
+                line.delete(l50)
+                line.delete(l61)
+                line.delete(l80)
+                box.delete(bZone)
+                label.delete(lb50)
+                label.delete(lb80)
+                
+                rangeVal = activeHigh - activeLow
+                lev50 = activeLow + (rangeVal * 0.50)
+                lev61 = activeLow + (rangeVal * 0.618)
+                lev80 = activeLow + (rangeVal * 0.80)
+                
+                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.red, 85))
+                l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+                l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+                lb50 := label.new(bar_index, lev50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                lb80 := label.new(bar_index, lev80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+            
+            rangeVal = activeHigh - activeLow
+            fib50Limit = activeLow + (rangeVal * 0.50)
+            if high >= fib50Limit
+                isLocked := true
+        
+        // Normal Buy Mode (Mode 2)
+        else if tradeMode == 2
+            if high > activeHigh
+                activeHigh := high
+                line.delete(l50)
+                line.delete(l61)
+                line.delete(l80)
+                box.delete(bZone)
+                label.delete(lb50)
+                label.delete(lb80)
+                
+                rangeVal = activeHigh - activeLow
+                lev50 = activeHigh - (rangeVal * 0.50)
+                lev61 = activeHigh - (rangeVal * 0.618)
+                lev80 = activeHigh - (rangeVal * 0.80)
+                
+                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.green, 85))
+                l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+                l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+                lb50 := label.new(bar_index, lev50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                lb80 := label.new(bar_index, lev80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+            
+            rangeVal = activeHigh - activeLow
+            fib50Limit = activeHigh - (rangeVal * 0.50)
+            if low <= fib50Limit
+                isLocked := true
+
+// Backgrounds
+bgcolor(inMonitoringWindow ? color.new(color.yellow, 90) : na, title="Monitoring")
+
+// Labels on right (SMA)
+var label l_sma50 = na
+var label l_sma21 = na
+var label l_sma9 = na
+var label l_sma100 = na
+var label l_sma200 = na
+
+if barstate.islast
+    label.delete(l_sma50)
+    label.delete(l_sma21)
+    label.delete(l_sma9)
+    label.delete(l_sma100)
+    label.delete(l_sma200)
+    
+    // Shifted labels further to the right using "bar_index + 55"
+    l_sma50 := label.new(bar_index + 55, sma50, "SMA 50: " + str.tostring(sma50, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma21 := label.new(bar_index + 55, sma21, "SMA 21: " + str.tostring(sma21, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma9 := label.new(bar_index + 55, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma100 := label.new(bar_index + 55, sma100, "SMA 100: " + str.tostring(sma100, "#.##"), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma200 := label.new(bar_index + 55, sma200, "SMA 200: " + str.tostring(sma200, "#.##"), color=color.purple, style=label.style_label_left, textcolor=color.white, size=size.small)
+
+// ==========================================
+// 2. MTPC DKO LOGIC (Robust Previous Day)
+// ==========================================
+
+//──────────────── INPUTS ────────────────
+autoTF  = input.bool(true, "Auto Timeframe", group="MTPC DKO")
+tfInput = input.timeframe("1D", "Manual Timeframe", group="MTPC DKO")
+useHA   = input.bool(false, "Use Heikin Ashi Calculation?", group="MTPC DKO")
+
+fibColor50  = input.color(color.blue, "50% Fib", group="MTPC DKO")
+fibColor618 = input.color(color.orange, "61.8% Fib", group="MTPC DKO")
+pocketColor = input.color(color.new(color.purple, 80), "Fib Pocket", group="MTPC DKO")
+
+atrLen = input.int(14, "ATR Length", group="MTPC DKO")
+atrMult = input.float(1.0, "ATR Multiplier for Target", group="MTPC DKO")
+atrColor = input.color(color.black, "ATR Target Line Color", group="MTPC DKO")
+
+bgBullColor = input.color(color.new(color.green, 90), "Bullish Prev BG", group="MTPC DKO")
+bgBearColor = input.color(color.new(color.red, 90), "Bearish Prev BG", group="MTPC DKO")
+
+//──────────────── DATA FETCHING ────────────────
+string tf = autoTF ? "1D" : tfInput
+// Helper to choose ticker based on HA input
+string tickerId = useHA ? ticker.heikinashi(syminfo.tickerid) : syminfo.tickerid
+
+// Fetch Previous Day's Data (Yesterday's Completed Candle)
+// We request Open, High, Low, Close, and ATR for the PREVIOUS period [1]
+// lookahead_on ensures we get the static values for the entire day
+[pOpen, pHigh, pLow, pClose, htfATR] = request.security(tickerId, tf, [open[1], high[1], low[1], close[1], ta.atr(atrLen)], lookahead=barmerge.lookahead_on)
+
+// Determine Trend of YESTERDAY
+bool prevBullish = (pClose > pOpen)
+bool prevBearish = (pClose < pOpen)
+
+// Draw Background based on YESTERDAY'S Trend (Replaced with Range Box)
+// bgcolor(prevBullish ? bgBullColor : prevBearish ? bgBearColor : na, title="MTPC Background")
+
+//──────────────── DRAWING LOGIC (FIBS & POCKET & PREV RANGE BOX) ────────────────
+bool newMP = timeframe.change(tf)
+var int mpStart = na
+
+if newMP
+    mpStart := bar_index
+
+// Only draw if we have valid history and a start point
+if not na(mpStart) and not na(pHigh)
+    int left  = mpStart
+    int right = bar_index
+    
+    // Calc Fibs based on PREVIOUS Range (Directional)
+    // If Bullish: Retrace from High Down (61.8% is BELOW 50%)
+    // If Bearish: Retrace from Low Up (61.8% is ABOVE 50%)
+    float f50  = na
+    float f618 = na
+    
+    if prevBullish
+        f50  := pHigh - (pHigh - pLow) * 0.50
+        f618 := pHigh - (pHigh - pLow) * 0.618
+    else
+        f50  := pLow + (pHigh - pLow) * 0.50
+        f618 := pLow + (pHigh - pLow) * 0.618
+    
+    // Calc ATR Target (Low + ATR)
+    float targetLevel = pLow + (htfATR * atrMult)
+
+    // Objects
+    var line fib50  = na
+    var line fib618 = na
+    var box  fibPocket = na
+    var line atrLine = na
+    // var box  prevRangeBox = na // Removed Background Box
+    
+    // On new MP, reset objects (so we start fresh lines for the new day)
+    if newMP
+        fib50 := na
+        fib618 := na
+        fibPocket := na
+        atrLine := na
+        // prevRangeBox := na
+    
+    // Create or Update
+    if na(fib50)
+        fib50 := line.new(left, f50, right, f50, color=fibColor50, width=2)
+        fib618 := line.new(left, f618, right, f618, color=fibColor618, width=2)
+        // Pocket between 50 and 618
+        fibPocket := box.new(left, math.max(f50, f618), right, math.min(f50, f618), border_color = na, bgcolor = pocketColor)
+        
+        // atrLine moved to Developing Daily Box section
+        
+        // PREVIOUS RANGE BOX (Replacing bgcolor)
+        // Fills the Previous Period's High-Low Range across the current period
+        // prevRangeBox := box.new(left, pHigh, right, pLow, 
+        //      border_color = na, 
+        //      bgcolor = prevBullish ? bgBullColor : bgBearColor)
+    else
+        line.set_x2(fib50, right)
+        line.set_x2(fib618, right)
+        box.set_right(fibPocket, right)
+        // line.set_x2(atrLine, right) // Removed from here
+        // box.set_right(prevRangeBox, right)
+
+
+//──────────────── DAILY RANGE BOX (Colored by Daily Trend) ────────────────
+var box mpBox = na
+var line dailyAtrLine = na // Fixed: Declared variable
+var float currHigh = na
+var float currLow = na
+var float dayOpen = na
+
+// Inputs for Daily Box
+dBoxBullColor = input.color(color.new(color.green, 80), "Daily Box Bullish", group="MTPC DKO")
+dBoxBearColor = input.color(color.new(color.red, 80), "Daily Box Bearish", group="MTPC DKO")
+
+if newMP
+    currHigh := high
+    currLow := low
+    dayOpen := open
+    // Start new box for the day
+    mpBox := box.new(bar_index, currHigh, bar_index, currLow, 
+         border_color = na, 
+         bgcolor = na) 
+         
+    // Start new ATR Line (Based on Start-of-Day Low/High)
+    float startTarget = prevBullish ? (low + htfATR * atrMult) : (high - htfATR * atrMult)
+    dailyAtrLine := line.new(bar_index, startTarget, bar_index, startTarget, color=atrColor, width=2)
+else
+    currHigh := math.max(nz(currHigh, high), high)
+    currLow := math.min(nz(currLow, low), low)
+    
+    // Calc Target (Based on Developing Low/High)
+    float devTarget = prevBullish ? (currLow + htfATR * atrMult) : (currHigh - htfATR * atrMult)
+    
+    if not na(mpBox)
+        box.set_right(mpBox, bar_index)
+        box.set_top(mpBox, currHigh)
+        box.set_bottom(mpBox, currLow)
+        
+        // Update color based on developing trend
+        bool isBull = close > dayOpen
+        box.set_bgcolor(mpBox, isBull ? dBoxBullColor : dBoxBearColor)
+
+    // Update ATR Line
+    if not na(dailyAtrLine)
+        line.set_y1(dailyAtrLine, devTarget)
+        line.set_y2(dailyAtrLine, devTarget)
+        line.set_x2(dailyAtrLine, bar_index)
+
+
+// ==========================================
+// 3. WEEKLY RANGE BOX (Historical & Developing)
+// ==========================================
+
+// Inputs
+showWeekly    = input.bool(true, "Show Weekly Box", group="Weekly Range")
+wBoxBullColor = input.color(color.new(color.green, 95), "Weekly Bullish Fill", group="Weekly Range")
+wBoxBearColor = input.color(color.new(color.red, 95), "Weekly Bearish Fill", group="Weekly Range")
+wBorderColor  = input.color(color.new(color.gray, 60), "Weekly Border Color", group="Weekly Range")
+wFibColor     = input.color(color.new(color.blue, 80), "Weekly Fib Pocket (50-61.8%)", group="Weekly Range")
+
+// Logic
+// We track the Developing Weekly Range directly on the chart
+bool newWeek = timeframe.change("1W")
+
+// Fetch Previous Week's Data (High, Low, Open, Close, ATR)
+[prevWHigh, prevWLow, prevWOpen, prevWClose, wAtr] = request.security(tickerId, "1W", [high[1], low[1], open[1], close[1], ta.atr(14)], lookahead=barmerge.lookahead_on)
+
+// Determine Previous Week's Trend here so it's available globally in this block
+bool prevWBull = prevWClose > prevWOpen
+
+var box currentWBox = na
+var box wFibPocketBox = na 
+var line wAtrLine = na // New Weekly ATR Target Line
+
+var float wOpen = na
+var float wHigh = na
+var float wLow = na
+
+if showWeekly
+    if newWeek
+        // START of a new week
+        wOpen := open
+        wHigh := high
+        wLow := low
+        
+        // Create the box for THIS new week
+        currentWBox := box.new(bar_index, wHigh, bar_index, wLow, 
+             border_color = wBorderColor, 
+             bgcolor = na, 
+             border_style = line.style_dotted, 
+             border_width = 1)
+             
+        // Create Weekly Fib Pocket (Directional based on PREVIOUS week's trend)
+        if not na(prevWHigh)
+            float wf50 = na
+            float wf618 = na
+            
+            if prevWBull
+                // Bullish Week -> Buying Pullback
+                wf50 := prevWHigh - (prevWHigh - prevWLow) * 0.50
+                wf618 := prevWHigh - (prevWHigh - prevWLow) * 0.618
+            else
+                // Bearish Week -> Selling Pullback
+                wf50 := prevWLow + (prevWHigh - prevWLow) * 0.50
+                wf618 := prevWLow + (prevWHigh - prevWLow) * 0.618
+            
+            wFibPocketBox := box.new(bar_index, math.max(wf50, wf618), bar_index, math.min(wf50, wf618), 
+                 border_color = na, 
+                 bgcolor = input.color(color.new(color.navy, 60), "Weekly Fib Pocket Color", group="Weekly Range"))
+
+        // Create Weekly ATR Target Line (Purple)
+        float initialWTarget = prevWBull ? (wLow + wAtr) : (wHigh - wAtr)
+        wAtrLine := line.new(bar_index, initialWTarget, bar_index, initialWTarget, color=color.purple, width=2)
+            
+    else
+        // CONTINUE current week
+        wHigh := math.max(nz(wHigh, high), high)
+        wLow := math.min(nz(wLow, low), low)
+        
+        // Re-calc Weekly Target
+        // We need to calculate this variable so it's available for update below
+        // But since it's local scope here, we need a better way to pass it to the update logic or update line here.
+        float currentWTarget = prevWBull ? (wLow + wAtr) : (wHigh - wAtr)
+        if not na(wAtrLine)
+            line.set_y1(wAtrLine, currentWTarget)
+            line.set_y2(wAtrLine, currentWTarget)
+
+    // Update the box dimensions and color every bar
+    if not na(currentWBox)
+        box.set_top(currentWBox, wHigh)
+        box.set_bottom(currentWBox, wLow)
+        box.set_right(currentWBox, bar_index)
+        
+        // Color based on performance so far (Current Close vs Weekly Open)
+        bool isBull = close > wOpen
+        box.set_bgcolor(currentWBox, isBull ? wBoxBullColor : wBoxBearColor)
+        
+    // Update Weekly Fib Pocket and ATR Line (X-axis only for ATR here)
+    if not na(wFibPocketBox)
+        box.set_right(wFibPocketBox, bar_index)
+    if not na(wAtrLine)
+        line.set_x2(wAtrLine, bar_index)
+
+

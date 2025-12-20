@@ -1,0 +1,23 @@
+//@version=5
+strategy("My New Strategy", overlay=true, margin_long=100, margin_short=100)
+
+// Input parameters
+fastLength = input.int(9, "Fast Length", minval=1)
+slowLength = input.int(21, "Slow Length", minval=1)
+
+// Calculations
+fastMA = ta.sma(close, fastLength)
+slowMA = ta.sma(close, slowLength)
+
+// Plotting
+plot(fastMA, "Fast MA", color=color.blue)
+plot(slowMA, "Slow MA", color=color.orange)
+
+// Strategy Logic
+longCondition = ta.crossover(fastMA, slowMA)
+if (longCondition)
+    strategy.entry("Long", strategy.long)
+
+shortCondition = ta.crossunder(fastMA, slowMA)
+if (shortCondition)
+    strategy.close("Long")
