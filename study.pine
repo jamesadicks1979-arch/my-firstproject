@@ -333,11 +333,12 @@ wFibColor     = input.color(color.new(color.blue, 80), "Weekly Fib Pocket (50-61
 // We track the Developing Weekly Range directly on the chart
 bool newWeek = timeframe.change("1W")
 
-// Fetch Previous Week's Range for Fib Pocket
-[prevWHigh, prevWLow] = request.security(tickerId, "1W", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+// Fetch Previous Week's Data (High, Low, Open, Close, ATR)
+[prevWHigh, prevWLow, prevWOpen, prevWClose, wAtr] = request.security(tickerId, "1W", [high[1], low[1], open[1], close[1], ta.atr(14)], lookahead=barmerge.lookahead_on)
 
 var box currentWBox = na
 var box wFibPocketBox = na 
+var line wAtrLine = na // New Weekly ATR Target Line
 
 var float wOpen = na
 var float wHigh = na
@@ -357,11 +358,33 @@ if showWeekly
              border_style = line.style_dotted, 
              border_width = 1)
              
-        // Create Weekly Fib Pocket (Fixed range from PREVIOUS week)
+        // Create Weekly Fib Pocket (Directional based on PREVIOUS week's trend)
+        // If Prev Week was Bullish: Retracement is measured from High down (Pocket in lower half)
+        // If Prev Week was Bearish: Retracement is measured from Low up (Pocket in upper half)
         if not na(prevWHigh)
-            wf50 = prevWLow + (prevWHigh - prevWLow) * 0.50
-            wf618 = prevWLow + (prevWHigh - prevWLow) * 0.618
-            wFibPocketBox := box.new(bar_index, math.max(wf50, wf618), bar_index, math.min(wf50, wf618), border_color = na, bgcolor = wFibColor)
+            float wf50 = na
+            float wf618 = na
+            bool prevWBull = prevWClose > prevWOpen
+            
+            if prevWBull
+                // Bullish Week -> Buying Pullback -> Pocket is High - 0.618 to High - 0.5
+                wf50 = prevWHigh - (prevWHigh - prevWLow) * 0.50
+                wf618 = prevWHigh - (prevWHigh - prevWLow) * 0.618
+            else
+                // Bearish Week -> Selling Pullback -> Pocket is Low + 0.618 to Low + 0.5
+                wf50 = prevWLow + (prevWHigh - prevWLow) * 0.50
+                wf618 = prevWLow + (prevWHigh - prevWLow) * 0.618
+            
+            wFibPocketBox := box.new(bar_index, math.max(wf50, wf618), bar_index, math.min(wf50, wf618), 
+                 border_color = na, 
+                 bgcolor = input.color(color.new(color.navy, 60), "Weekly Fib Pocket Color", group="Weekly Range"))
+
+        // Create Weekly ATR Target Line (Purple)
+        // Added onto the Low of the Previous Week (as per Daily logic)
+        if not na(wAtr)
+            float wTargetLev = prevWLow + wAtr
+            wAtrLine := line.new(bar_index, wTargetLev, bar_index, wTargetLev, color=color.purple, width=2)
+            
     else
         // CONTINUE current week
         wHigh := math.max(nz(wHigh, high), high)
@@ -377,8 +400,10 @@ if showWeekly
         bool isBull = close > wOpen
         box.set_bgcolor(currentWBox, isBull ? wBoxBullColor : wBoxBearColor)
         
-    // Update Weekly Fib Pocket
+    // Update Weekly Fib Pocket and ATR Line
     if not na(wFibPocketBox)
         box.set_right(wFibPocketBox, bar_index)
+    if not na(wAtrLine)
+        line.set_x2(wAtrLine, bar_index)
 
 
