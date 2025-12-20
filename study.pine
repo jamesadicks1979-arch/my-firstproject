@@ -1,0 +1,12 @@
+//@version=5
+indicator("My New Script", overlay=true)
+
+// Input parameters
+length = input.int(14, "Length", minval=1)
+src = input.source(close, "Source")
+
+// Calculation
+smaValue = ta.sma(src, length)
+
+// Plotting
+plot(smaValue, "SMA", color=color.blue)
