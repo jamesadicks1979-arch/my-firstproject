@@ -9,6 +9,8 @@ indicator("Triple SMA with Session & Fibs (Simple Dynamic) + MTPC DKO", overlay=
 len1 = input.int(50, "Length SMA 1", minval=1, group="Triple SMA")
 len2 = input.int(21, "Length SMA 2", minval=1, group="Triple SMA")
 len3 = input.int(9, "Length SMA 3", minval=1, group="Triple SMA")
+len4 = input.int(100, "Length SMA 4", minval=1, group="Triple SMA")
+len5 = input.int(200, "Length SMA 5", minval=1, group="Triple SMA")
 src = input.source(close, "Source", group="Triple SMA")
 
 // Session Inputs
@@ -20,11 +22,15 @@ sessionZone = input.string("Europe/London", "Timezone", group="Intraday Session"
 sma50 = ta.sma(src, len1)
 sma21 = ta.sma(src, len2)
 sma9 = ta.sma(src, len3)
+sma100 = ta.sma(src, len4)
+sma200 = ta.sma(src, len5)
 
 // Plotting SMAs
 plot(sma50, "SMA 50", color=color.green, linewidth=2)
 plot(sma21, "SMA 21", color=color.blue, linewidth=2)
 plot(sma9, "SMA 9", color=color.red, linewidth=3)
+plot(sma100, "SMA 100", color=color.orange, linewidth=2)
+plot(sma200, "SMA 200", color=color.purple, linewidth=2)
 
 // ------------------------------------------
 // INTRADAY FIB LOGIC
@@ -183,15 +189,22 @@ bgcolor(inMonitoringWindow ? color.new(color.yellow, 90) : na, title="Monitoring
 var label l_sma50 = na
 var label l_sma21 = na
 var label l_sma9 = na
+var label l_sma100 = na
+var label l_sma200 = na
 
 if barstate.islast
     label.delete(l_sma50)
     label.delete(l_sma21)
     label.delete(l_sma9)
+    label.delete(l_sma100)
+    label.delete(l_sma200)
+    
     // Shifted labels further to the right using "bar_index + 45"
     l_sma50 := label.new(bar_index + 45, sma50, "SMA 50: " + str.tostring(sma50, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
     l_sma21 := label.new(bar_index + 45, sma21, "SMA 21: " + str.tostring(sma21, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
     l_sma9 := label.new(bar_index + 45, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma100 := label.new(bar_index + 45, sma100, "SMA 100: " + str.tostring(sma100, "#.##"), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma200 := label.new(bar_index + 45, sma200, "SMA 200: " + str.tostring(sma200, "#.##"), color=color.purple, style=label.style_label_left, textcolor=color.white, size=size.small)
 
 // ==========================================
 // 2. MTPC DKO LOGIC (Robust Previous Day)
