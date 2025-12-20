@@ -199,12 +199,12 @@ if barstate.islast
     label.delete(l_sma100)
     label.delete(l_sma200)
     
-    // Shifted labels further to the right using "bar_index + 45"
-    l_sma50 := label.new(bar_index + 45, sma50, "SMA 50: " + str.tostring(sma50, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
-    l_sma21 := label.new(bar_index + 45, sma21, "SMA 21: " + str.tostring(sma21, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
-    l_sma9 := label.new(bar_index + 45, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
-    l_sma100 := label.new(bar_index + 45, sma100, "SMA 100: " + str.tostring(sma100, "#.##"), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
-    l_sma200 := label.new(bar_index + 45, sma200, "SMA 200: " + str.tostring(sma200, "#.##"), color=color.purple, style=label.style_label_left, textcolor=color.white, size=size.small)
+    // Shifted labels further to the right using "bar_index + 55"
+    l_sma50 := label.new(bar_index + 55, sma50, "SMA 50: " + str.tostring(sma50, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma21 := label.new(bar_index + 55, sma21, "SMA 21: " + str.tostring(sma21, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma9 := label.new(bar_index + 55, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma100 := label.new(bar_index + 55, sma100, "SMA 100: " + str.tostring(sma100, "#.##"), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma200 := label.new(bar_index + 55, sma200, "SMA 200: " + str.tostring(sma200, "#.##"), color=color.purple, style=label.style_label_left, textcolor=color.white, size=size.small)
 
 // ==========================================
 // 2. MTPC DKO LOGIC (Robust Previous Day)
