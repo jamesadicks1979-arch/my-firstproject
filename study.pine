@@ -327,12 +327,18 @@ showWeekly    = input.bool(true, "Show Weekly Box", group="Weekly Range")
 wBoxBullColor = input.color(color.new(color.green, 95), "Weekly Bullish Fill", group="Weekly Range")
 wBoxBearColor = input.color(color.new(color.red, 95), "Weekly Bearish Fill", group="Weekly Range")
 wBorderColor  = input.color(color.new(color.gray, 60), "Weekly Border Color", group="Weekly Range")
+wFibColor     = input.color(color.new(color.blue, 80), "Weekly Fib Pocket (50-61.8%)", group="Weekly Range")
 
 // Logic
 // We track the Developing Weekly Range directly on the chart
 bool newWeek = timeframe.change("1W")
 
+// Fetch Previous Week's Range for Fib Pocket
+[prevWHigh, prevWLow] = request.security(tickerId, "1W", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+
 var box currentWBox = na
+var box wFibPocketBox = na 
+
 var float wOpen = na
 var float wHigh = na
 var float wLow = na
@@ -350,6 +356,14 @@ if showWeekly
              bgcolor = na, 
              border_style = line.style_dotted, 
              border_width = 1)
+             
+        // Create Weekly Fib Pocket (Fixed range from PREVIOUS week)
+        if not na(prevWHigh)
+             float wf50 = prevWLow + (prevWHigh - prevWLow) * 0.50
+             float wf618 = prevWLow + (prevWHigh - prevWLow) * 0.618
+             wFibPocketBox := box.new(bar_index, math.max(wf50, wf618), bar_index, math.min(wf50, wf618),
+                border_color = na,
+                bgcolor = wFibColor)
     else
         // CONTINUE current week
         wHigh := math.max(nz(wHigh, high), high)
@@ -364,5 +378,9 @@ if showWeekly
         // Color based on performance so far (Current Close vs Weekly Open)
         bool isBull = close > wOpen
         box.set_bgcolor(currentWBox, isBull ? wBoxBullColor : wBoxBearColor)
+        
+    // Update Weekly Fib Pocket
+    if not na(wFibPocketBox)
+        box.set_right(wFibPocketBox, bar_index)
 
 
