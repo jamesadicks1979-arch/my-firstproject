@@ -297,9 +297,9 @@ if not na(mpStart) and not na(pHigh)
         
         // PREVIOUS RANGE BOX (Replacing bgcolor)
         // Fills the Previous Period's High-Low Range across the current period
-        prevRangeBox := box.new(left, pHigh, right, pLow, 
-             border_color = na, 
-             bgcolor = prevBullish ? bgBullColor : bgBearColor)
+        // prevRangeBox := box.new(left, pHigh, right, pLow, 
+        //      border_color = na, 
+        //      bgcolor = prevBullish ? bgBullColor : bgBearColor)
     else
         line.set_x2(fib50, right)
         line.set_x2(fib618, right)
