@@ -288,8 +288,8 @@ if not na(mpStart) and not na(pHigh)
     
     // Create or Update
     if na(fib50)
-        fib50 := line.new(left, f50, right, f50, color=fibColor50, width=2)
-        fib618 := line.new(left, f618, right, f618, color=fibColor618, width=2)
+        // fib50 := line.new(left, f50, right, f50, color=fibColor50, width=2)
+        // fib618 := line.new(left, f618, right, f618, color=fibColor618, width=2)
         // Pocket between 50 and 618
         fibPocket := box.new(left, math.max(f50, f618), right, math.min(f50, f618), border_color = na, bgcolor = pocketColor)
         
@@ -300,8 +300,8 @@ if not na(mpStart) and not na(pHigh)
         //      border_color = na, 
         //      bgcolor = prevBullish ? bgBullColor : bgBearColor)
     else
-        line.set_x2(fib50, right)
-        line.set_x2(fib618, right)
+        // line.set_x2(fib50, right)
+        // line.set_x2(fib618, right)
         box.set_right(fibPocket, right)
         // line.set_x2(atrLine, right) // Removed from here
         // box.set_right(prevRangeBox, right)
