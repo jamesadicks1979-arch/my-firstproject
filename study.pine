@@ -8,7 +8,7 @@ len3 = input.int(9, "Length SMA 3", minval=1)
 src = input.source(close, "Source")
 
 // Session Inputs
-monitoringTime = input.session("1330-1430", "High/Low Monitoring Period")
+monitoringTime = input.session("1200-1430", "High/Low Monitoring Period")
 fibLookPeriod = input.session("1430-1630", "Fib Trigger Period")
 sessionZone = input.string("Europe/London", "Timezone")
 
