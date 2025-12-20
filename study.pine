@@ -188,10 +188,10 @@ if barstate.islast
     label.delete(l_sma50)
     label.delete(l_sma21)
     label.delete(l_sma9)
-    // Shifted labels further to the right using "bar_index + 25"
-    l_sma50 := label.new(bar_index + 25, sma50, "SMA 50: " + str.tostring(sma50, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
-    l_sma21 := label.new(bar_index + 25, sma21, "SMA 21: " + str.tostring(sma21, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
-    l_sma9 := label.new(bar_index + 25, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+    // Shifted labels further to the right using "bar_index + 35"
+    l_sma50 := label.new(bar_index + 35, sma50, "SMA 50: " + str.tostring(sma50, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma21 := label.new(bar_index + 35, sma21, "SMA 21: " + str.tostring(sma21, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma9 := label.new(bar_index + 35, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
 
 // ==========================================
 // 2. MTPC DKO LOGIC (Robust Previous Day)
