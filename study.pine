@@ -305,7 +305,7 @@ if not na(mpStart) and not na(pHigh)
         line.set_x2(fib618, right)
         box.set_right(fibPocket, right)
         // line.set_x2(atrLine, right) // Removed from here
-        box.set_right(prevRangeBox, right)
+        // box.set_right(prevRangeBox, right)
 
 
 //──────────────── DAILY RANGE BOX (Colored by Daily Trend) ────────────────
