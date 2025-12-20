@@ -227,10 +227,10 @@ string tickerId = useHA ? ticker.heikinashi(syminfo.tickerid) : syminfo.tickerid
 bool prevBullish = (pClose > pOpen)
 bool prevBearish = (pClose < pOpen)
 
-// Draw Background based on YESTERDAY'S Trend
-bgcolor(prevBullish ? bgBullColor : prevBearish ? bgBearColor : na, title="MTPC Background")
+// Draw Background based on YESTERDAY'S Trend (Replaced with Range Box)
+// bgcolor(prevBullish ? bgBullColor : prevBearish ? bgBearColor : na, title="MTPC Background")
 
-//──────────────── DRAWING LOGIC (FIBS & POCKET) ────────────────
+//──────────────── DRAWING LOGIC (FIBS & POCKET & PREV RANGE BOX) ────────────────
 bool newMP = timeframe.change(tf)
 var int mpStart = na
 
@@ -254,6 +254,7 @@ if not na(mpStart) and not na(pHigh)
     var line fib618 = na
     var box  fibPocket = na
     var line atrLine = na
+    var box  prevRangeBox = na // New Background Box
     
     // On new MP, reset objects (so we start fresh lines for the new day)
     if newMP
@@ -261,6 +262,7 @@ if not na(mpStart) and not na(pHigh)
         fib618 := na
         fibPocket := na
         atrLine := na
+        prevRangeBox := na
     
     // Create or Update
     if na(fib50)
@@ -270,11 +272,19 @@ if not na(mpStart) and not na(pHigh)
         fibPocket := box.new(left, math.max(f50, f618), right, math.min(f50, f618), border_color = na, bgcolor = pocketColor)
         
         atrLine := line.new(left, targetLevel, right, targetLevel, color=atrColor, width=2, style=line.style_solid)
+        
+        // PREVIOUS RANGE BOX (Replacing bgcolor)
+        // Fills the Previous Period's High-Low Range across the current period
+        prevRangeBox := box.new(left, pHigh, right, pLow, 
+             border_color = na, 
+             bgcolor = prevBullish ? bgBullColor : bgBearColor)
     else
         line.set_x2(fib50, right)
         line.set_x2(fib618, right)
         box.set_right(fibPocket, right)
         line.set_x2(atrLine, right)
+        box.set_right(prevRangeBox, right)
+
 
 //──────────────── DAILY RANGE BOX (Colored by Daily Trend) ────────────────
 var box mpBox = na
