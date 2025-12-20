@@ -1,5 +1,5 @@
 //@version=5
-indicator("Triple SMA with Session & Fibs", overlay=true)
+indicator("Triple SMA with Session & Fibs (Dynamic)", overlay=true)
 
 // Input parameters
 len1 = input.int(50, "Length SMA 1", minval=1)
@@ -13,106 +13,162 @@ fibLookPeriod = input.session("1430-1630", "Fib Trigger Period")
 sessionZone = input.string("Europe/London", "Timezone")
 
 // Calculation
-sma50 = ta.sma(src, len1) // SMA 50 (Green)
-sma21 = ta.sma(src, len2) // SMA 21 (Blue)
-sma9 = ta.sma(src, len3)  // SMA 9 (Red)
+sma50 = ta.sma(src, len1)
+sma21 = ta.sma(src, len2)
+sma9 = ta.sma(src, len3)
 
 // Plotting SMAs
 plot(sma50, "SMA 50", color=color.green, linewidth=2)
 plot(sma21, "SMA 21", color=color.blue, linewidth=2)
 plot(sma9, "SMA 9", color=color.red, linewidth=3)
 
-// Logic for High/Low tracking between 13:30 and 14:30
+// ==========================================
+// LOGIC
+// ==========================================
+
+// 1. Monitor High/Low (13:30 - 14:30)
 inMonitoringWindow = not na(time(timeframe.period, monitoringTime, sessionZone))
 
-// Variables to store the High and Low since 13:30
-var float periodHigh = na
-var float periodLow = na
+var float monitorHigh = na
+var float monitorLow = na
 
-// Reset or Track High/Low
 if inMonitoringWindow
-    if not inMonitoringWindow[1] // Start of period
-        periodHigh := high
-        periodLow := low
+    if not inMonitoringWindow[1]
+        monitorHigh := high
+        monitorLow := low
     else
-        periodHigh := math.max(periodHigh, high)
-        periodLow := math.min(periodLow, low)
+        monitorHigh := math.max(monitorHigh, high)
+        monitorLow := math.min(monitorLow, low)
 
-// Fib Look Logic between 14:30 and 16:30
+// 2. Trigger & Dynamic Updates (14:30 - 16:30)
 inFibWindow = not na(time(timeframe.period, fibLookPeriod, sessionZone))
 
-// We only want to draw the fibs ONCE per session.
-var bool fibsDrawn = false
+// State Variables
+// 0 = Idle/Waiting
+// 1 = Sell Mode (Trailing Low)
+// 2 = Buy Mode (Trailing High)
+var int tradeMode = 0 
+var bool isLocked = false // Becomes true once price hits 50% retracement
 
-// Reset flag at start of new monitoring period (next day)
+// Active Anchors for the Fib Calculation
+var float activeHigh = na
+var float activeLow = na
+
+// Drawing References
+var line l50 = na
+var line l61 = na
+var line l80 = na
+var box bZone = na
+var label lb50 = na
+var label lb80 = na
+
+// Helper function to delete drawings
+deleteDrawings() =>
+    line.delete(l50)
+    line.delete(l61)
+    line.delete(l80)
+    box.delete(bZone)
+    label.delete(lb50)
+    label.delete(lb80)
+
+// Helper function to draw Sell Fibs
+drawSellFibs(float _high, float _low) =>
+    rangeVal = _high - _low
+    // Retracement UP from Low
+    lev50 = _low + (rangeVal * 0.50)
+    lev61 = _low + (rangeVal * 0.618)
+    lev80 = _low + (rangeVal * 0.80)
+    
+    // Draw
+    bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.red, 85))
+    l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+    l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+    l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+    lb50 := label.new(bar_index, lev50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+    lb80 := label.new(bar_index, lev80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+
+// Helper function to draw Buy Fibs
+drawBuyFibs(float _high, float _low) =>
+    rangeVal = _high - _low
+    // Retracement DOWN from High
+    lev50 = _high - (rangeVal * 0.50)
+    lev61 = _high - (rangeVal * 0.618)
+    lev80 = _high - (rangeVal * 0.80)
+    
+    // Draw
+    bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.green, 85))
+    l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+    l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+    l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+    lb50 := label.new(bar_index, lev50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+    lb80 := label.new(bar_index, lev80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+
+// RESET at start of new day/monitoring cycle
 if inMonitoringWindow and not inMonitoringWindow[1]
-    fibsDrawn := false
+    tradeMode := 0
+    isLocked := false
+    activeHigh := na
+    activeLow := na
+    deleteDrawings()
 
-// Check Logic inside the 14:30 - 16:30 window
-if inFibWindow and not fibsDrawn
-    // Condition 1: MAs above market (Sell Scenario)
-    if (sma9 < sma21 and sma9 < sma50)
-        rangeVal = periodHigh - periodLow
-        
-        // Sell Fibs (Retracement goes UP from Low)
-        // 50% = Low + 0.50 * Range
-        // 61.8% = Low + 0.618 * Range (Higher than 50%)
-        // 80% = Low + 0.80 * Range (Highest)
-        
-        sellFib50 = periodLow + (rangeVal * 0.50)
-        sellFib61 = periodLow + (rangeVal * 0.618)
-        sellFib80 = periodLow + (rangeVal * 0.80) 
-        
-        // Fill box between 50% and 61.8%
-        box.new(bar_index, sellFib50, bar_index + 20, sellFib61, border_width=0, bgcolor=color.new(color.red, 85))
-        
-        line.new(bar_index, sellFib50, bar_index + 20, sellFib50, color=color.gray, width=1, style=line.style_dashed)
-        line.new(bar_index, sellFib61, bar_index + 20, sellFib61, color=color.gray, width=1, style=line.style_dashed)
-        line.new(bar_index, sellFib80, bar_index + 20, sellFib80, color=color.red, width=2)
-        
-        label.new(bar_index, sellFib50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
-        label.new(bar_index, sellFib80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
-        
-        fibsDrawn := true
+// PROCESSING inside Trigger Window
+if inFibWindow
+    // 1. Initial Trigger (Enter Mode)
+    if tradeMode == 0
+        // Sell Trigger: MAs bearish
+        if (sma9 < sma21 and sma9 < sma50)
+            tradeMode := 1 // Sell Mode
+            activeHigh := monitorHigh // Fixed High
+            activeLow := monitorLow   // Dynamic Low
+            drawSellFibs(activeHigh, activeLow)
 
-    // Condition 2: Market closes above 50 SMA (Buy Scenario)
-    else if (close > sma50)
-        rangeVal = periodHigh - periodLow
-        
-        // Buy Fibs (Retracement goes DOWN from High)
-        // 50% = High - 0.50 * Range
-        // 61.8% = High - 0.618 * Range
-        // 80% = High - 0.80 * Range (Lowest)
-        
-        buyFib50 = periodHigh - (rangeVal * 0.50)
-        buyFib61 = periodHigh - (rangeVal * 0.618)
-        buyFib80 = periodHigh - (rangeVal * 0.80)
+        // Buy Trigger: Market closes above SMA 50
+        else if (close > sma50)
+            tradeMode := 2 // Buy Mode
+            activeLow := monitorLow   // Fixed Low
+            activeHigh := monitorHigh // Dynamic High
+            drawBuyFibs(activeHigh, activeLow)
+            
+    // 2. Update Logic (if not locked)
+    else if not isLocked
+        if tradeMode == 1 // Sell Mode
+            // Update Low if price makes new low
+            if low < activeLow
+                activeLow := low
+                deleteDrawings()
+                drawSellFibs(activeHigh, activeLow)
+            
+            // Check if Retracement hit 50%
+            rangeVal = activeHigh - activeLow
+            fib50Limit = activeLow + (rangeVal * 0.50)
+            if high >= fib50Limit
+                isLocked := true
+                
+        else if tradeMode == 2 // Buy Mode
+            // Update High if price makes new high
+            if high > activeHigh
+                activeHigh := high
+                deleteDrawings()
+                drawBuyFibs(activeHigh, activeLow)
+                
+            // Check if Retracement hit 50%
+            rangeVal = activeHigh - activeLow
+            fib50Limit = activeHigh - (rangeVal * 0.50)
+            if low <= fib50Limit
+                isLocked := true
 
-        // Fill box between 50% and 61.8%
-        box.new(bar_index, buyFib50, bar_index + 20, buyFib61, border_width=0, bgcolor=color.new(color.green, 85))
-        
-        line.new(bar_index, buyFib50, bar_index + 20, buyFib50, color=color.gray, width=1, style=line.style_dashed)
-        line.new(bar_index, buyFib61, bar_index + 20, buyFib61, color=color.gray, width=1, style=line.style_dashed)
-        line.new(bar_index, buyFib80, bar_index + 20, buyFib80, color=color.red, width=2)
-        
-        label.new(bar_index, buyFib50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
-        label.new(bar_index, buyFib80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
-        
-        fibsDrawn := true
+// Backgrounds
+bgcolor(inMonitoringWindow ? color.new(color.yellow, 90) : na, title="Monitoring")
 
-// Highlight the monitoring period background (13:30 - 14:30)
-bgcolor(inMonitoringWindow ? color.new(color.yellow, 90) : na, title="Monitoring Period")
-
-// Labels on the right
-var label l1 = na
-var label l2 = na
-var label l3 = na
+// Labels on right (Persistent)
+var label l_sma50 = na
+var label l_sma21 = na
+var label l_sma9 = na
 
 if barstate.islast
-    label.delete(l1)
-    label.delete(l2)
-    label.delete(l3)
-    
-    l1 := label.new(bar_index + 3, sma50, "SMA 50: " + str.tostring(sma50, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
-    l2 := label.new(bar_index + 3, sma21, "SMA 21: " + str.tostring(sma21, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
-    l3 := label.new(bar_index + 3, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label.delete(l_sma50)
+    label.delete(l_sma21)
+    label.delete(l_sma9)
+    l_sma50 := label.new(bar_index + 3, sma50, "SMA 50: " + str.tostring(sma50, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma21 := label.new(bar_index + 3, sma21, "SMA 21: " + str.tostring(sma21, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
+    l_sma9 := label.new(bar_index + 3, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
