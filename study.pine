@@ -254,15 +254,8 @@ if canDraw
     if na(fib50)
         fib50 := line.new(left, f50, right, f50, color=fibColor50, width=2)
         fib618 := line.new(left, f618, right, f618, color=fibColor618, width=2)
-
-        fibBox := box.new(
-            left   = left,
-            right  = right,
-            top    = math.max(f50, f618),
-            bottom = math.min(f50, f618),
-            bgcolor = pocketColor,
-            border_color = na
-        )
+        // Fixed: Box.new on one line to avoid indentation errors
+        fibBox := box.new(left, math.max(f50, f618), right, math.min(f50, f618), border_color = na, bgcolor = pocketColor)
     else
         line.set_x2(fib50, right)
         line.set_x2(fib618, right)
@@ -272,14 +265,8 @@ if canDraw
 var box mpBox = na
 
 if newMP
-    mpBox := box.new(
-        left   = mpStart,
-        right  = bar_index,
-        top    = mpHigh,
-        bottom = mpLow,
-        bgcolor = color.new(color.gray, 90),
-        border_color = color.gray
-    )
+    // Fixed: Box.new on one line to avoid indentation errors
+    mpBox := box.new(mpStart, mpHigh, bar_index, mpLow, border_color = color.gray, bgcolor = color.new(color.gray, 90))
 else if not na(mpBox)
     box.set_right(mpBox, bar_index)
     box.set_top(mpBox, mpHigh)
