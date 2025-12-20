@@ -62,46 +62,9 @@ var box bZone = na
 var label lb50 = na
 var label lb80 = na
 
-// Helper function to delete drawings
-deleteDrawings() =>
-    line.delete(l50)
-    line.delete(l61)
-    line.delete(l80)
-    box.delete(bZone)
-    label.delete(lb50)
-    label.delete(lb80)
-
-// Helper function to draw Sell Fibs
-drawSellFibs(float _high, float _low) =>
-    rangeVal = _high - _low
-    // Retracement UP from Low
-    lev50 = _low + (rangeVal * 0.50)
-    lev61 = _low + (rangeVal * 0.618)
-    lev80 = _low + (rangeVal * 0.80)
-    
-    // Draw
-    bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.red, 85))
-    l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
-    l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
-    l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
-    lb50 := label.new(bar_index, lev50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
-    lb80 := label.new(bar_index, lev80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
-
-// Helper function to draw Buy Fibs
-drawBuyFibs(float _high, float _low) =>
-    rangeVal = _high - _low
-    // Retracement DOWN from High
-    lev50 = _high - (rangeVal * 0.50)
-    lev61 = _high - (rangeVal * 0.618)
-    lev80 = _high - (rangeVal * 0.80)
-    
-    // Draw
-    bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.green, 85))
-    l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
-    l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
-    l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
-    lb50 := label.new(bar_index, lev50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
-    lb80 := label.new(bar_index, lev80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+// Helper function to delete drawings - can't rely on globals directly if trying to reassign in v5 func,
+// but void function calling delete on ID is fine.
+// However, to be safe and avoid "Global variable access" issues in different contexts, I'll inline deletion too.
 
 // RESET at start of new day/monitoring cycle
 if inMonitoringWindow and not inMonitoringWindow[1]
@@ -109,7 +72,12 @@ if inMonitoringWindow and not inMonitoringWindow[1]
     isLocked := false
     activeHigh := na
     activeLow := na
-    deleteDrawings()
+    line.delete(l50)
+    line.delete(l61)
+    line.delete(l80)
+    box.delete(bZone)
+    label.delete(lb50)
+    label.delete(lb80)
 
 // PROCESSING inside Trigger Window
 if inFibWindow
@@ -120,14 +88,38 @@ if inFibWindow
             tradeMode := 1 // Sell Mode
             activeHigh := monitorHigh // Fixed High
             activeLow := monitorLow   // Dynamic Low
-            drawSellFibs(activeHigh, activeLow)
+            
+            // Draw Sell Fibs (Inline)
+            rangeVal = activeHigh - activeLow
+            lev50 = activeLow + (rangeVal * 0.50)
+            lev61 = activeLow + (rangeVal * 0.618)
+            lev80 = activeLow + (rangeVal * 0.80)
+            
+            bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.red, 85))
+            l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+            l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+            l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+            lb50 := label.new(bar_index, lev50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+            lb80 := label.new(bar_index, lev80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
 
         // Buy Trigger: Market closes above SMA 50
         else if (close > sma50)
             tradeMode := 2 // Buy Mode
             activeLow := monitorLow   // Fixed Low
             activeHigh := monitorHigh // Dynamic High
-            drawBuyFibs(activeHigh, activeLow)
+            
+            // Draw Buy Fibs (Inline)
+            rangeVal = activeHigh - activeLow
+            lev50 = activeHigh - (rangeVal * 0.50)
+            lev61 = activeHigh - (rangeVal * 0.618)
+            lev80 = activeHigh - (rangeVal * 0.80)
+            
+            bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.green, 85))
+            l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+            l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+            l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+            lb50 := label.new(bar_index, lev50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+            lb80 := label.new(bar_index, lev80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
             
     // 2. Update Logic (if not locked)
     else if not isLocked
@@ -135,8 +127,26 @@ if inFibWindow
             // Update Low if price makes new low
             if low < activeLow
                 activeLow := low
-                deleteDrawings()
-                drawSellFibs(activeHigh, activeLow)
+                // Delete Old
+                line.delete(l50)
+                line.delete(l61)
+                line.delete(l80)
+                box.delete(bZone)
+                label.delete(lb50)
+                label.delete(lb80)
+                
+                // Draw New Sell Fibs
+                rangeVal = activeHigh - activeLow
+                lev50 = activeLow + (rangeVal * 0.50)
+                lev61 = activeLow + (rangeVal * 0.618)
+                lev80 = activeLow + (rangeVal * 0.80)
+                
+                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.red, 85))
+                l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+                l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+                lb50 := label.new(bar_index, lev50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                lb80 := label.new(bar_index, lev80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
             
             // Check if Retracement hit 50%
             rangeVal = activeHigh - activeLow
@@ -148,8 +158,26 @@ if inFibWindow
             // Update High if price makes new high
             if high > activeHigh
                 activeHigh := high
-                deleteDrawings()
-                drawBuyFibs(activeHigh, activeLow)
+                // Delete Old
+                line.delete(l50)
+                line.delete(l61)
+                line.delete(l80)
+                box.delete(bZone)
+                label.delete(lb50)
+                label.delete(lb80)
+                
+                // Draw New Buy Fibs
+                rangeVal = activeHigh - activeLow
+                lev50 = activeHigh - (rangeVal * 0.50)
+                lev61 = activeHigh - (rangeVal * 0.618)
+                lev80 = activeHigh - (rangeVal * 0.80)
+                
+                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.green, 85))
+                l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+                l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+                lb50 := label.new(bar_index, lev50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                lb80 := label.new(bar_index, lev80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
                 
             // Check if Retracement hit 50%
             rangeVal = activeHigh - activeLow
