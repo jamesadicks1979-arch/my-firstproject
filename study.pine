@@ -385,33 +385,24 @@ if showWeekly
              border_width = 1)
              
         // Create Weekly Fib Pocket (Directional based on PREVIOUS week's trend)
-        // If Prev Week was Bullish: Retracement is measured from High down (Pocket in lower half)
-        // If Prev Week was Bearish: Retracement is measured from Low up (Pocket in upper half)
         if not na(prevWHigh)
             float wf50 = na
             float wf618 = na
-            // bool prevWBull = prevWClose > prevWOpen // Removed local declaration
             
             if prevWBull
                 // Bullish Week -> Buying Pullback
-                // Pocket is between High - 50% (Higher Price) and High - 61.8% (Lower Price)
-                // 50% Retracement Level
-                wf50 = prevWHigh - (prevWHigh - prevWLow) * 0.50
-                // 61.8% Retracement Level (Deeper pullback, so lower price)
-                wf618 = prevWHigh - (prevWHigh - prevWLow) * 0.618
+                wf50 := prevWHigh - (prevWHigh - prevWLow) * 0.50
+                wf618 := prevWHigh - (prevWHigh - prevWLow) * 0.618
             else
                 // Bearish Week -> Selling Pullback
-                // Pocket is between Low + 50% (Lower Price) and Low + 61.8% (Higher Price)
-                wf50 = prevWLow + (prevWHigh - prevWLow) * 0.50
-                wf618 = prevWLow + (prevWHigh - prevWLow) * 0.618
+                wf50 := prevWLow + (prevWHigh - prevWLow) * 0.50
+                wf618 := prevWLow + (prevWHigh - prevWLow) * 0.618
             
             wFibPocketBox := box.new(bar_index, math.max(wf50, wf618), bar_index, math.min(wf50, wf618), 
                  border_color = na, 
                  bgcolor = input.color(color.new(color.navy, 60), "Weekly Fib Pocket Color", group="Weekly Range"))
 
         // Create Weekly ATR Target Line (Purple)
-        // Added onto the Low/High of the CURRENT Developing Week (Directional)
-        // We initialize it here, and update it in the 'else' block
         float initialWTarget = prevWBull ? (wLow + wAtr) : (wHigh - wAtr)
         wAtrLine := line.new(bar_index, initialWTarget, bar_index, initialWTarget, color=color.purple, width=2)
             
@@ -420,11 +411,13 @@ if showWeekly
         wHigh := math.max(nz(wHigh, high), high)
         wLow := math.min(nz(wLow, low), low)
         
-        // Re-calc Weekly Target based on PREVIOUS Week's Direction
-        // If Prev Week Bullish -> Target = Current Week Low + ATR
-        // If Prev Week Bearish -> Target = Current Week High - ATR
-        // bool prevWBull = prevWClose > prevWOpen // Removed local declaration
-        float wTarget = prevWBull ? (wLow + wAtr) : (wHigh - wAtr)
+        // Re-calc Weekly Target
+        // We need to calculate this variable so it's available for update below
+        // But since it's local scope here, we need a better way to pass it to the update logic or update line here.
+        float currentWTarget = prevWBull ? (wLow + wAtr) : (wHigh - wAtr)
+        if not na(wAtrLine)
+             line.set_y1(wAtrLine, currentWTarget)
+             line.set_y2(wAtrLine, currentWTarget)
 
     // Update the box dimensions and color every bar
     if not na(currentWBox)
@@ -436,12 +429,10 @@ if showWeekly
         bool isBull = close > wOpen
         box.set_bgcolor(currentWBox, isBull ? wBoxBullColor : wBoxBearColor)
         
-    // Update Weekly Fib Pocket and ATR Line
+    // Update Weekly Fib Pocket and ATR Line (X-axis only for ATR here)
     if not na(wFibPocketBox)
         box.set_right(wFibPocketBox, bar_index)
     if not na(wAtrLine)
-        line.set_y1(wAtrLine, wTarget)
-        line.set_y2(wAtrLine, wTarget)
         line.set_x2(wAtrLine, bar_index)
 
 
