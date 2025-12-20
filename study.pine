@@ -194,7 +194,7 @@ if barstate.islast
     l_sma9 := label.new(bar_index + 15, sma9, "SMA 9: " + str.tostring(sma9, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
 
 // ==========================================
-// 2. MTPC DKO LOGIC
+// 2. MTPC DKO LOGIC (Updated with Backgrounds & ATR)
 // ==========================================
 
 //──────────────── INPUTS ────────────────
@@ -205,6 +205,14 @@ fibColor50  = input.color(color.blue, "50% Fib", group="MTPC DKO")
 fibColor618 = input.color(color.orange, "61.8% Fib", group="MTPC DKO")
 pocketColor = input.color(color.new(color.purple, 80), "Fib Pocket", group="MTPC DKO")
 
+// New Inputs for Backgrounds & ATR
+atrLen = input.int(14, "ATR Length", group="MTPC DKO")
+atrMult = input.float(1.0, "ATR Multiplier for Target", group="MTPC DKO")
+atrColor = input.color(color.black, "ATR Target Line Color", group="MTPC DKO")
+
+bgBullColor = input.color(color.new(color.green, 90), "Bullish Prev BG", group="MTPC DKO")
+bgBearColor = input.color(color.new(color.red, 90), "Bearish Prev BG", group="MTPC DKO")
+
 //──────────────── TIMEFRAME SELECTION ────────────────
 string tf = autoTF ? "1D" : tfInput
 
@@ -214,27 +222,53 @@ bool newMP = timeframe.change(tf)
 //──────────────── MP RANGE TRACKING ────────────────
 var float mpHigh = na
 var float mpLow  = na
+var float mpOpen = na // Need Open to determine color
+var float mpClose = na
 
 var float prevHigh = na
 var float prevLow  = na
+var float prevOpen = na
+var float prevClose = na
 
 var int mpStart = na
 
+// ATR Calculation (on Higher Timeframe)
+// We need to fetch ATR from the higher timeframe
+htfATR = request.security(syminfo.tickerid, tf, ta.atr(atrLen))
+
+// Update Logic
 if newMP
     prevHigh := mpHigh
     prevLow  := mpLow
+    prevOpen := mpOpen
+    prevClose := mpClose // The last known close of the prev session
 
     mpHigh := high
     mpLow  := low
+    mpOpen := open
+    mpClose := close
     mpStart := bar_index
 else
     mpHigh := na(mpHigh) ? high : math.max(mpHigh, high)
     mpLow  := na(mpLow)  ? low  : math.min(mpLow, low)
+    if na(mpOpen)
+        mpOpen := open
+    mpClose := close // Continuously update close to be the 'current' close of the TF
+
+//──────────────── BACKGROUND COLOR ────────────────
+// "add a background colour if last period was green and red if it was bearish"
+// Determine trend of previous MP
+bool prevBullish = not na(prevClose) and (prevClose > prevOpen)
+bool prevBearish = not na(prevClose) and (prevClose < prevOpen)
+
+// Draw background for the CURRENT period based on PREVIOUS period status
+bgcolor(prevBullish ? bgBullColor : prevBearish ? bgBearColor : na, title="MTPC Background")
 
 //──────────────── FIB OBJECTS ────────────────
 var line fib50  = na
 var line fib618 = na
 var box  fibBox = na
+var line atrLine = na // ATR Target Object
 
 //──────────────── DRAW FIBS ACROSS CURRENT MP ────────────────
 bool canDraw = not na(prevHigh) and not na(prevLow)
@@ -243,30 +277,54 @@ if newMP
     fib50  := na
     fib618 := na
     fibBox := na
+    atrLine := na
 
 if canDraw
     float f50  = prevLow + (prevHigh - prevLow) * 0.50
     float f618 = prevLow + (prevHigh - prevLow) * 0.618
 
+    // ATR Target Logic
+    // "black line for an atr target line which is added on to the low of that time period"
+    // Assuming adding to the Previous Low? Or Current Low?
+    // Usually target is projected from the range.
+    // "added on to the low of that time period" -> If bearish period, maybe subtract?
+    // If user says "added on to the low", literally Low + ATR.
+    // But if it was a bullish period (Green), maybe we target High + ATR?
+    // Let's stick to "added on to the low" as requested literally first.
+    // Wait, if it's a target, maybe it's Low - ATR (for shorts)? Or Low + ATR (reversion)?
+    // Re-reading: "atr target line which is added on to the low of that time period"
+    // I will do: Target = prevLow + htfATR.
+    // If you meant "subtracted from high" or directional, let me know.
+    
+    // Actually, usually:
+    // If Prev Period was Green (Bullish), we might expect continuation? Or reversion?
+    // Let's implement literally: Line at (Prev Low + ATR).
+    
+    float targetLevel = prevLow + (htfATR * atrMult) 
+    
     int left  = mpStart
     int right = bar_index
 
     if na(fib50)
         fib50 := line.new(left, f50, right, f50, color=fibColor50, width=2)
         fib618 := line.new(left, f618, right, f618, color=fibColor618, width=2)
-        // Fixed: Box.new on one line to avoid indentation errors
+        // Fixed: Box.new on one line
         fibBox := box.new(left, math.max(f50, f618), right, math.min(f50, f618), border_color = na, bgcolor = pocketColor)
+        
+        // Draw ATR Line
+        atrLine := line.new(left, targetLevel, right, targetLevel, color=atrColor, width=2, style=line.style_solid)
     else
         line.set_x2(fib50, right)
         line.set_x2(fib618, right)
         box.set_right(fibBox, right)
+        line.set_x2(atrLine, right)
 
 //──────────────── OPTIONAL MP BOX ────────────────
 var box mpBox = na
 
 if newMP
-    // Fixed: Box.new on one line to avoid indentation errors
-    mpBox := box.new(mpStart, mpHigh, bar_index, mpLow, border_color = color.gray, bgcolor = color.new(color.gray, 90))
+    // Fixed: Box.new on one line
+    mpBox := box.new(mpStart, mpHigh, bar_index, mpLow, border_color = color.gray, bgcolor = na) // removed bg fill to not clash with main bg
 else if not na(mpBox)
     box.set_right(mpBox, bar_index)
     box.set_top(mpBox, mpHigh)
