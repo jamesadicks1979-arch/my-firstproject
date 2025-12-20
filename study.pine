@@ -297,6 +297,7 @@ if not na(mpStart) and not na(pHigh)
 
 //──────────────── DAILY RANGE BOX (Colored by Daily Trend) ────────────────
 var box mpBox = na
+var line dailyAtrLine = na // Fixed: Declared variable
 var float currHigh = na
 var float currLow = na
 var float dayOpen = na
@@ -304,13 +305,6 @@ var float dayOpen = na
 // Inputs for Daily Box
 dBoxBullColor = input.color(color.new(color.green, 80), "Daily Box Bullish", group="MTPC DKO")
 dBoxBearColor = input.color(color.new(color.red, 80), "Daily Box Bearish", group="MTPC DKO")
-
-// Daily ATR Target Calc (Directional based on Prev Trend)
-float dTarget = na
-if prevBullish
-    dTarget := nz(currLow, low) + (htfATR * atrMult)
-else
-    dTarget := nz(currHigh, high) - (htfATR * atrMult)
 
 if newMP
     currHigh := high
@@ -321,17 +315,15 @@ if newMP
          border_color = na, 
          bgcolor = na) 
          
-    // Start new ATR Line
-    atrLine := line.new(bar_index, dTarget, bar_index, dTarget, color=atrColor, width=2)
+    // Start new ATR Line (Based on Start-of-Day Low/High)
+    float startTarget = prevBullish ? (low + htfATR * atrMult) : (high - htfATR * atrMult)
+    dailyAtrLine := line.new(bar_index, startTarget, bar_index, startTarget, color=atrColor, width=2)
 else
     currHigh := math.max(nz(currHigh, high), high)
     currLow := math.min(nz(currLow, low), low)
     
-    // Re-calc target with updated High/Low
-    if prevBullish
-        dTarget := currLow + (htfATR * atrMult)
-    else
-        dTarget := currHigh - (htfATR * atrMult)
+    // Calc Target (Based on Developing Low/High)
+    float devTarget = prevBullish ? (currLow + htfATR * atrMult) : (currHigh - htfATR * atrMult)
     
     if not na(mpBox)
         box.set_right(mpBox, bar_index)
@@ -343,10 +335,10 @@ else
         box.set_bgcolor(mpBox, isBull ? dBoxBullColor : dBoxBearColor)
 
     // Update ATR Line
-    if not na(atrLine)
-        line.set_y1(atrLine, dTarget)
-        line.set_y2(atrLine, dTarget)
-        line.set_x2(atrLine, bar_index)
+    if not na(dailyAtrLine)
+        line.set_y1(dailyAtrLine, devTarget)
+        line.set_y2(dailyAtrLine, devTarget)
+        line.set_x2(dailyAtrLine, bar_index)
 
 
 // ==========================================
