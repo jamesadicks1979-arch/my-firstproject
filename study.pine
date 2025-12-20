@@ -215,16 +215,21 @@ bgBearColor = input.color(color.new(color.red, 90), "Bearish Prev BG", group="MT
 //──────────────── DATA FETCHING ────────────────
 string tf = autoTF ? "1D" : tfInput
 
-// Get Previous Day's OHLC and ATR using request.security
-// Using [1] and lookahead_on ensures we get the COMPLETED yesterday's data from the moment today starts.
-[pOpen, pHigh, pLow, pClose, htfATR] = request.security(syminfo.tickerid, tf, [open[1], high[1], low[1], close[1], ta.atr(atrLen)], lookahead=barmerge.lookahead_on)
+// 1. Get Previous Day's High/Low/ATR for FIBS (Yesterday's Range)
+[pHigh, pLow, htfATR] = request.security(syminfo.tickerid, tf, [high[1], low[1], ta.atr(atrLen)], lookahead=barmerge.lookahead_on)
 
-// Determine Trend (of Yesterday)
-bool prevBullish = (pClose > pOpen)
-bool prevBearish = (pClose < pOpen)
+// 2. Get CURRENT Day's Open/Close for BACKGROUND (Today's Trend)
+// We use lookahead=on to get the 'daily' view.
+// On historical bars, this returns the Close of that day.
+// On real-time bars, this returns the Current Price.
+[dOpen, dClose] = request.security(syminfo.tickerid, tf, [open, close], lookahead=barmerge.lookahead_on)
 
-// Draw Background based on PREVIOUS Day Trend
-bgcolor(prevBullish ? bgBullColor : prevBearish ? bgBearColor : na, title="MTPC Background")
+// Determine Trend (of THE DAY WE ARE LOOKING AT)
+bool dayBullish = (dClose > dOpen)
+bool dayBearish = (dClose < dOpen)
+
+// Draw Background based on CURRENT Day Trend
+bgcolor(dayBullish ? bgBullColor : dayBearish ? bgBearColor : na, title="MTPC Background")
 
 //──────────────── DRAWING LOGIC ────────────────
 bool newMP = timeframe.change(tf)
@@ -243,7 +248,6 @@ if not na(mpStart) and not na(pHigh)
     float f618 = pLow + (pHigh - pLow) * 0.618
     
     // Calc ATR Target (Low + ATR)
-    // Note: User asked for "added on to the low".
     float targetLevel = pLow + (htfATR * atrMult)
 
     // Objects
@@ -271,16 +275,8 @@ if not na(mpStart) and not na(pHigh)
         box.set_right(fibBox, right)
         line.set_x2(atrLine, right)
     
-    // Optional: Update y-values if needed (though previous day stats are constant for the day)
-    // No need to update Y, they are static for the day.
-    
 //──────────────── OPTIONAL MP BOX ────────────────
 var box mpBox = na
-
-// Calculate CURRENT DAY developing range for the box?
-// The original code was tracking "mpHigh" which was accumulating during the day.
-// We can use request.security for current data or manual tracking.
-// Manual tracking matches the "MTPC DKO" style of showing the developing range.
 
 var float currHigh = na
 var float currLow = na
