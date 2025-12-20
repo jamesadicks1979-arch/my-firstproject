@@ -17,3 +17,10 @@ sma3 = ta.sma(src, len3)
 plot(sma1, "SMA 5", color=color.green, linewidth=2)
 plot(sma2, "SMA 9", color=color.blue, linewidth=2)
 plot(sma3, "SMA 21", color=color.red, linewidth=3) // Made slightly thicker
+
+// Labels on the right side for better visibility
+if barstate.islast
+    label.new(bar_index, sma1, "SMA 5: " + str.tostring(sma1, "#.##"), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label.new(bar_index, sma2, "SMA 9: " + str.tostring(sma2, "#.##"), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label.new(bar_index, sma3, "SMA 21: " + str.tostring(sma3, "#.##"), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+
