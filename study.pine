@@ -8,11 +8,8 @@ len3 = input.int(9, "Length SMA 3", minval=1)
 src = input.source(close, "Source")
 
 // Session Inputs
-monitoringTime = input.session("1430-1530", "High/Low Monitoring Period") // Was 12:00, now 14:30. wait. user said "2.30" -> 14:30.
-// "can you start tracking the high or low from 2.30 instead"
-// Assuming 14:30 London time.
-
-fibLookPeriod = input.session("1530-1730", "Fib Trigger Period") // Shifted trigger period appropriately
+monitoringTime = input.session("1230-1430", "High/Low Monitoring Period") 
+fibLookPeriod = input.session("1430-1630", "Fib Trigger Period")
 sessionZone = input.string("Europe/London", "Timezone")
 
 // Calculation
