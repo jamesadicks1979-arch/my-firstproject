@@ -416,8 +416,8 @@ if showWeekly
         // But since it's local scope here, we need a better way to pass it to the update logic or update line here.
         float currentWTarget = prevWBull ? (wLow + wAtr) : (wHigh - wAtr)
         if not na(wAtrLine)
-             line.set_y1(wAtrLine, currentWTarget)
-             line.set_y2(wAtrLine, currentWTarget)
+            line.set_y1(wAtrLine, currentWTarget)
+            line.set_y2(wAtrLine, currentWTarget)
 
     // Update the box dimensions and color every bar
     if not na(currentWBox)
