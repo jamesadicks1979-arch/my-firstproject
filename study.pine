@@ -1,5 +1,5 @@
 //@version=5
-indicator("Triple SMA with Session & Fibs (Dynamic)", overlay=true)
+indicator("Triple SMA with Session & Fibs (Dynamic + Reversal)", overlay=true)
 
 // Input parameters
 len1 = input.int(50, "Length SMA 1", minval=1)
@@ -26,7 +26,7 @@ plot(sma9, "SMA 9", color=color.red, linewidth=3)
 // LOGIC
 // ==========================================
 
-// 1. Monitor High/Low (13:30 - 14:30)
+// 1. Monitor High/Low (12:00 - 14:30)
 inMonitoringWindow = not na(time(timeframe.period, monitoringTime, sessionZone))
 
 var float monitorHigh = na
@@ -42,12 +42,19 @@ if inMonitoringWindow
 
 // 2. Trigger & Dynamic Updates (14:30 - 16:30)
 inFibWindow = not na(time(timeframe.period, fibLookPeriod, sessionZone))
+// Check time limit for reversal (14:40)
+inReversalWindow = not na(time(timeframe.period, "1430-1440", sessionZone))
 
 // State Variables
+// 0 = Idle
+// 1 = Sell Mode
+// 2 = Buy Mode
+// 3 = Reversal Buy Mode
+// 4 = Reversal Sell Mode
 var int tradeMode = 0 
 var bool isLocked = false 
 
-// Active Anchors for the Fib Calculation
+// Active Anchors
 var float activeHigh = na
 var float activeLow = na
 
@@ -65,8 +72,6 @@ if inMonitoringWindow and not inMonitoringWindow[1]
     isLocked := false
     activeHigh := na
     activeLow := na
-    // IMPORTANT: removed deletion here so history persists.
-    // Resetting references to na effectively "detaches" variables from old drawings.
     l50 := na
     l61 := na
     l80 := na
@@ -84,7 +89,7 @@ if inFibWindow
             activeHigh := monitorHigh // Fixed High
             activeLow := monitorLow   // Dynamic Low
             
-            // Draw Sell Fibs (Inline)
+            // Draw Sell Fibs
             rangeVal = activeHigh - activeLow
             lev50 = activeLow + (rangeVal * 0.50)
             lev61 = activeLow + (rangeVal * 0.618)
@@ -103,7 +108,7 @@ if inFibWindow
             activeLow := monitorLow   // Fixed Low
             activeHigh := monitorHigh // Dynamic High
             
-            // Draw Buy Fibs (Inline)
+            // Draw Buy Fibs
             rangeVal = activeHigh - activeLow
             lev50 = activeHigh - (rangeVal * 0.50)
             lev61 = activeHigh - (rangeVal * 0.618)
@@ -118,42 +123,23 @@ if inFibWindow
             
     // 2. Update Logic (if not locked)
     else if not isLocked
-        if tradeMode == 1 // Sell Mode
-            // Update Low if price makes new low
-            if low < activeLow
-                activeLow := low
-                // Delete Old (only if it exists and belongs to THIS session)
-                line.delete(l50)
-                line.delete(l61)
-                line.delete(l80)
-                box.delete(bZone)
-                label.delete(lb50)
-                label.delete(lb80)
-                
-                // Draw New Sell Fibs
-                rangeVal = activeHigh - activeLow
-                lev50 = activeLow + (rangeVal * 0.50)
-                lev61 = activeLow + (rangeVal * 0.618)
-                lev80 = activeLow + (rangeVal * 0.80)
-                
-                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.red, 85))
-                l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
-                l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
-                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
-                lb50 := label.new(bar_index, lev50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
-                lb80 := label.new(bar_index, lev80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+        // SELL MODE LOGIC (Mode 1)
+        if tradeMode == 1
+            // Check for STOP OUT + REVERSAL (Before 14:40)
+            // Condition: High breaks ActiveHigh AND Close > All SMAs (strict reversal)
+            // Or simpler: Close > SMA50 (since that was the Buy trigger)
+            // User said: "closes the other side of the three sma's" -> implies Close > SMA9/21/50
+            reversalCondition = (high > activeHigh) and (close > sma9 and close > sma21 and close > sma50)
             
-            // Check if Retracement hit 50%
-            rangeVal = activeHigh - activeLow
-            fib50Limit = activeLow + (rangeVal * 0.50)
-            if high >= fib50Limit
-                isLocked := true
+            if inReversalWindow and reversalCondition
+                // SWITCH TO REVERSAL BUY (Mode 3)
+                tradeMode := 3
+                // New Low Anchor = The lowest point reached during the failed sell
+                // New High Anchor = Current High
+                // We keep activeLow as is. Update activeHigh to current high.
+                activeHigh := high 
                 
-        else if tradeMode == 2 // Buy Mode
-            // Update High if price makes new high
-            if high > activeHigh
-                activeHigh := high
-                // Delete Old
+                // Clear Old Drawings
                 line.delete(l50)
                 line.delete(l61)
                 line.delete(l80)
@@ -161,29 +147,171 @@ if inFibWindow
                 label.delete(lb50)
                 label.delete(lb80)
                 
-                // Draw New Buy Fibs
+                // Draw Reversal Buy Fibs (Blue Box)
                 rangeVal = activeHigh - activeLow
                 lev50 = activeHigh - (rangeVal * 0.50)
                 lev61 = activeHigh - (rangeVal * 0.618)
                 lev80 = activeHigh - (rangeVal * 0.80)
                 
-                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.green, 85))
+                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.blue, 85))
                 l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
                 l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
-                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
-                lb50 := label.new(bar_index, lev50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
-                lb80 := label.new(bar_index, lev80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.blue, width=2)
+                lb50 := label.new(bar_index, lev50, "Rev Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                lb80 := label.new(bar_index, lev80, "Rev Buy 80%", style=label.style_label_left, color=color.blue, size=size.tiny, textcolor=color.white)
+
+            else
+                // Normal Sell Mode Update
+                if low < activeLow
+                    activeLow := low
+                    line.delete(l50)
+                    line.delete(l61)
+                    line.delete(l80)
+                    box.delete(bZone)
+                    label.delete(lb50)
+                    label.delete(lb80)
+                    
+                    rangeVal = activeHigh - activeLow
+                    lev50 = activeLow + (rangeVal * 0.50)
+                    lev61 = activeLow + (rangeVal * 0.618)
+                    lev80 = activeLow + (rangeVal * 0.80)
+                    
+                    bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.red, 85))
+                    l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+                    l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+                    l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+                    lb50 := label.new(bar_index, lev50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                    lb80 := label.new(bar_index, lev80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
                 
-            // Check if Retracement hit 50%
+                // Check Lock (Pullback to 50%)
+                rangeVal = activeHigh - activeLow
+                fib50Limit = activeLow + (rangeVal * 0.50)
+                if high >= fib50Limit
+                    isLocked := true
+
+        // BUY MODE LOGIC (Mode 2)
+        else if tradeMode == 2
+            // Check for STOP OUT + REVERSAL
+            reversalCondition = (low < activeLow) and (close < sma9 and close < sma21 and close < sma50)
+            
+            if inReversalWindow and reversalCondition
+                // SWITCH TO REVERSAL SELL (Mode 4)
+                tradeMode := 4
+                // New High Anchor = The highest point reached during the failed buy
+                // New Low Anchor = Current Low
+                activeLow := low 
+                
+                line.delete(l50)
+                line.delete(l61)
+                line.delete(l80)
+                box.delete(bZone)
+                label.delete(lb50)
+                label.delete(lb80)
+                
+                // Draw Reversal Sell Fibs (Orange Box)
+                rangeVal = activeHigh - activeLow
+                lev50 = activeLow + (rangeVal * 0.50)
+                lev61 = activeLow + (rangeVal * 0.618)
+                lev80 = activeLow + (rangeVal * 0.80)
+                
+                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.orange, 85))
+                l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+                l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.orange, width=2)
+                lb50 := label.new(bar_index, lev50, "Rev Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                lb80 := label.new(bar_index, lev80, "Rev Sell 80%", style=label.style_label_left, color=color.orange, size=size.tiny, textcolor=color.white)
+
+            else
+                // Normal Buy Mode Update
+                if high > activeHigh
+                    activeHigh := high
+                    line.delete(l50)
+                    line.delete(l61)
+                    line.delete(l80)
+                    box.delete(bZone)
+                    label.delete(lb50)
+                    label.delete(lb80)
+                    
+                    rangeVal = activeHigh - activeLow
+                    lev50 = activeHigh - (rangeVal * 0.50)
+                    lev61 = activeHigh - (rangeVal * 0.618)
+                    lev80 = activeHigh - (rangeVal * 0.80)
+                    
+                    bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.green, 85))
+                    l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+                    l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+                    l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.red, width=2)
+                    lb50 := label.new(bar_index, lev50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                    lb80 := label.new(bar_index, lev80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+                
+                // Check Lock (Pullback to 50%)
+                rangeVal = activeHigh - activeLow
+                fib50Limit = activeHigh - (rangeVal * 0.50)
+                if low <= fib50Limit
+                    isLocked := true
+                    
+        // REVERSAL BUY MODE (Mode 3) - Dynamic Update
+        else if tradeMode == 3
+            if high > activeHigh
+                activeHigh := high
+                line.delete(l50)
+                line.delete(l61)
+                line.delete(l80)
+                box.delete(bZone)
+                label.delete(lb50)
+                label.delete(lb80)
+                
+                rangeVal = activeHigh - activeLow
+                lev50 = activeHigh - (rangeVal * 0.50)
+                lev61 = activeHigh - (rangeVal * 0.618)
+                lev80 = activeHigh - (rangeVal * 0.80)
+                
+                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.blue, 85))
+                l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+                l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.blue, width=2)
+                lb50 := label.new(bar_index, lev50, "Rev Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                lb80 := label.new(bar_index, lev80, "Rev Buy 80%", style=label.style_label_left, color=color.blue, size=size.tiny, textcolor=color.white)
+                
+            // Check Lock
             rangeVal = activeHigh - activeLow
             fib50Limit = activeHigh - (rangeVal * 0.50)
             if low <= fib50Limit
                 isLocked := true
 
+        // REVERSAL SELL MODE (Mode 4) - Dynamic Update
+        else if tradeMode == 4
+            if low < activeLow
+                activeLow := low
+                line.delete(l50)
+                line.delete(l61)
+                line.delete(l80)
+                box.delete(bZone)
+                label.delete(lb50)
+                label.delete(lb80)
+                
+                rangeVal = activeHigh - activeLow
+                lev50 = activeLow + (rangeVal * 0.50)
+                lev61 = activeLow + (rangeVal * 0.618)
+                lev80 = activeLow + (rangeVal * 0.80)
+                
+                bZone := box.new(bar_index, lev50, bar_index + 20, lev61, border_width=0, bgcolor=color.new(color.orange, 85))
+                l50 := line.new(bar_index, lev50, bar_index + 20, lev50, color=color.gray, width=1, style=line.style_dashed)
+                l61 := line.new(bar_index, lev61, bar_index + 20, lev61, color=color.gray, width=1, style=line.style_dashed)
+                l80 := line.new(bar_index, lev80, bar_index + 20, lev80, color=color.orange, width=2)
+                lb50 := label.new(bar_index, lev50, "Rev Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+                lb80 := label.new(bar_index, lev80, "Rev Sell 80%", style=label.style_label_left, color=color.orange, size=size.tiny, textcolor=color.white)
+                
+            // Check Lock
+            rangeVal = activeHigh - activeLow
+            fib50Limit = activeLow + (rangeVal * 0.50)
+            if high >= fib50Limit
+                isLocked := true
+
 // Backgrounds
 bgcolor(inMonitoringWindow ? color.new(color.yellow, 90) : na, title="Monitoring")
 
-// Labels on right (Persistent)
+// Labels on right
 var label l_sma50 = na
 var label l_sma21 = na
 var label l_sma9 = na
