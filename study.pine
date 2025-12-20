@@ -44,11 +44,8 @@ if inMonitoringWindow
 inFibWindow = not na(time(timeframe.period, fibLookPeriod, sessionZone))
 
 // State Variables
-// 0 = Idle/Waiting
-// 1 = Sell Mode (Trailing Low)
-// 2 = Buy Mode (Trailing High)
 var int tradeMode = 0 
-var bool isLocked = false // Becomes true once price hits 50% retracement
+var bool isLocked = false 
 
 // Active Anchors for the Fib Calculation
 var float activeHigh = na
@@ -62,22 +59,20 @@ var box bZone = na
 var label lb50 = na
 var label lb80 = na
 
-// Helper function to delete drawings - can't rely on globals directly if trying to reassign in v5 func,
-// but void function calling delete on ID is fine.
-// However, to be safe and avoid "Global variable access" issues in different contexts, I'll inline deletion too.
-
 // RESET at start of new day/monitoring cycle
 if inMonitoringWindow and not inMonitoringWindow[1]
     tradeMode := 0
     isLocked := false
     activeHigh := na
     activeLow := na
-    line.delete(l50)
-    line.delete(l61)
-    line.delete(l80)
-    box.delete(bZone)
-    label.delete(lb50)
-    label.delete(lb80)
+    // IMPORTANT: removed deletion here so history persists.
+    // Resetting references to na effectively "detaches" variables from old drawings.
+    l50 := na
+    l61 := na
+    l80 := na
+    bZone := na
+    lb50 := na
+    lb80 := na
 
 // PROCESSING inside Trigger Window
 if inFibWindow
@@ -127,7 +122,7 @@ if inFibWindow
             // Update Low if price makes new low
             if low < activeLow
                 activeLow := low
-                // Delete Old
+                // Delete Old (only if it exists and belongs to THIS session)
                 line.delete(l50)
                 line.delete(l61)
                 line.delete(l80)
