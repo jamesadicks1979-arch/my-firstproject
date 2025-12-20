@@ -8,9 +8,8 @@ len3 = input.int(9, "Length SMA 3", minval=1)
 src = input.source(close, "Source")
 
 // Session Inputs
-// We need to monitor 13:30 to 14:30 specifically for the High/Low calculation.
 monitoringTime = input.session("1330-1430", "High/Low Monitoring Period")
-triggerTimeStr = input.session("1430-1431", "Trigger Time") 
+fibLookPeriod = input.session("1430-1630", "Fib Trigger Period")
 sessionZone = input.string("Europe/London", "Timezone")
 
 // Calculation
@@ -24,54 +23,82 @@ plot(sma21, "SMA 21", color=color.blue, linewidth=2)
 plot(sma9, "SMA 9", color=color.red, linewidth=3)
 
 // Logic for High/Low tracking between 13:30 and 14:30
-// "time" returns the open time of the bar. 
-// We use "not na" to check if the current bar falls within the session.
 inMonitoringWindow = not na(time(timeframe.period, monitoringTime, sessionZone))
 
 // Variables to store the High and Low since 13:30
 var float periodHigh = na
 var float periodLow = na
 
-// If we are starting the window (or inside it), we track.
-// Reset at the start of the window
+// Reset or Track High/Low
+if inMonitoringWindow
+    if not inMonitoringWindow[1] // Start of period
+        periodHigh := high
+        periodLow := low
+    else
+        periodHigh := math.max(periodHigh, high)
+        periodLow := math.min(periodLow, low)
+
+// Fib Look Logic between 14:30 and 16:30
+inFibWindow = not na(time(timeframe.period, fibLookPeriod, sessionZone))
+
+// We only want to draw the fibs ONCE per session.
+// So we use a variable to track if we've already drawn for the day.
+var bool fibsDrawn = false
+
+// Reset flag at start of new monitoring period (next day)
 if inMonitoringWindow and not inMonitoringWindow[1]
-    periodHigh := high
-    periodLow := low
-else if inMonitoringWindow
-    periodHigh := math.max(periodHigh, high)
-    periodLow := math.min(periodLow, low)
+    fibsDrawn := false
 
-// Trigger Condition Logic at 14:30
-// We check if the current bar *starts* at 14:30.
-isTriggerBar = not na(time(timeframe.period, "1430-1430", sessionZone))
-
-// We only draw if the condition is met once per day at that specific time.
-if isTriggerBar
-    // Condition: 9 is below 21 AND 9 is below 50
+// Check Logic inside the 14:30 - 16:30 window
+if inFibWindow and not fibsDrawn
+    // Condition 1: MAs above market (Sell Scenario)
+    // "MAs above market" usually means Price < SMA9, SMA21, SMA50 OR SMAs are arranged in bearish order.
+    // Based on user request: "if at 14.30 the ma are above market" -> assume Bearish setup
+    // Interpreting "ma are above market" as Close < SMAs or SMA9 < SMA21 < SMA50.
+    // Let's stick to the previous logic interpretation but refined:
+    // SELL setup: SMA9 < SMA21 and SMA9 < SMA50 (Bearish Alignment)
     if (sma9 < sma21 and sma9 < sma50)
-        // Calculate Range
         rangeVal = periodHigh - periodLow
+        // Sell Fibs (High to Low): Retracements go UP from Low
+        // 0% at Low, 100% at High. 
+        // 50% retracement level = Low + 0.5 * Range (Same as High - 0.5 * Range)
+        fib50 = periodHigh - (rangeVal * 0.50)
+        fib61 = periodHigh - (rangeVal * 0.618)
+        fib80 = periodHigh - (rangeVal * 0.80) // Deep retracement
         
-        // Calculate Levels
-        fib50 = periodLow + (rangeVal * 0.50)
+        line.new(bar_index, fib50, bar_index + 10, fib50, color=color.gray, width=1, style=line.style_dashed)
+        line.new(bar_index, fib61, bar_index + 10, fib61, color=color.gray, width=1, style=line.style_dashed)
+        line.new(bar_index, fib80, bar_index + 10, fib80, color=color.red, width=2)
+        
+        label.new(bar_index, fib50, "Sell 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+        label.new(bar_index, fib80, "Sell 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+        
+        fibsDrawn := true
+
+    // Condition 2: Market closes above 50 SMA (Buy Scenario)
+    // "if the market closes above the 50 sma then look for a low to high fib"
+    else if (close > sma50)
+        rangeVal = periodHigh - periodLow
+        // Buy Fibs (Low to High): Retracements go DOWN from High
+        // 0% at High, 100% at Low.
+        // 50% retracement level = High - 0.5 * Range (Same as Low + 0.5 * Range)
+        fib50 = periodLow + (rangeVal * 0.50) 
         fib61 = periodLow + (rangeVal * 0.618)
         fib80 = periodLow + (rangeVal * 0.80)
         
-        // Draw Lines extending to the right
-        // We set extend=extend.right so they go into the future
-        line.new(bar_index, fib50, bar_index + 1, fib50, color=color.gray, width=1, style=line.style_dashed, extend=extend.right)
-        line.new(bar_index, fib61, bar_index + 1, fib61, color=color.gray, width=1, style=line.style_dashed, extend=extend.right)
-        line.new(bar_index, fib80, bar_index + 1, fib80, color=color.red, width=2, extend=extend.right) // Red line for 80%
-
-        // Optional: Add labels to identify the lines
-        label.new(bar_index, fib50, "50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
-        label.new(bar_index, fib80, "80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
-
+        line.new(bar_index, fib50, bar_index + 10, fib50, color=color.gray, width=1, style=line.style_dashed)
+        line.new(bar_index, fib61, bar_index + 10, fib61, color=color.gray, width=1, style=line.style_dashed)
+        line.new(bar_index, fib80, bar_index + 10, fib80, color=color.red, width=2)
+        
+        label.new(bar_index, fib50, "Buy 50%", style=label.style_label_left, color=color.gray, size=size.tiny, textcolor=color.white)
+        label.new(bar_index, fib80, "Buy 80%", style=label.style_label_left, color=color.red, size=size.tiny, textcolor=color.white)
+        
+        fibsDrawn := true
 
 // Highlight the monitoring period background (13:30 - 14:30)
 bgcolor(inMonitoringWindow ? color.new(color.yellow, 90) : na, title="Monitoring Period")
 
-// Labels on the right (Persistent SMA labels)
+// Labels on the right
 var label l1 = na
 var label l2 = na
 var label l3 = na
