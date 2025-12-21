@@ -28,13 +28,9 @@ if isLondonStart()
     line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
 
 // Track High price between 7:00 and 7:15
-// We need to know if the market "has gone above" 5 pips by 7:15.
-// This implies checking the High of bars between 7:00 and 7:15.
 isBetween700and715() =>
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
-    // Simple check: Same hour (7) and minute < 15. 
-    // Note: This logic assumes we are in the 7:00-7:59 hour.
     h == londonStartHour and m >= londonStartMinute and m < 15
 
 if isBetween700and715()
@@ -42,7 +38,7 @@ if isBetween700and715()
         highSince700 := high
 
 // -------------------------------------------------------------------------
-// Check Logic at 7:05 (Previous Logic)
+// Check Logic at 7:05
 // -------------------------------------------------------------------------
 isCheckTime705() =>
     h = hour(time, "Europe/London")
@@ -51,7 +47,6 @@ isCheckTime705() =>
     h == londonStartHour and m == targetM
 
 if isCheckTime705() and not na(openPrice700)
-    // Existing logic for 7:05 check...
     thresholdPrice = openPrice700 + (100 * syminfo.mintick)
     isAbove = close > thresholdPrice
     
@@ -68,20 +63,18 @@ if isCheckTime705() and not na(openPrice700)
     sellLevel = openPrice700 + (sellOffsetTicks * syminfo.mintick)
     stopLevel = openPrice700 + (stopOffsetTicks * syminfo.mintick)
 
-    // Draw lines starting from NOW (7:05)
     sellLineDuration = 2 * 60 * 60 * 1000
     sellLineEndTime = time + sellLineDuration
     
     line.new(x1=time, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
     
-    // Stop line duration: Until 12:00 London time
     timeTo12 = (11 - 7) * 60 * 60 * 1000 + (60 - 5) * 60 * 1000 
     stopLineEndTime = time + timeTo12
     
     line.new(x1=time, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
 
 // -------------------------------------------------------------------------
-// Check Logic at 7:15 (New Logic)
+// Check Logic at 7:15
 // -------------------------------------------------------------------------
 isCheckTime715() =>
     h = hour(time, "Europe/London")
@@ -89,55 +82,10 @@ isCheckTime715() =>
     targetM = londonStartMinute + 15
     h == londonStartHour and m == targetM
 
-if isCheckTime715() and not na(openPrice700)
-    // Check if market has NOT gone above 5 pips (50 ticks) from 7:00 Open
-    // We check highSince700 against (Open + 50 ticks)
-    threshold50Ticks = openPrice700 + (50 * syminfo.mintick)
-    
-    hasGoneAbove50 = highSince700 > threshold50Ticks
-    
-    if not hasGoneAbove50
-        // "then sell 7.20 opening price and put a sell above that candle if its true"
-        // Interpretation:
-        // 1. Wait for 7:20 candle to open.
-        // 2. Put a sell order (line?) at the 7:20 Opening Price?
-        // 3. "put a sell above that candle" -> usually means Sell Stop order below low? Or Sell Limit above high?
-        // User says: "sell 7.20 opening price" -> Suggests Sell Limit/Market at Open of 7:20?
-        // AND "put a sell above that candle" -> Maybe a stop loss above the 7:20 candle?
-        // Or maybe "put a sell (order) above that candle" meaning a Sell Stop order above the High? (Unlikely for selling).
-        // Let's assume:
-        // - Trigger condition: Market didn't go > 50 ticks by 7:15.
-        // - Action: At 7:20, Draw a Sell Line at 7:20 Open Price.
-        // - "put a sell above that candle" might mean Stop Loss above the 7:20 candle High?
-        
-        // We need to wait for 7:20.
-        // We can set a flag here at 7:15 to trigger the action at 7:20.
-        // But since script runs bar by bar, we can just check at 7:20 and look back at the condition.
-        // However, we need to know the High of 7:00-7:15 at 7:20. `highSince700` variable persists.
-        // BUT `highSince700` keeps updating. We need to freeze it or check it at 7:15.
-        // Let's store the status at 7:15.
-        // We can't store a boolean in a 'var' easily that resets daily without complex logic.
-        // Simpler: Just check logic at 7:20, but we need to ensure we only look at high from 7:00 to 7:15.
-        // We can stop updating highSince700 at 7:15.
-        
-        // Actually, simpler:
-        // At 7:15, we determine if condition is met. We store this decision in a var variable for today.
-        // Then at 7:20, if that var is true, we execute the drawing.
-        na // Placeholder
-        
-// Variable to store 7:15 condition result
 var bool conditionMetAt715 = false
 
 if isCheckTime715()
     threshold50Ticks = openPrice700 + (50 * syminfo.mintick)
-    // Check if High (up to 7:15 close/high) exceeded threshold
-    // `highSince700` tracks highs from 7:00. At 7:15 bar, it includes 7:15 high? 
-    // `isCheckTime715` returns true on the bar starting at 7:15. 
-    // The "by 7.15" usually excludes the 7.15 price action itself or includes it?
-    // Assuming "by 7.15" means from 7:00 up to the moment 7:15 starts (so [7:00, 7:15)).
-    // `highSince700` is updated at the start of the bar? No, it updates on every bar.
-    // If we are on the 7:15 bar, highSince700 currently holds max(highs 7:00...7:14) + current 7:15 high.
-    // Let's use the high so far.
     if highSince700 <= threshold50Ticks
         conditionMetAt715 := true
     else
@@ -151,49 +99,23 @@ isCheckTime720() =>
     h == londonStartHour and m == targetM
 
 if isCheckTime720() and conditionMetAt715
-    // "sell 7.20 opening price"
     sellPrice720 = open
-    
-    // "put a sell above that candle" -> confusing. 
-    // Maybe "put a Stop above that candle"? 
-    // Or "Sell Limit above that candle"? 
-    // Given context of selling, "Sell above that candle" implies a Sell Limit above the High of the 7:20 candle?
-    // Or did you mean "put a STOP above that candle"?
-    // I will assume "Stop Loss above the 7:20 candle High".
-    stopPrice720 = high // This is the high of the 7:20 bar SO FAR? Or Previous candle? 
-    // "Above that candle" usually implies the signal candle (7:20).
-    // Since we are *on* the 7:20 bar, we don't know its final High yet.
-    // Maybe we use the High of the 7:20 bar (updates as bar forms) or wait for it to close?
-    // Drawing lines usually happens on bar open/close. 
-    // Let's assume we draw a Sell line at Open.
-    // And for the "above", maybe we use a fixed distance or the High of the *previous* (7:15) candle?
-    // Or maybe we wait for 7:20 close? 
-    // "sell 7.20 opening price" -> Action at Open.
-    // "put a sell above that candle" -> This part is ambiguous. 
-    // Interpretation A: Stop Loss at High of 7:20 candle (needs to wait for close?).
-    // Interpretation B: Another Sell Order above the 7:20 candle?
-    // Interpretation C: Typo for "put a STOP above that candle".
-    
-    // I will implement: Sell Line at 7:20 Open.
-    // And I will add a comment/placeholder for the "above that candle" part or implement a Stop at High of previous bar (7:15) + buffer?
-    // Or if "above that candle" refers to the 7:20 candle itself, I'll draw a dynamic line at the High?
-    
-    // Let's assume Stop Loss at High of 7:20. Since 7:20 isn't closed, I'll use High of 7:15 as a proxy or just draw it.
-    // Actually, "sell 7.20 opening price" is a very specific level.
-    // I'll draw the Sell Line at Open.
-    // I'll draw the Stop Line at (Open + something) or Previous High.
-    // Let's try to interpret "put a sell above that candle" literally -> "Sell Limit above High of 7:20"?
-    // Or "Stop Loss above High of 7:20"?
-    
-    // I will use: Sell Line at Open. Stop Line at High of 7:20 (updating?).
-    // Better: Stop Line at High of 7:15 candle (previous completed candle).
-    
-    // Let's just implement the Sell Line at 7:20 Open first.
-    
-    sellLineDuration = 2 * 60 * 60 * 1000 // 2 hours
+    sellLineDuration = 2 * 60 * 60 * 1000
     sellLineEndTime = time + sellLineDuration
-    
     line.new(x1=time, y1=sellPrice720, x2=sellLineEndTime, y2=sellPrice720, xloc=xloc.bar_time, color=color.orange, style=line.style_solid, width=2)
-    
-    // Note: I am NOT implementing the "above that candle" part fully because it's ambiguous.
-    // I'll add a label or marker.
+
+// -------------------------------------------------------------------------
+// Daily SMAs on smaller timeframe
+// -------------------------------------------------------------------------
+// Request Daily Close data
+dailyClose = request.security(syminfo.tickerid, "D", close, lookahead=barmerge.lookahead_on)
+
+// Calculate SMAs
+sma5 = ta.sma(dailyClose, 5)
+sma9 = ta.sma(dailyClose, 9)
+sma21 = ta.sma(dailyClose, 21)
+
+// Plot SMAs
+plot(sma5, "Daily SMA 5", color=color.purple, linewidth=2)
+plot(sma9, "Daily SMA 9", color=color.orange, linewidth=2)
+plot(sma21, "Daily SMA 21", color=color.yellow, linewidth=2)
