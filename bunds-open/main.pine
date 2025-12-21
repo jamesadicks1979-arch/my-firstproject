@@ -105,10 +105,17 @@ if isCheckTime705() and not na(openPrice700)
     orderPlacedToday := true
 
 // -------------------------------------------------------------------------
-// Daily SMA 21
+// Daily SMAs
 // -------------------------------------------------------------------------
 sma21 = request.security(syminfo.tickerid, "D", ta.sma(close, 21), lookahead=barmerge.lookahead_on)
+sma50 = request.security(syminfo.tickerid, "D", ta.sma(close, 50), lookahead=barmerge.lookahead_on)
+sma100 = request.security(syminfo.tickerid, "D", ta.sma(close, 100), lookahead=barmerge.lookahead_on)
+sma200 = request.security(syminfo.tickerid, "D", ta.sma(close, 200), lookahead=barmerge.lookahead_on)
+
 plot(sma21, "Daily SMA 21", color=color.yellow, linewidth=2)
+plot(sma50, "Daily SMA 50", color=color.blue, linewidth=2)
+plot(sma100, "Daily SMA 100", color=color.white, linewidth=2)
+plot(sma200, "Daily SMA 200", color=color.purple, linewidth=2)
 
 // -------------------------------------------------------------------------
 // Manage Orders
