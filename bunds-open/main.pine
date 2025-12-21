@@ -45,14 +45,12 @@ if isCheckTime705() and not na(openPrice700)
     // Let's assume the threshold is 100 ticks (10 pips).
     thresholdPrice = openPrice700 + (100 * syminfo.mintick)
     
-    // Check if current state (at 7:05 Open) is above threshold
-    // Using 'close' here means Close of the PREVIOUS bar (7:00-7:05) if on 5m chart, 
-    // because at the moment the bar opens, close = open.
-    // However, previously we used 'close' effectively. 
-    // To be precise "before 7.05", checking the Close of the 7:00 bar (on 5m) or just the Open of 7:05 bar is best.
-    // I will use 'open' of the 7:05 bar as the reference for "where we are at 7:05".
-    
-    isAbove = open > thresholdPrice
+    // Debug
+    // label.new(bar_index, high, "Check 7:05. Open700=" + str.tostring(openPrice700) + " Curr=" + str.tostring(open), textcolor=color.white)
+
+    // Using 'close' as per original request that worked before
+    // Even if 'open' is technically more correct at start of bar, 'close' was what showed lines before.
+    isAbove = close > thresholdPrice
     
     float finalSellOffset = na
     float finalStopOffset = na
