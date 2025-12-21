@@ -1,0 +1,22 @@
+//@version=5
+indicator("Bunds Open - London Start", overlay=true)
+
+// Input for the time
+londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
+londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
+
+// Function to check if the current bar is at the specific London time
+isLondonStart() =>
+    // Get the hour and minute in London time
+    h = hour(time, "Europe/London")
+    m = minute(time, "Europe/London")
+    h == londonStartHour and m == londonStartMinute
+
+// Plotting
+// We use bgcolor to highlight the specific time, or we can use line.new
+// Since line.new is for drawing objects, let's use a background color for visibility
+bgcolor(isLondonStart() ? color.new(color.blue, 80) : na, title="London Start Background")
+
+// Alternatively, draw a vertical line using line.new on the specific bar
+if isLondonStart()
+    line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
