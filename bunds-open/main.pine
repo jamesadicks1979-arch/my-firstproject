@@ -1,12 +1,9 @@
 //@version=5
-indicator("Bunds Open - London Start", overlay=true, max_lines_count=500, max_labels_count=500)
+indicator("Bunds Open - London Start", overlay=true)
 
 // Input for the time
 londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
 londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
-pipsOffset = input.float(10, "Pips Offset (x10 ticks)", minval=0)
-stopTicksInput = input.int(6, "Stop Loss Ticks (x10 ticks)", minval=0)
-showDebug = input.bool(true, "Show Debug Info")
 
 // Function to check if the current bar is at the specific London time
 isLondonStart() =>
@@ -14,110 +11,10 @@ isLondonStart() =>
     m = minute(time, "Europe/London")
     h == londonStartHour and m == londonStartMinute
 
-// Background color for start time
+// Plotting
+// We use bgcolor to highlight the specific time
 bgcolor(isLondonStart() ? color.new(color.blue, 80) : na, title="London Start Background")
 
-// Variables to store the opening price of the 7:00 bar and High between 7:00 and 7:15
-var float openPrice700 = na
-var float highSince700 = na
-
-// Reset or Set Variables at 7:00
+// Draw a vertical line using line.new on the specific bar
 if isLondonStart()
-    openPrice700 := open
-    highSince700 := high
-    // Draw vertical line for the start
     line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
-    if showDebug
-        label.new(bar_index, high, "Start 7:00\nOpen: " + str.tostring(open), color=color.blue, textcolor=color.white, style=label.style_label_down)
-
-// Track High price between 7:00 and 7:15
-isBetween700and715() =>
-    h = hour(time, "Europe/London")
-    m = minute(time, "Europe/London")
-    // Strict between 7:00 and 7:15 check
-    h == londonStartHour and m >= londonStartMinute and m < 15
-
-if isBetween700and715()
-    if high > highSince700
-        highSince700 := high
-
-// -------------------------------------------------------------------------
-// Check Logic at 7:05
-// -------------------------------------------------------------------------
-isCheckTime705() =>
-    h = hour(time, "Europe/London")
-    m = minute(time, "Europe/London")
-    targetM = londonStartMinute + 5
-    h == londonStartHour and m == targetM
-
-if isCheckTime705() and not na(openPrice700)
-    thresholdPrice = openPrice700 + (100 * syminfo.mintick)
-    
-    // Reverting to 'close' as per original working version
-    // If on a 5-minute chart, 'close' at the moment this runs (start of 7:05 bar) is equal to Open.
-    // If this runs on historical bars, 'close' is the close of the 7:05 bar.
-    // The "brilliant" version used 'close'.
-    isAbove = close > thresholdPrice
-    
-    float sellOffsetTicks = na
-    float stopOffsetTicks = na
-    
-    if isAbove
-        sellOffsetTicks := 200
-        stopOffsetTicks := 260 
-    else
-        sellOffsetTicks := 100 
-        stopOffsetTicks := 160
-    
-    sellLevel = openPrice700 + (sellOffsetTicks * syminfo.mintick)
-    stopLevel = openPrice700 + (stopOffsetTicks * syminfo.mintick)
-
-    sellLineDuration = 2 * 60 * 60 * 1000
-    sellLineEndTime = time + sellLineDuration
-    
-    line.new(x1=time, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
-    
-    timeTo12 = (11 - 7) * 60 * 60 * 1000 + (60 - 5) * 60 * 1000 
-    stopLineEndTime = time + timeTo12
-    
-    line.new(x1=time, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
-    
-    if showDebug
-        label.new(bar_index, high, "Check 7:05\nAbove: " + str.tostring(isAbove), color=color.green, textcolor=color.white, style=label.style_label_down)
-
-// -------------------------------------------------------------------------
-// Check Logic at 7:15
-// -------------------------------------------------------------------------
-isCheckTime715() =>
-    h = hour(time, "Europe/London")
-    m = minute(time, "Europe/London")
-    targetM = londonStartMinute + 15
-    h == londonStartHour and m == targetM
-
-var bool conditionMetAt715 = false
-
-if isCheckTime715()
-    threshold50Ticks = openPrice700 + (50 * syminfo.mintick)
-    if highSince700 <= threshold50Ticks
-        conditionMetAt715 := true
-    else
-        conditionMetAt715 := false
-        
-    if showDebug
-        label.new(bar_index, high, "Check 7:15\nHigh: " + str.tostring(highSince700) + "\nCond: " + str.tostring(conditionMetAt715), color=color.orange, textcolor=color.white, style=label.style_label_down)
-
-// 7:20 Action
-isCheckTime720() =>
-    h = hour(time, "Europe/London")
-    m = minute(time, "Europe/London")
-    targetM = londonStartMinute + 20
-    h == londonStartHour and m == targetM
-
-if isCheckTime720() and conditionMetAt715
-    sellPrice720 = open
-    sellLineDuration = 2 * 60 * 60 * 1000
-    sellLineEndTime = time + sellLineDuration
-    line.new(x1=time, y1=sellPrice720, x2=sellLineEndTime, y2=sellPrice720, xloc=xloc.bar_time, color=color.orange, style=line.style_solid, width=2)
-    
-    if showDebug
-        label.new(bar_index, high, "Action 7:20\nSell", color=color.orange, textcolor=color.white, style=label.style_label_down)
