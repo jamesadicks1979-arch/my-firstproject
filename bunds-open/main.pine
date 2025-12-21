@@ -24,8 +24,8 @@ if isLondonStart()
     line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
     
     // Calculate Sell Level (Opening Price + 10 pips)
-    // We assume 1 pip = 1 tick (syminfo.mintick). Adjust '10' if you mean 10 full points.
-    sellLevel = open + (pipsOffset * syminfo.mintick)
+    // We multiply by 10 to adjust for pip/tick ratio if needed (user requested 100*tick size)
+    sellLevel = open + (pipsOffset * 10 * syminfo.mintick)
     
     // Duration: 2 hours in milliseconds
     duration = 2 * 60 * 60 * 1000
