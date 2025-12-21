@@ -4,64 +4,107 @@ indicator("Bunds Open - London Start", overlay=true)
 // Input for the time
 londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
 londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
-pipsOffset = input.float(10, "Pips Offset", minval=0)
-stopTicks = input.int(6, "Stop Loss Ticks", minval=0)
+pipsOffset = input.float(10, "Pips Offset (x10 ticks)", minval=0)
+stopTicksInput = input.int(6, "Stop Loss Ticks (x10 ticks)", minval=0)
 
 // Function to check if the current bar is at the specific London time
 isLondonStart() =>
-    // Get the hour and minute in London time
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
     h == londonStartHour and m == londonStartMinute
 
-// Plotting
-// We use bgcolor to highlight the specific time, or we can use line.new
-// Since line.new is for drawing objects, let's use a background color for visibility
+// Background color for start time
 bgcolor(isLondonStart() ? color.new(color.blue, 80) : na, title="London Start Background")
 
-// Logic for Sell Line
+// Variables to store the opening price of the 7:00 bar
+var float openPrice700 = na
+var int startBarIndex = na
+
+// Logic runs on every bar, but we only act when conditions are met
 if isLondonStart()
+    openPrice700 := open
+    startBarIndex := bar_index
     // Draw vertical line for the start
     line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
+
+// We need to check the price at 7:05 to determine the levels.
+// Since we can't "wait" inside the `isLondonStart` block in Pine Script (it runs per bar),
+// we need to detect the 7:05 bar or the bar closest to it (e.g., 5 minutes later).
+
+// Function to check if it's 7:05 London time
+isCheckTime() =>
+    h = hour(time, "Europe/London")
+    m = minute(time, "Europe/London")
+    // Target 7:05
+    targetM = londonStartMinute + 5
+    // Handle hour rollover if needed (simple case: 0->5)
+    h == londonStartHour and m == targetM
+
+// Note: If the chart timeframe is > 5 minutes, this logic needs adjustment.
+// Assuming timeframe is 1 minute or 5 minutes.
+
+if isCheckTime() and not na(openPrice700)
+    // Check if price (Close? High? we'll use Close of this 7:05 bar or just the current price) 
+    // is > 10 ticks above the 7:00 Open.
+    // 10 ticks = 10 * syminfo.mintick
     
-    // Calculate Sell Level (Opening Price + 10 pips)
-    // We multiply by 10 to adjust for pip/tick ratio if needed (user requested 100*tick size)
-    sellLevel = open + (pipsOffset * 10 * syminfo.mintick)
+    thresholdPrice = openPrice700 + (10 * syminfo.mintick)
     
-    // Duration for Sell Line: 2 hours in milliseconds
-    // BUT user wants it to START at 7:05.
-    // So the line should start 5 minutes after 'time' (which is 7:00).
-    // And if it still lasts 2 hours *from start of line*, then end is start + 2 hours.
-    // If "next two hours" meant from 7:00 to 9:00, then duration is less.
-    // Assuming "put a line across for the next two hours" implies a 2 hour duration for the line itself.
+    // Condition: "if above 10 ticks by 7.05"
+    // We check if the current close (at 7:05) is > threshold
+    isAbove = close > thresholdPrice
     
-    // Start delay: 5 minutes
-    startDelay = 5 * 60 * 1000
-    sellLineStartTime = time + startDelay
+    // Determine offsets based on condition
+    // Default: Sell at 100 ticks (pipsOffset * 10), Stop at 60 ticks (stopTicks * 10) relative to Sell?
+    // User said: "move green line from 100* tick size to 200* ticks size"
+    // "the stop to 120* ticks size from the opening price at 7.00"
+    
+    float sellOffsetTicks = na
+    float stopOffsetTicks = na
+    
+    if isAbove
+        sellOffsetTicks := 200
+        stopOffsetTicks := 120 // "from the opening price at 7.00"
+    else
+        sellOffsetTicks := pipsOffset * 10 // Default 100 ticks
+        // Previous stop logic was: Sell Level + 60 ticks.
+        // Let's interpret "stop to 120 ticks from opening price" strictly for the 'isAbove' case.
+        // For the normal case, let's keep previous logic: Sell Level + 60 ticks.
+        // Sell Level = Open + 100 ticks. So Stop = Open + 160 ticks?
+        // Wait, user just said "move ... stop to 120* ticks size from the opening price"
+        // This implies the stop is relative to the Open price now.
+        
+        // Let's stick to the previous defined relationship for the 'else' case unless specified otherwise.
+        // Previous: Stop = SellLevel + (stopTicksInput * 10 * tick)
+        // SellLevel = Open + 100 ticks.
+        // So Stop = Open + 100 + 60 = Open + 160 ticks.
+        stopOffsetTicks := (pipsOffset * 10) + (stopTicksInput * 10)
+    
+    sellLevel = openPrice700 + (sellOffsetTicks * syminfo.mintick)
+    
+    // For the 'isAbove' case, stop is 120 ticks FROM OPENING PRICE.
+    // For the 'else' case, it's calculated as above.
+    float stopLevel = na
+    if isAbove
+        stopLevel := openPrice700 + (stopOffsetTicks * syminfo.mintick)
+    else
+         stopLevel := openPrice700 + (stopOffsetTicks * syminfo.mintick)
+
+    // Draw lines starting from NOW (7:05)
     
     sellLineDuration = 2 * 60 * 60 * 1000
-    sellLineEndTime = sellLineStartTime + sellLineDuration
+    sellLineEndTime = time + sellLineDuration
     
-    // Draw Horizontal Sell Line (Green) from 7:05 to 7:05 + 2 hours
-    line.new(x1=sellLineStartTime, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
+    line.new(x1=time, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
     
-    // Calculate Stop Level (Sell Level + 6 ticks)
-    // User requested 60 * ticksize (effectively 10x the input if input is 6, or just hardcoded logic change)
-    // Assuming input 'stopTicks' (default 6) should be multiplied by 10 to get 60 ticks
-    stopLevel = sellLevel + (stopTicks * 10 * syminfo.mintick)
+    // Stop line duration: Until 12:00 London time.
+    // 7:05 to 12:00 is approx 4h 55m.
+    // 12:00 is (12 - 7) hours from start bar. 
+    // We are at 7:05.
+    // Target time is start bar time + 5 hours.
+    // We don't have start bar time variable stored as time, but we can compute relative to current time.
+    // Current time is 7:05. 12:00 is 4 hours 55 mins away.
+    timeTo12 = (11 - 7) * 60 * 60 * 1000 + (60 - 5) * 60 * 1000 // 4h 55m
+    stopLineEndTime = time + timeTo12
     
-    // Duration for Stop Line: Until 12:00 London time
-    // We need to calculate the timestamp for 12:00 London time of the same day
-    // This is tricky because `time` is in UTC. We need to find the offset for 12:00 London relative to the current bar's time.
-    // However, simpler approach: The start is at londonStartHour (e.g., 7). 12:00 is (12 - 7) = 5 hours later.
-    stopDuration = (12 - londonStartHour) * 60 * 60 * 1000
-    stopLineEndTime = time + stopDuration
-
-    // Draw Horizontal Stop Line (Red) from Open Time to 12:00 London time
-    // User might want this to start at 7:05 as well? "start the sell line at 7.05"
-    // Assuming stop line should also align or just start from 7:00?
-    // User said "start the sell line at 7.05". I will delay the sell line.
-    // I will leave the stop line starting at 7:00 unless requested otherwise, or maybe match the sell line?
-    // Usually stops are active when the order is active. I'll match the start time for the stop line too.
-    
-    line.new(x1=sellLineStartTime, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
+    line.new(x1=time, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
