@@ -93,11 +93,24 @@ if isCheckTime705() and not na(openPrice700)
     
     // Visuals
     line.new(x1=time, y1=dailySellLevel, x2=dailySellLineEndTime, y2=dailySellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
+    label.new(dailySellLineEndTime, dailySellLevel, "Sell Entry", xloc=xloc.bar_time, color=color.green, textcolor=color.white, style=label.style_label_left)
     
     // Stop Duration: Until 12:00
     timeTo12 = (5 * 60 * 60 * 1000) - (5 * 60 * 1000)
     stopLineEndTime = time + timeTo12
     line.new(x1=time, y1=dailyStopLevel, x2=stopLineEndTime, y2=dailyStopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
+    label.new(stopLineEndTime, dailyStopLevel, "Stop Loss", xloc=xloc.bar_time, color=color.red, textcolor=color.white, style=label.style_label_left)
+    
+    // Visualize TP Levels (Optional but helpful)
+    tp1Level = dailySellLevel - (tp1Ticks * syminfo.mintick)
+    tp2Level = dailySellLevel - (250 * syminfo.mintick)
+    
+    // Draw TP lines for visualization
+    line.new(x1=time, y1=tp1Level, x2=dailySellLineEndTime, y2=tp1Level, xloc=xloc.bar_time, color=color.green, style=line.style_dotted, width=1)
+    label.new(dailySellLineEndTime, tp1Level, "TP1", xloc=xloc.bar_time, color=color.green, textcolor=color.white, style=label.style_label_left)
+    
+    line.new(x1=time, y1=tp2Level, x2=dailySellLineEndTime, y2=tp2Level, xloc=xloc.bar_time, color=color.green, style=line.style_dotted, width=1)
+    label.new(dailySellLineEndTime, tp2Level, "TP2", xloc=xloc.bar_time, color=color.green, textcolor=color.white, style=label.style_label_left)
     
     // Strategy Entry: Place Limit Order
     // We name the order "Sell Entry"
