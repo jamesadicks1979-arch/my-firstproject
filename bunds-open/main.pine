@@ -1,9 +1,13 @@
 //@version=5
-indicator("Bunds Open - London Start", overlay=true)
+indicator("Bunds Open - London Start", overlay=true, max_lines_count=500, max_labels_count=500)
 
 // Input for the time
 londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
 londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
+
+// Inputs for Offsets (in Ticks)
+sellOffsetTicks = input.int(100, "Sell Line Offset (Ticks)", minval=0)
+stopOffsetTicks = input.int(160, "Stop Line Offset (Ticks)", minval=0)
 
 // Function to check if the current bar is at the specific London time
 isLondonStart() =>
@@ -11,10 +15,34 @@ isLondonStart() =>
     m = minute(time, "Europe/London")
     h == londonStartHour and m == londonStartMinute
 
-// Plotting
-// We use bgcolor to highlight the specific time
+// Background color for start time
 bgcolor(isLondonStart() ? color.new(color.blue, 80) : na, title="London Start Background")
 
-// Draw a vertical line using line.new on the specific bar
+// Logic
 if isLondonStart()
+    // Capture Open Price
+    openPrice = open
+    
+    // Draw vertical line for the start
     line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
+    
+    // Calculate Levels
+    sellLevel = openPrice + (sellOffsetTicks * syminfo.mintick)
+    stopLevel = openPrice + (stopOffsetTicks * syminfo.mintick)
+    
+    // Durations
+    // Sell Line: 2 hours (default from previous context)
+    sellDuration = 2 * 60 * 60 * 1000
+    sellEndTime = time + sellDuration
+    
+    // Stop Line: Until 12:00 London Time (default from previous context)
+    // 12:00 is (12 - 7) = 5 hours from 7:00
+    stopDuration = (12 - londonStartHour) * 60 * 60 * 1000
+    stopEndTime = time + stopDuration
+    
+    // Draw Lines
+    // Green Sell Line
+    line.new(x1=time, y1=sellLevel, x2=sellEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
+    
+    // Red Stop Line
+    line.new(x1=time, y1=stopLevel, x2=stopEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
