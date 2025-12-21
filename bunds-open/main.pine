@@ -117,6 +117,13 @@ plot(sma50, "SMA 50", color=color.blue, linewidth=2)
 plot(sma100, "SMA 100", color=color.white, linewidth=2)
 plot(sma200, "SMA 200", color=color.purple, linewidth=2)
 
+// Labels for SMAs on the right side
+if barstate.islast
+    label.new(bar_index, sma21, "SMA 21", color=color.yellow, textcolor=color.black, style=label.style_label_left)
+    label.new(bar_index, sma50, "SMA 50", color=color.blue, textcolor=color.white, style=label.style_label_left)
+    label.new(bar_index, sma100, "SMA 100", color=color.white, textcolor=color.black, style=label.style_label_left)
+    label.new(bar_index, sma200, "SMA 200", color=color.purple, textcolor=color.white, style=label.style_label_left)
+
 // -------------------------------------------------------------------------
 // Manage Orders
 // -------------------------------------------------------------------------
