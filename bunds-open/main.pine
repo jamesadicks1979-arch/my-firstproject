@@ -107,19 +107,16 @@ if isCheckTime705() and not na(openPrice700)
 // -------------------------------------------------------------------------
 // SMAs (Current Timeframe)
 // -------------------------------------------------------------------------
-sma21 = ta.sma(close, 21)
 sma50 = ta.sma(close, 50)
 sma100 = ta.sma(close, 100)
 sma200 = ta.sma(close, 200)
 
-plot(sma21, "SMA 21", color=color.yellow, linewidth=2)
 plot(sma50, "SMA 50", color=color.blue, linewidth=2)
 plot(sma100, "SMA 100", color=color.white, linewidth=2)
 plot(sma200, "SMA 200", color=color.purple, linewidth=2)
 
 // Labels for SMAs on the right side
 if barstate.islast
-    label.new(bar_index, sma21, "SMA 21", color=color.yellow, textcolor=color.black, style=label.style_label_left)
     label.new(bar_index, sma50, "SMA 50", color=color.blue, textcolor=color.white, style=label.style_label_left)
     label.new(bar_index, sma100, "SMA 100", color=color.white, textcolor=color.black, style=label.style_label_left)
     label.new(bar_index, sma200, "SMA 200", color=color.purple, textcolor=color.white, style=label.style_label_left)
@@ -141,23 +138,23 @@ if strategy.position_size < 0
     // Trigger price for TP1 (120 ticks)
     tp1Price = entryPrice - (tp1Ticks * syminfo.mintick)
     
-    // Variable to track if TP1 has been hit for the current position
-    var bool isTp1Hit = false
+    // Logic for Move to Breakeven:
+    // User requested: "stops and profit takes the same as before"
+    // "Before" meant: Once TP1 hit, Move Remaining to Breakeven (Scratch).
+    // And TP2 was 250 ticks.
+    
+    var bool isBreakeven = false
     
     if strategy.position_size == 0
-        isTp1Hit := false
+        isBreakeven := false
     
+    // Check if TP1 was hit (price went below TP1 level)
     if strategy.position_size < 0 and low <= tp1Price
-        isTp1Hit := true
+        isBreakeven := true
         
-    // Dynamic Exit Logic for Remaining Half (after TP1 is hit)
-    // 1. Close if Price Closes ABOVE SMA 21.
-    // 2. OR Close at TP2 (300 ticks).
-    
-    // Condition 1: Trailing Stop / Trend Following Exit
-    // We check if the current bar's close > SMA 21
-    if isTp1Hit and close > sma21
-        strategy.close("Sell Entry", comment="Exit SMA21", qty_percent=100)
+    // Dynamic Stop Level for Remaining Position
+    // If BE triggered, Stop is Entry Price. Else, it is Daily Stop Level.
+    currentStopLevel = isBreakeven ? entryPrice : dailyStopLevel
     
     // Setup Exits
     
@@ -166,10 +163,9 @@ if strategy.position_size < 0
     strategy.exit("TP1", "Sell Entry", qty_percent=50, profit=tp1Ticks, stop=dailyStopLevel, comment_profit="TP1 Hit", comment_loss="Stop Hit")
     
     // Exit 2: Remaining Position
-    // Target: 300 ticks (30 pips)
-    // Stop: Remains at Daily Stop Level (Red Line) - User removed Breakeven requirement.
-    // Trailing/SMA Exit is handled by `strategy.close` above.
-    strategy.exit("TP2", "Sell Entry", qty_percent=100, profit=300, stop=dailyStopLevel, comment_profit="TP2 300 Ticks", comment_loss="Stop Hit")
+    // Target: 250 ticks (as requested "same as before")
+    // Stop: Dynamic (Breakeven or Daily Stop)
+    strategy.exit("TP2", "Sell Entry", qty_percent=100, profit=250, stop=currentStopLevel, comment_profit="TP2 250 Ticks", comment_loss="Stop Hit/BE")
 
 
 
