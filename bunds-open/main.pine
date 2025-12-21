@@ -107,13 +107,11 @@ if isCheckTime720() and conditionMetAt715
 // -------------------------------------------------------------------------
 // Daily SMAs on smaller timeframe
 // -------------------------------------------------------------------------
-// Request Daily Close data
-dailyClose = request.security(syminfo.tickerid, "D", close, lookahead=barmerge.lookahead_on)
-
-// Calculate SMAs
-sma5 = ta.sma(dailyClose, 5)
-sma9 = ta.sma(dailyClose, 9)
-sma21 = ta.sma(dailyClose, 21)
+// We calculate the SMA inside the security call to ensure it's calculated on Daily data
+// and then returned to the current timeframe.
+sma5 = request.security(syminfo.tickerid, "D", ta.sma(close, 5), lookahead=barmerge.lookahead_on)
+sma9 = request.security(syminfo.tickerid, "D", ta.sma(close, 9), lookahead=barmerge.lookahead_on)
+sma21 = request.security(syminfo.tickerid, "D", ta.sma(close, 21), lookahead=barmerge.lookahead_on)
 
 // Plot SMAs
 plot(sma5, "Daily SMA 5", color=color.purple, linewidth=2)
