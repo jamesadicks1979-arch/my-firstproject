@@ -6,8 +6,11 @@ londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
 londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
 
 // Inputs for Offsets (in Ticks)
-sellOffsetTicks = input.int(100, "Sell Line Offset (Ticks)", minval=0)
-stopOffsetTicks = input.int(160, "Stop Line Offset (Ticks)", minval=0)
+sellOffsetTicksDefault = input.int(100, "Default Sell Offset (Ticks)", minval=0)
+stopOffsetTicksDefault = input.int(160, "Default Stop Offset (Ticks)", minval=0)
+
+sellOffsetTicksMoved = input.int(200, "Moved Sell Offset (Ticks)", minval=0)
+stopOffsetTicksMoved = input.int(260, "Moved Stop Offset (Ticks)", minval=0)
 
 // Function to check if the current bar is at the specific London time
 isLondonStart() =>
@@ -18,31 +21,68 @@ isLondonStart() =>
 // Background color for start time
 bgcolor(isLondonStart() ? color.new(color.blue, 80) : na, title="London Start Background")
 
-// Logic
+// Persistent variables to store 7:00 data
+var float openPrice700 = na
+
+// 1. Capture 7:00 Open
 if isLondonStart()
-    // Capture Open Price
-    openPrice = open
-    
+    openPrice700 := open
     // Draw vertical line for the start
     line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
+
+// 2. Check Logic at 7:05
+isCheckTime705() =>
+    h = hour(time, "Europe/London")
+    m = minute(time, "Europe/London")
+    targetM = londonStartMinute + 5
+    // Returns true at the START of the 7:05 bar
+    h == londonStartHour and m == targetM
+
+if isCheckTime705() and not na(openPrice700)
+    // "if the market trades above 10 pips before 7.05"
+    // 10 pips = 100 ticks (assuming 1 pip = 10 ticks for this instrument context, or just strict 100 ticks as requested before)
+    // User said "above 10 pips ... move ... to 200 ticks".
+    // Let's assume the threshold is 100 ticks (10 pips).
+    thresholdPrice = openPrice700 + (100 * syminfo.mintick)
+    
+    // Check if current state (at 7:05 Open) is above threshold
+    // Using 'close' here means Close of the PREVIOUS bar (7:00-7:05) if on 5m chart, 
+    // because at the moment the bar opens, close = open.
+    // However, previously we used 'close' effectively. 
+    // To be precise "before 7.05", checking the Close of the 7:00 bar (on 5m) or just the Open of 7:05 bar is best.
+    // I will use 'open' of the 7:05 bar as the reference for "where we are at 7:05".
+    
+    isAbove = open > thresholdPrice
+    
+    float finalSellOffset = na
+    float finalStopOffset = na
+    
+    if isAbove
+        // Move lines
+        finalSellOffset := sellOffsetTicksMoved // 200
+        finalStopOffset := stopOffsetTicksMoved // 260
+    else
+        // Stay same
+        finalSellOffset := sellOffsetTicksDefault // 100
+        finalStopOffset := stopOffsetTicksDefault // 160
     
     // Calculate Levels
-    sellLevel = openPrice + (sellOffsetTicks * syminfo.mintick)
-    stopLevel = openPrice + (stopOffsetTicks * syminfo.mintick)
+    sellLevel = openPrice700 + (finalSellOffset * syminfo.mintick)
+    stopLevel = openPrice700 + (finalStopOffset * syminfo.mintick)
     
-    // Durations
-    // Sell Line: 2 hours (default from previous context)
+    // Draw Lines starting NOW (7:05)
+    
+    // Sell Line Duration: 2 hours (from 7:05)
     sellDuration = 2 * 60 * 60 * 1000
     sellEndTime = time + sellDuration
     
-    // Stop Line: Until 12:00 London Time (default from previous context)
-    // 12:00 is (12 - 7) = 5 hours from 7:00
-    stopDuration = (12 - londonStartHour) * 60 * 60 * 1000
-    stopEndTime = time + stopDuration
-    
-    // Draw Lines
-    // Green Sell Line
     line.new(x1=time, y1=sellLevel, x2=sellEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
     
-    // Red Stop Line
+    // Stop Line Duration: Until 12:00
+    // 12:00 is (12 - 7) = 5 hours from 7:00.
+    // We are at 7:05.
+    // Time until 12:00 = (5 hours) - 5 minutes = 4h 55m.
+    timeTo12 = (5 * 60 * 60 * 1000) - (5 * 60 * 1000)
+    stopEndTime = time + timeTo12
+    
     line.new(x1=time, y1=stopLevel, x2=stopEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
