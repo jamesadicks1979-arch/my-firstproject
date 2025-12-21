@@ -5,6 +5,7 @@ indicator("Bunds Open - London Start", overlay=true)
 londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
 londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
 pipsOffset = input.float(10, "Pips Offset", minval=0)
+stopTicks = input.int(6, "Stop Loss Ticks", minval=0)
 
 // Function to check if the current bar is at the specific London time
 isLondonStart() =>
@@ -27,9 +28,22 @@ if isLondonStart()
     // We multiply by 10 to adjust for pip/tick ratio if needed (user requested 100*tick size)
     sellLevel = open + (pipsOffset * 10 * syminfo.mintick)
     
-    // Duration: 2 hours in milliseconds
-    duration = 2 * 60 * 60 * 1000
-    endTime = time + duration
+    // Duration for Sell Line: 2 hours in milliseconds
+    sellLineDuration = 2 * 60 * 60 * 1000
+    sellLineEndTime = time + sellLineDuration
     
-    // Draw Horizontal Line from Open Time to Open Time + 2 hours
-    line.new(x1=time, y1=sellLevel, x2=endTime, y2=sellLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
+    // Draw Horizontal Sell Line (Green) from Open Time to Open Time + 2 hours
+    line.new(x1=time, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
+    
+    // Calculate Stop Level (Sell Level + 6 ticks)
+    stopLevel = sellLevel + (stopTicks * syminfo.mintick)
+    
+    // Duration for Stop Line: Until 12:00 London time
+    // We need to calculate the timestamp for 12:00 London time of the same day
+    // This is tricky because `time` is in UTC. We need to find the offset for 12:00 London relative to the current bar's time.
+    // However, simpler approach: The start is at londonStartHour (e.g., 7). 12:00 is (12 - 7) = 5 hours later.
+    stopDuration = (12 - londonStartHour) * 60 * 60 * 1000
+    stopLineEndTime = time + stopDuration
+
+    // Draw Horizontal Stop Line (Red) from Open Time to 12:00 London time
+    line.new(x1=time, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
