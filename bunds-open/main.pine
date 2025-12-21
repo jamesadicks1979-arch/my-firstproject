@@ -53,7 +53,7 @@ if isCheckTime() and not na(openPrice700)
     
     if isAbove
         sellOffsetTicks := 200
-        stopOffsetTicks := 320 // "from the opening price at 7.00"
+        stopOffsetTicks := 260 // "from the opening price at 7.00"
     else
         sellOffsetTicks := 100 // Default 100 ticks
         // Previous logic for default stop: Sell Level (100) + 60 ticks = 160 ticks from open
