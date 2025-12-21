@@ -11,6 +11,9 @@ stopTicksInput = input.int(6, "Stop Loss Ticks (x10 ticks)", minval=0)
 isLondonStart() =>
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
+    // On a 5-minute chart, 7:00 bar covers 7:00-7:05.
+    // On a 1-minute chart, 7:00 bar covers 7:00-7:01.
+    // We check if the bar *starts* at the target time.
     h == londonStartHour and m == londonStartMinute
 
 // Background color for start time
@@ -31,9 +34,12 @@ if isLondonStart()
 isBetween700and715() =>
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
+    // If we are on 5min chart: 7:00, 7:05, 7:10 bars. 
+    // 7:15 bar starts at 7:15, so it is NOT "between 7:00 and 7:15" (exclusive of 7:15).
     h == londonStartHour and m >= londonStartMinute and m < 15
 
 if isBetween700and715()
+    // Update high if this bar's high is higher
     if high > highSince700
         highSince700 := high
 
@@ -44,14 +50,39 @@ isCheckTime705() =>
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
     targetM = londonStartMinute + 5
+    // On 5m chart: Bar 7:05 starts at 7:05.
+    // This function returns true at the START of the 7:05 bar.
     h == londonStartHour and m == targetM
 
 if isCheckTime705() and not na(openPrice700)
+    // We are at the OPEN of 7:05 bar.
+    // We need to check if condition "by 7.05" is met.
+    // Previous code checked `close > threshold`.
+    // If we run this at 7:05 Open, `close` is the current close (which is Open at the start of bar, or updates during bar).
+    // If we want to check the *state* at 7:05, we should probably check the *previous* bar's Close (the 7:00 bar on a 5m chart).
+    // But `isLondonStart` (7:00) sets `openPrice700`.
+    // On 5m chart: 
+    // Bar 1: 7:00 (Open 7:00, Close 7:05).
+    // Bar 2: 7:05 (Open 7:05).
+    // So at `isCheckTime705()` (Bar 2), `close[1]` is the close of Bar 1 (price at 7:05).
+    
+    // The previous logic `isAbove = close > thresholdPrice` used current close.
+    // If indicator runs on confirmed bars, `close` is final.
+    // If running real-time, it changes.
+    // Assuming we want the confirmed state "by 7:05", we should check `close[1]` if on 5m chart?
+    // Or just use the `open` of the 7:05 bar (which is approx equal to close of 7:00 bar)?
+    // Let's stick to using `close` of the current bar if we want "if above ... by 7.05" meaning AT 7:05 check.
+    // Actually, "by 7.05" implies we look at what happened before.
+    // On a 5m chart, the 7:00 bar finished.
+    // Let's use `close` of the 7:05 bar? No, that's the price at 7:10.
+    // We are at the 7:05 bar. The price is just starting.
+    // If we want to know if price is > threshold AT 7:05, we should use `open` of 7:05 bar or `close` of 7:00 bar.
+    // Let's use `open` of current bar (7:05) or `close` if we treat it as a check during the bar.
+    
     thresholdPrice = openPrice700 + (100 * syminfo.mintick)
-    // Reverting to 'close' as per original successful version logic (assuming logic matches timeframe)
-    // If this caused issues on 5m, 'open' might be safer, but user asked for "code before SMAs".
-    // I will use 'close' as it was in the code before SMAs.
-    isAbove = close > thresholdPrice
+    // Use `open` here because at 7:05 start, `close` is not formed yet (it equals open).
+    // Or if we want to check the price action *up to* 7:05.
+    isAbove = open > thresholdPrice 
     
     float sellOffsetTicks = na
     float stopOffsetTicks = na
