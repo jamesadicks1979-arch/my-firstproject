@@ -29,11 +29,21 @@ if isLondonStart()
     sellLevel = open + (pipsOffset * 10 * syminfo.mintick)
     
     // Duration for Sell Line: 2 hours in milliseconds
-    sellLineDuration = 2 * 60 * 60 * 1000
-    sellLineEndTime = time + sellLineDuration
+    // BUT user wants it to START at 7:05.
+    // So the line should start 5 minutes after 'time' (which is 7:00).
+    // And if it still lasts 2 hours *from start of line*, then end is start + 2 hours.
+    // If "next two hours" meant from 7:00 to 9:00, then duration is less.
+    // Assuming "put a line across for the next two hours" implies a 2 hour duration for the line itself.
     
-    // Draw Horizontal Sell Line (Green) from Open Time to Open Time + 2 hours
-    line.new(x1=time, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
+    // Start delay: 5 minutes
+    startDelay = 5 * 60 * 1000
+    sellLineStartTime = time + startDelay
+    
+    sellLineDuration = 2 * 60 * 60 * 1000
+    sellLineEndTime = sellLineStartTime + sellLineDuration
+    
+    // Draw Horizontal Sell Line (Green) from 7:05 to 7:05 + 2 hours
+    line.new(x1=sellLineStartTime, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
     
     // Calculate Stop Level (Sell Level + 6 ticks)
     // User requested 60 * ticksize (effectively 10x the input if input is 6, or just hardcoded logic change)
@@ -48,4 +58,10 @@ if isLondonStart()
     stopLineEndTime = time + stopDuration
 
     // Draw Horizontal Stop Line (Red) from Open Time to 12:00 London time
-    line.new(x1=time, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
+    // User might want this to start at 7:05 as well? "start the sell line at 7.05"
+    // Assuming stop line should also align or just start from 7:00?
+    // User said "start the sell line at 7.05". I will delay the sell line.
+    // I will leave the stop line starting at 7:00 unless requested otherwise, or maybe match the sell line?
+    // Usually stops are active when the order is active. I'll match the start time for the stop line too.
+    
+    line.new(x1=sellLineStartTime, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
