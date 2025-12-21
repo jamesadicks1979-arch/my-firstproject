@@ -6,14 +6,12 @@ londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
 londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
 pipsOffset = input.float(10, "Pips Offset (x10 ticks)", minval=0)
 stopTicksInput = input.int(6, "Stop Loss Ticks (x10 ticks)", minval=0)
+showDebug = input.bool(true, "Show Debug Labels")
 
 // Function to check if the current bar is at the specific London time
 isLondonStart() =>
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
-    // On a 5-minute chart, 7:00 bar covers 7:00-7:05.
-    // On a 1-minute chart, 7:00 bar covers 7:00-7:01.
-    // We check if the bar *starts* at the target time.
     h == londonStartHour and m == londonStartMinute
 
 // Background color for start time
@@ -29,17 +27,16 @@ if isLondonStart()
     highSince700 := high
     // Draw vertical line for the start
     line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
+    if showDebug
+        label.new(bar_index, high, "Start 7:00\nOpen: " + str.tostring(open), color=color.blue, textcolor=color.white)
 
 // Track High price between 7:00 and 7:15
 isBetween700and715() =>
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
-    // If we are on 5min chart: 7:00, 7:05, 7:10 bars. 
-    // 7:15 bar starts at 7:15, so it is NOT "between 7:00 and 7:15" (exclusive of 7:15).
     h == londonStartHour and m >= londonStartMinute and m < 15
 
 if isBetween700and715()
-    // Update high if this bar's high is higher
     if high > highSince700
         highSince700 := high
 
@@ -50,65 +47,47 @@ isCheckTime705() =>
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
     targetM = londonStartMinute + 5
-    // On 5m chart: Bar 7:05 starts at 7:05.
-    // This function returns true at the START of the 7:05 bar.
     h == londonStartHour and m == targetM
 
-if isCheckTime705() and not na(openPrice700)
-    // We are at the OPEN of 7:05 bar.
-    // We need to check if condition "by 7.05" is met.
-    // Previous code checked `close > threshold`.
-    // If we run this at 7:05 Open, `close` is the current close (which is Open at the start of bar, or updates during bar).
-    // If we want to check the *state* at 7:05, we should probably check the *previous* bar's Close (the 7:00 bar on a 5m chart).
-    // But `isLondonStart` (7:00) sets `openPrice700`.
-    // On 5m chart: 
-    // Bar 1: 7:00 (Open 7:00, Close 7:05).
-    // Bar 2: 7:05 (Open 7:05).
-    // So at `isCheckTime705()` (Bar 2), `close[1]` is the close of Bar 1 (price at 7:05).
+if isCheckTime705()
+    if not na(openPrice700)
+        // Using 'close' to be consistent with previous working version, or 'open' since it's start of bar.
+        // If we use 'close' on a 5m bar at 7:05, it is the close of the 7:05 bar (i.e. price at 7:10).
+        // If we want to check price AT 7:05, we should use 'open' of the 7:05 bar.
+        // I will use 'open' but add a debug label to confirm values.
+        
+        thresholdPrice = openPrice700 + (100 * syminfo.mintick)
+        isAbove = open > thresholdPrice 
+        
+        float sellOffsetTicks = na
+        float stopOffsetTicks = na
+        
+        if isAbove
+            sellOffsetTicks := 200
+            stopOffsetTicks := 260 
+        else
+            sellOffsetTicks := 100 
+            stopOffsetTicks := 160
+        
+        sellLevel = openPrice700 + (sellOffsetTicks * syminfo.mintick)
+        stopLevel = openPrice700 + (stopOffsetTicks * syminfo.mintick)
     
-    // The previous logic `isAbove = close > thresholdPrice` used current close.
-    // If indicator runs on confirmed bars, `close` is final.
-    // If running real-time, it changes.
-    // Assuming we want the confirmed state "by 7:05", we should check `close[1]` if on 5m chart?
-    // Or just use the `open` of the 7:05 bar (which is approx equal to close of 7:00 bar)?
-    // Let's stick to using `close` of the current bar if we want "if above ... by 7.05" meaning AT 7:05 check.
-    // Actually, "by 7.05" implies we look at what happened before.
-    // On a 5m chart, the 7:00 bar finished.
-    // Let's use `close` of the 7:05 bar? No, that's the price at 7:10.
-    // We are at the 7:05 bar. The price is just starting.
-    // If we want to know if price is > threshold AT 7:05, we should use `open` of 7:05 bar or `close` of 7:00 bar.
-    // Let's use `open` of current bar (7:05) or `close` if we treat it as a check during the bar.
-    
-    // HOWEVER, the main issue "where have all the opening lines gone" might be due to `openPrice700` being NA or logic failing.
-    // Ensure `openPrice700` is preserved. It is a `var`.
-    
-    thresholdPrice = openPrice700 + (100 * syminfo.mintick)
-    // Use `open` here because at 7:05 start, `close` is not formed yet (it equals open).
-    // Or if we want to check the price action *up to* 7:05.
-    isAbove = open > thresholdPrice 
-    
-    float sellOffsetTicks = na
-    float stopOffsetTicks = na
-    
-    if isAbove
-        sellOffsetTicks := 200
-        stopOffsetTicks := 260 
+        sellLineDuration = 2 * 60 * 60 * 1000
+        sellLineEndTime = time + sellLineDuration
+        
+        line.new(x1=time, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
+        
+        timeTo12 = (11 - 7) * 60 * 60 * 1000 + (60 - 5) * 60 * 1000 
+        stopLineEndTime = time + timeTo12
+        
+        line.new(x1=time, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
+        
+        if showDebug
+            label.new(bar_index, high, "Check 7:05\nAbove: " + str.tostring(isAbove) + "\nSell: " + str.tostring(sellLevel), color=color.green, textcolor=color.white)
     else
-        sellOffsetTicks := 100 
-        stopOffsetTicks := 160
-    
-    sellLevel = openPrice700 + (sellOffsetTicks * syminfo.mintick)
-    stopLevel = openPrice700 + (stopOffsetTicks * syminfo.mintick)
+        if showDebug
+            label.new(bar_index, high, "Check 7:05\nError: No OpenPrice700", color=color.red, textcolor=color.white)
 
-    sellLineDuration = 2 * 60 * 60 * 1000
-    sellLineEndTime = time + sellLineDuration
-    
-    line.new(x1=time, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
-    
-    timeTo12 = (11 - 7) * 60 * 60 * 1000 + (60 - 5) * 60 * 1000 
-    stopLineEndTime = time + timeTo12
-    
-    line.new(x1=time, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
 
 // -------------------------------------------------------------------------
 // Check Logic at 7:15
@@ -117,20 +96,19 @@ isCheckTime715() =>
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
     targetM = londonStartMinute + 15
-    // On 5m chart, we have a bar at 7:15.
     h == londonStartHour and m == targetM
 
 var bool conditionMetAt715 = false
 
 if isCheckTime715()
-    // Check highSince700 vs threshold.
-    // highSince700 collects highs from 7:00, 7:05, 7:10 bars (on 5m chart).
-    // 7:15 bar just started.
     threshold50Ticks = openPrice700 + (50 * syminfo.mintick)
     if highSince700 <= threshold50Ticks
         conditionMetAt715 := true
     else
         conditionMetAt715 := false
+    
+    if showDebug
+        label.new(bar_index, high, "Check 7:15\nHigh: " + str.tostring(highSince700) + "\nCond: " + str.tostring(conditionMetAt715), color=color.orange, textcolor=color.white)
 
 // 7:20 Action
 isCheckTime720() =>
@@ -144,17 +122,18 @@ if isCheckTime720() and conditionMetAt715
     sellLineDuration = 2 * 60 * 60 * 1000
     sellLineEndTime = time + sellLineDuration
     line.new(x1=time, y1=sellPrice720, x2=sellLineEndTime, y2=sellPrice720, xloc=xloc.bar_time, color=color.orange, style=line.style_solid, width=2)
+    
+    if showDebug
+        label.new(bar_index, high, "Action 7:20\nSell", color=color.orange, textcolor=color.white)
 
 // -------------------------------------------------------------------------
 // Daily SMAs on smaller timeframe
 // -------------------------------------------------------------------------
-// We calculate the SMA inside the security call to ensure it's calculated on Daily data
-// and then returned to the current timeframe.
+// We calculate the SMA inside the security call
 sma5 = request.security(syminfo.tickerid, "D", ta.sma(close, 5), lookahead=barmerge.lookahead_on)
 sma9 = request.security(syminfo.tickerid, "D", ta.sma(close, 9), lookahead=barmerge.lookahead_on)
 sma21 = request.security(syminfo.tickerid, "D", ta.sma(close, 21), lookahead=barmerge.lookahead_on)
 
-// Plot SMAs
 plot(sma5, "Daily SMA 5", color=color.purple, linewidth=2)
 plot(sma9, "Daily SMA 9", color=color.orange, linewidth=2)
 plot(sma21, "Daily SMA 21", color=color.yellow, linewidth=2)
