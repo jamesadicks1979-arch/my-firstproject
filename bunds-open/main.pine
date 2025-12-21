@@ -119,11 +119,68 @@ if strategy.position_size < 0
     // TP1: 120 ticks
     // TP2: 250 ticks
     
-    // Partial Exit (50%)
+    // Check if TP1 has been hit (we can check strategy.closedtrades to see if a partial exit happened)
+    // Actually, simpler way in Pine: 
+    // If we have exited half, position size will be different from entry.
+    // However, strategy.position_size changes immediately.
+    
+    // Logic for Move to Breakeven:
+    // If price has reached TP1 level (Entry Price - 120 ticks), then Stop Loss becomes Entry Price.
+    
+    // Calculate Entry Price (Average)
+    entryPrice = strategy.position_avg_price
+    
+    // Logic to detect if we hit TP1
+    // We can use a var to track if BE is active for current trade
+    
+    // Better approach with strategy.exit:
+    // 1. Exit 50% at TP1.
+    // 2. Update Stop for remaining 50% to Breakeven once TP1 is hit.
+    // Pine Script's `strategy.exit` handles this if we update the stop price dynamically.
+    
+    // Calculate if we should be at Breakeven
+    // If the Low of the current bar (or any bar since entry) hit the TP1 target?
+    // Hard to track perfectly without intra-bar data or complex vars.
+    // Easier: If strategy.position_size is HALF of the original entry, we move stop to BE.
+    // BUT we don't know the original size easily if we use % equity.
+    
+    // Alternative: Use `loss` parameter in strategy.exit? No, that's trailing offset.
+    
+    // We will use 2 strategy.exit calls.
+    // The second one's stop price will be conditional.
+    
+    // We need to know if TP1 occurred.
+    // We can check `strategy.closedtrades.entry_id(strategy.closedtrades - 1) == "Sell Entry"`?
+    
+    // Robust way:
+    // Use `stop` parameter.
+    // For the remaining position (TP2), the stop is initially `dailyStopLevel`.
+    // If `low <= entryPrice - (tp1Ticks * syminfo.mintick)`, we update stop to `entryPrice`.
+    
+    // Trigger price for BE
+    tp1Price = entryPrice - (tp1Ticks * syminfo.mintick)
+    
+    // Variable to track if BE is triggered for the current position
+    // We need a var that resets when position is closed.
+    var bool isBreakeven = false
+    
+    if strategy.position_size == 0
+        isBreakeven := false
+    
+    if strategy.position_size < 0 and low <= tp1Price
+        isBreakeven := true
+        
+    // Dynamic Stop Level for Remaining Position
+    // If BE triggered, Stop is Entry Price. Else, it is Daily Stop Level.
+    currentStopLevel = isBreakeven ? entryPrice : dailyStopLevel
+    
+    // Partial Exit (50%) - Fixed Stop (Daily Stop Level)
+    // We use a specific ID so we don't overwrite the TP2 exit
     strategy.exit("TP1", "Sell Entry", qty_percent=50, profit=tp1Ticks, stop=dailyStopLevel, comment_profit="TP1 Hit", comment_loss="Stop Hit")
     
-    // Full Exit (Remaining 50% -> 100% of remaining)
-    strategy.exit("TP2", "Sell Entry", qty_percent=100, profit=tp2Ticks, stop=dailyStopLevel, comment_profit="TP2 Hit", comment_loss="Stop Hit")
+    // Full Exit (Remaining) - Dynamic Stop (BE or Daily Stop)
+    // Note: qty_percent=100 of *remaining* position
+    strategy.exit("TP2", "Sell Entry", qty_percent=100, profit=tp2Ticks, stop=currentStopLevel, comment_profit="TP2 Hit", comment_loss="Stop Hit/BE")
 
 
 // -------------------------------------------------------------------------
