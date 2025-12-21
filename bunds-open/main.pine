@@ -6,7 +6,6 @@ londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
 londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
 pipsOffset = input.float(10, "Pips Offset (x10 ticks)", minval=0)
 stopTicksInput = input.int(6, "Stop Loss Ticks (x10 ticks)", minval=0)
-showDebug = input.bool(true, "Show Debug Labels")
 
 // Function to check if the current bar is at the specific London time
 isLondonStart() =>
@@ -27,8 +26,6 @@ if isLondonStart()
     highSince700 := high
     // Draw vertical line for the start
     line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
-    if showDebug
-        label.new(bar_index, high, "Start 7:00\nOpen: " + str.tostring(open), color=color.blue, textcolor=color.white)
 
 // Track High price between 7:00 and 7:15
 isBetween700and715() =>
@@ -49,45 +46,35 @@ isCheckTime705() =>
     targetM = londonStartMinute + 5
     h == londonStartHour and m == targetM
 
-if isCheckTime705()
-    if not na(openPrice700)
-        // Using 'close' to be consistent with previous working version, or 'open' since it's start of bar.
-        // If we use 'close' on a 5m bar at 7:05, it is the close of the 7:05 bar (i.e. price at 7:10).
-        // If we want to check price AT 7:05, we should use 'open' of the 7:05 bar.
-        // I will use 'open' but add a debug label to confirm values.
-        
-        thresholdPrice = openPrice700 + (100 * syminfo.mintick)
-        isAbove = open > thresholdPrice 
-        
-        float sellOffsetTicks = na
-        float stopOffsetTicks = na
-        
-        if isAbove
-            sellOffsetTicks := 200
-            stopOffsetTicks := 260 
-        else
-            sellOffsetTicks := 100 
-            stopOffsetTicks := 160
-        
-        sellLevel = openPrice700 + (sellOffsetTicks * syminfo.mintick)
-        stopLevel = openPrice700 + (stopOffsetTicks * syminfo.mintick)
+if isCheckTime705() and not na(openPrice700)
+    thresholdPrice = openPrice700 + (100 * syminfo.mintick)
+    // Reverting to 'close' as per original successful version logic (assuming logic matches timeframe)
+    // If this caused issues on 5m, 'open' might be safer, but user asked for "code before SMAs".
+    // I will use 'close' as it was in the code before SMAs.
+    isAbove = close > thresholdPrice
     
-        sellLineDuration = 2 * 60 * 60 * 1000
-        sellLineEndTime = time + sellLineDuration
-        
-        line.new(x1=time, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
-        
-        timeTo12 = (11 - 7) * 60 * 60 * 1000 + (60 - 5) * 60 * 1000 
-        stopLineEndTime = time + timeTo12
-        
-        line.new(x1=time, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
-        
-        if showDebug
-            label.new(bar_index, high, "Check 7:05\nAbove: " + str.tostring(isAbove) + "\nSell: " + str.tostring(sellLevel), color=color.green, textcolor=color.white)
+    float sellOffsetTicks = na
+    float stopOffsetTicks = na
+    
+    if isAbove
+        sellOffsetTicks := 200
+        stopOffsetTicks := 260 
     else
-        if showDebug
-            label.new(bar_index, high, "Check 7:05\nError: No OpenPrice700", color=color.red, textcolor=color.white)
+        sellOffsetTicks := 100 
+        stopOffsetTicks := 160
+    
+    sellLevel = openPrice700 + (sellOffsetTicks * syminfo.mintick)
+    stopLevel = openPrice700 + (stopOffsetTicks * syminfo.mintick)
 
+    sellLineDuration = 2 * 60 * 60 * 1000
+    sellLineEndTime = time + sellLineDuration
+    
+    line.new(x1=time, y1=sellLevel, x2=sellLineEndTime, y2=sellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
+    
+    timeTo12 = (11 - 7) * 60 * 60 * 1000 + (60 - 5) * 60 * 1000 
+    stopLineEndTime = time + timeTo12
+    
+    line.new(x1=time, y1=stopLevel, x2=stopLineEndTime, y2=stopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
 
 // -------------------------------------------------------------------------
 // Check Logic at 7:15
@@ -106,9 +93,6 @@ if isCheckTime715()
         conditionMetAt715 := true
     else
         conditionMetAt715 := false
-    
-    if showDebug
-        label.new(bar_index, high, "Check 7:15\nHigh: " + str.tostring(highSince700) + "\nCond: " + str.tostring(conditionMetAt715), color=color.orange, textcolor=color.white)
 
 // 7:20 Action
 isCheckTime720() =>
@@ -122,18 +106,3 @@ if isCheckTime720() and conditionMetAt715
     sellLineDuration = 2 * 60 * 60 * 1000
     sellLineEndTime = time + sellLineDuration
     line.new(x1=time, y1=sellPrice720, x2=sellLineEndTime, y2=sellPrice720, xloc=xloc.bar_time, color=color.orange, style=line.style_solid, width=2)
-    
-    if showDebug
-        label.new(bar_index, high, "Action 7:20\nSell", color=color.orange, textcolor=color.white)
-
-// -------------------------------------------------------------------------
-// Daily SMAs on smaller timeframe
-// -------------------------------------------------------------------------
-// We calculate the SMA inside the security call
-sma5 = request.security(syminfo.tickerid, "D", ta.sma(close, 5), lookahead=barmerge.lookahead_on)
-sma9 = request.security(syminfo.tickerid, "D", ta.sma(close, 9), lookahead=barmerge.lookahead_on)
-sma21 = request.security(syminfo.tickerid, "D", ta.sma(close, 21), lookahead=barmerge.lookahead_on)
-
-plot(sma5, "Daily SMA 5", color=color.purple, linewidth=2)
-plot(sma9, "Daily SMA 9", color=color.orange, linewidth=2)
-plot(sma21, "Daily SMA 21", color=color.yellow, linewidth=2)
