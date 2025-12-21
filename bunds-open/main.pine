@@ -88,7 +88,7 @@ if isCheckTime() and not na(openPrice700)
     if isAbove
         stopLevel := openPrice700 + (stopOffsetTicks * syminfo.mintick)
     else
-         stopLevel := openPrice700 + (stopOffsetTicks * syminfo.mintick)
+        stopLevel := openPrice700 + (stopOffsetTicks * syminfo.mintick)
 
     // Draw lines starting from NOW (7:05)
     
