@@ -22,17 +22,25 @@ p200 = plot(sma200, color=color.red, title="200 SMA", linewidth=2)
 // Pip Calculation (Standard 10 * mintick)
 pip_val = syminfo.mintick * 10
 
-// 30 Pips Bands relative to 200 SMA
-band_top = sma200 + (30 * pip_val)
-band_bot = sma200 - (30 * pip_val)
+// 60 Ticks Bands relative to 200 SMA
+// Note: 1 pip usually equals 10 ticks. 60 ticks is approx 6 pips.
+band_top = sma200 + (60 * syminfo.mintick)
+band_bot = sma200 - (60 * syminfo.mintick)
 
-plot(band_top, color=color.gray, title="Upper 30 Pips", linewidth=1, style=plot.style_circles)
-plot(band_bot, color=color.gray, title="Lower 30 Pips", linewidth=1, style=plot.style_circles)
+plot(band_top, color=color.gray, title="Upper 60 Ticks", linewidth=1, style=plot.style_circles)
+plot(band_bot, color=color.gray, title="Lower 60 Ticks", linewidth=1, style=plot.style_circles)
 
 // Fill Logic
-// Fill between 100 SMA and 200 SMA with green color
-// ONLY when 100 SMA is more than 10 pips above the 200 SMA
-threshold_fill = sma200 + (10 * pip_val)
-fill_condition = sma100 >= threshold_fill
+// Green: 100 SMA > 200 SMA + 10 pips
+// Red:   100 SMA < 200 SMA - 10 pips
+threshold_fill_long = sma200 + (10 * pip_val)
+threshold_fill_short = sma200 - (10 * pip_val)
 
-fill(p100, p200, color = fill_condition ? color.new(color.green, 70) : na, title="100 SMA > 200 SMA + 10 Pips Fill")
+fill_color = if sma100 >= threshold_fill_long
+    color.new(color.green, 70)
+else if sma100 <= threshold_fill_short
+    color.new(color.red, 70)
+else
+    na
+
+fill(p100, p200, color = fill_color, title="100/200 SMA Fill")
