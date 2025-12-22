@@ -1,0 +1,54 @@
+//@version=5
+indicator("200 SMA All Timeframes", overlay=true)
+
+// --- Inputs ---
+show_curr = input.bool(true, "Show Current TF 200 SMA", group="Timeframes")
+show_15m  = input.bool(true, "Show 15m 200 SMA", group="Timeframes")
+show_1h   = input.bool(true, "Show 1h 200 SMA", group="Timeframes")
+show_4h   = input.bool(true, "Show 4h 200 SMA", group="Timeframes")
+show_D    = input.bool(true, "Show Daily 200 SMA", group="Timeframes")
+show_W    = input.bool(true, "Show Weekly 200 SMA", group="Timeframes")
+show_M    = input.bool(false, "Show Monthly 200 SMA", group="Timeframes") // Default off to avoid clutter
+
+// --- Calculations ---
+// Helper function to get 200 SMA from a specific timeframe
+get_sma200(tf) =>
+    request.security(syminfo.tickerid, tf, ta.sma(close, 200))
+
+// Calculate values
+sma_curr = ta.sma(close, 200)
+sma_15m  = get_sma200("15")
+sma_1h   = get_sma200("60")
+sma_4h   = get_sma200("240")
+sma_D    = get_sma200("D")
+sma_W    = get_sma200("W")
+sma_M    = get_sma200("M")
+
+// --- Plotting ---
+// Current
+plot(show_curr ? sma_curr : na, color=color.white, title="Current 200 SMA", linewidth=2)
+
+// MTF (using different colors for distinction)
+plot(show_15m ? sma_15m : na, color=color.new(color.yellow, 0), title="15m 200 SMA", linewidth=1)
+plot(show_1h ? sma_1h : na, color=color.new(color.orange, 0), title="1h 200 SMA", linewidth=1)
+plot(show_4h ? sma_4h : na, color=color.new(color.fuchsia, 0), title="4h 200 SMA", linewidth=2)
+plot(show_D ? sma_D : na, color=color.new(color.red, 0), title="Daily 200 SMA", linewidth=3)
+plot(show_W ? sma_W : na, color=color.new(color.blue, 0), title="Weekly 200 SMA", linewidth=3)
+plot(show_M ? sma_M : na, color=color.new(color.purple, 0), title="Monthly 200 SMA", linewidth=4)
+
+// --- Labels (Optional, on right side) ---
+if barstate.islast
+    if show_curr
+        label.new(bar_index + 3, sma_curr, "Curr 200", style=label.style_label_left, color=color.white, textcolor=color.black, size=size.tiny)
+    if show_15m
+        label.new(bar_index + 3, sma_15m, "15m 200", style=label.style_label_left, color=color.yellow, textcolor=color.black, size=size.tiny)
+    if show_1h
+        label.new(bar_index + 3, sma_1h, "1h 200", style=label.style_label_left, color=color.orange, textcolor=color.black, size=size.tiny)
+    if show_4h
+        label.new(bar_index + 3, sma_4h, "4h 200", style=label.style_label_left, color=color.fuchsia, textcolor=color.white, size=size.small)
+    if show_D
+        label.new(bar_index + 3, sma_D, "Daily 200", style=label.style_label_left, color=color.red, textcolor=color.white, size=size.small)
+    if show_W
+        label.new(bar_index + 3, sma_W, "Wk 200", style=label.style_label_left, color=color.blue, textcolor=color.white, size=size.small)
+    if show_M
+        label.new(bar_index + 3, sma_M, "Mth 200", style=label.style_label_left, color=color.purple, textcolor=color.white, size=size.small)
