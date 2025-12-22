@@ -80,7 +80,7 @@ reset_fibs() =>
     // Usually markers should stay, but lines might clutter. 
     // User asked to "put lines on chart". 
     // I will delete OLD lines when a NEW signal comes to keep chart clean.
-    na
+    true
 
 // --- LONG LOGIC ---
 if validBuy
