@@ -12,6 +12,11 @@ len200 = input.int(200, "200 Length", group=grp_chart)
 grp_daily = "Daily Timeframe SMAs (Locked)"
 show_daily = input.bool(true, "Show Daily SMAs?", group=grp_daily)
 
+grp_sell = "Sell Signal Logic"
+sell_cluster_pips = input.float(50.0, "Cluster Threshold (Pips)", group=grp_sell, tooltip="Max distance between 21, 50, and 100 SMAs to consider them 'clustered'.")
+sell_ext_pips = input.float(400.0, "Extension Threshold (Pips)", group=grp_sell, tooltip="Min distance between 100 and 200 SMAs to consider trend 'extended'.")
+show_sell_debug = input.bool(false, "Show Sell Signal Debug Labels?", group=grp_sell)
+
 // --- CONSTANTS ---
 pip_val = syminfo.mintick * 10
 
@@ -107,23 +112,44 @@ fill(dp21, dp50, color=show_daily ? d_col21 : na, title="Daily 21/50 Fill")
 // ==========================================
 // Logic:
 // 1. 21 crosses below 100
-// 2. 21, 50, 100 are within 50 pips of each other
-// 3. 100 is > 200 by at least 400 pips
+// 2. 21, 50, 100 are within X pips of each other (Cluster)
+// 3. 100 is > 200 by at least Y pips (Extension)
+// 4. Trend Alignment (Implicit in Extension, but explicit 50 > 100 > 200 helps)
 
 // Using Chart Timeframe SMAs for execution signals
 fast_cluster_max = math.max(c_s21, c_s50, c_s100)
 fast_cluster_min = math.min(c_s21, c_s50, c_s100)
 cluster_range = fast_cluster_max - fast_cluster_min
+trend_extension = c_s100 - c_s200
 
 // Conditions
-cond_clustered = cluster_range <= (50 * pip_val)
-cond_extended = (c_s100 - c_s200) >= (400 * pip_val)
+// Cluster: The difference between the highest and lowest of the fast moving averages
+cond_clustered = cluster_range <= (sell_cluster_pips * pip_val)
+
+// Extension: 100 SMA is significantly above 200 SMA
+cond_extended = trend_extension >= (sell_ext_pips * pip_val)
+
+// Trend Alignment: 50 should be above 100 (before the collapse) and 100 above 200
+// We check if 100 > 200 (covered by Extension)
+// We might want to ensure 50 is somewhat high too, but the cluster logic implies 21, 50, 100 are grouped.
+
+// Trigger: 21 Crosses Under 100
 cond_cross = ta.crossunder(c_s21, c_s100)
 
-// Trigger
+// Final Signal
 sell_signal = cond_cross and cond_clustered and cond_extended
 
 plotshape(sell_signal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, text="SELL")
+
+// Debugging for Sell Signal
+if show_sell_debug and barstate.islast
+    debug_txt = "SELL SIGNAL DEBUG\n" +
+              "Cluster Range: " + str.tostring(cluster_range / pip_val, "#.0") + " pips (Max: " + str.tostring(sell_cluster_pips) + ")\n" +
+              "Extension: " + str.tostring(trend_extension / pip_val, "#.0") + " pips (Min: " + str.tostring(sell_ext_pips) + ")\n" +
+              "21 < 100: " + str.tostring(c_s21 < c_s100) + "\n" +
+              "Last Signal: " + str.tostring(sell_signal)
+    
+    label.new(bar_index, high, debug_txt, color=color.black, textcolor=color.white, style=label.style_label_down)
 
 
 // ==========================================
