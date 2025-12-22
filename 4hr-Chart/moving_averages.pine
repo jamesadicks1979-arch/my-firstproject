@@ -33,15 +33,15 @@ lowest_offset = ta.lowestbars(low, 14)
 // State Management for Lines
 // We use arrays to store information about active lines so we can manage them until they are touched.
 // We store:
-// 1. Level 50 value
-// 2. Level 82 value (stop)
+// 1. Setup Low (Anchor)
+// 2. Setup High (Current Highest High)
 // 3. Line ID for 50%
 // 4. Line ID for 82%
 // 5. Label ID for 50%
 // 6. Label ID for 82%
 
-var float[] active_levels_50 = array.new_float()
-var float[] active_levels_82 = array.new_float()
+var float[] active_setup_lows = array.new_float()
+var float[] active_setup_highs = array.new_float()
 var line[] active_lines_50 = array.new_line()
 var line[] active_lines_82 = array.new_line()
 var label[] active_labels_50 = array.new_label()
@@ -52,7 +52,7 @@ if cond_cross_over and was_below_4
     current_high = high // High of the breakout candle
     range_val = current_high - lowest_low
     
-    // Calculate levels
+    // Calculate initial levels
     level_50 = current_high - (range_val * 0.50)
     level_82 = current_high - (range_val * 0.82)
     
@@ -68,8 +68,8 @@ if cond_cross_over and was_below_4
     label.new(bar_index + lowest_offset, lowest_low, text="X", style=label.style_none, textcolor=color.black, size=size.normal)
     
     // Store in arrays
-    array.push(active_levels_50, level_50)
-    array.push(active_levels_82, level_82)
+    array.push(active_setup_lows, lowest_low)
+    array.push(active_setup_highs, current_high)
     array.push(active_lines_50, l_50)
     array.push(active_lines_82, l_82)
     array.push(active_labels_50, lbl_50)
@@ -79,19 +79,42 @@ if cond_cross_over and was_below_4
 // We iterate backwards to safely remove items
 should_color_purple = false
 
-if array.size(active_levels_50) > 0
-    for i = array.size(active_levels_50) - 1 to 0
-        lvl_50 = array.get(active_levels_50, i)
+if array.size(active_setup_lows) > 0
+    for i = array.size(active_setup_lows) - 1 to 0
+        // Get current setup details
+        setup_low = array.get(active_setup_lows, i)
+        setup_high = array.get(active_setup_highs, i)
+        
+        // Update High if current bar is higher (Running Retracement Logic)
+        new_high = math.max(setup_high, high)
+        if new_high > setup_high
+            array.set(active_setup_highs, i, new_high)
+            setup_high := new_high
+        
+        // Recalculate levels based on (possibly new) High
+        curr_range = setup_high - setup_low
+        lvl_50 = setup_high - (curr_range * 0.50)
+        lvl_82 = setup_high - (curr_range * 0.82)
+        
         l_50_id = array.get(active_lines_50, i)
         l_82_id = array.get(active_lines_82, i)
         lbl_50_id = array.get(active_labels_50, i)
         lbl_82_id = array.get(active_labels_82, i)
         
+        // Update Line Levels
+        line.set_y1(l_50_id, lvl_50)
+        line.set_y2(l_50_id, lvl_50)
+        line.set_y1(l_82_id, lvl_82)
+        line.set_y2(l_82_id, lvl_82)
+        
+        // Update Label Levels and Text
+        label.set_y(lbl_50_id, lvl_50)
+        label.set_text(lbl_50_id, "50% (" + str.tostring(lvl_50, format.mintick) + ")")
+        label.set_y(lbl_82_id, lvl_82)
+        label.set_text(lbl_82_id, "82% (" + str.tostring(lvl_82, format.mintick) + ")")
+        
         // Check if Price Touches 50% Level
-        // For a long setup (breakout UP), the 50% level is BELOW the high.
-        // We look for price coming DOWN to touch it.
-        // So Low <= Level 50
-        if low <= lvl_50
+        if low <= lvl_50 and low >= setup_low // Valid touch
             // Touch detected!
             
             // 1. Stop extending lines
@@ -112,15 +135,30 @@ if array.size(active_levels_50) > 0
             should_color_purple := true
             
             // 5. Remove from arrays (stop tracking)
-            array.remove(active_levels_50, i)
-            array.remove(active_levels_82, i)
+            array.remove(active_setup_lows, i)
+            array.remove(active_setup_highs, i)
             array.remove(active_lines_50, i)
             array.remove(active_lines_82, i)
             array.remove(active_labels_50, i)
             array.remove(active_labels_82, i)
+            
+        else if low < setup_low
+            // Price broke the anchor low before retracing -> Invalid setup
+            // Remove everything to clean up chart
+            line.delete(l_50_id)
+            line.delete(l_82_id)
+            label.delete(lbl_50_id)
+            label.delete(lbl_82_id)
+            
+            array.remove(active_setup_lows, i)
+            array.remove(active_setup_highs, i)
+            array.remove(active_lines_50, i)
+            array.remove(active_lines_82, i)
+            array.remove(active_labels_50, i)
+            array.remove(active_labels_82, i)
+            
         else
             // Update labels to stay ahead of price if not touched yet
-            // This keeps them visible on the far right
             label.set_x(lbl_50_id, bar_index + 5)
             label.set_x(lbl_82_id, bar_index + 5)
 
