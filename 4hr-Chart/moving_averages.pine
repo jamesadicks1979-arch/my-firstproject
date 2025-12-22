@@ -14,8 +14,8 @@ sma100 = ta.sma(close, len100)
 sma200 = ta.sma(close, len200)
 
 // Plot SMAs
-plot(sma21, color=color.green, title="21 SMA", linewidth=2)
-plot(sma50, color=color.blue, title="50 SMA", linewidth=2)
+p21 = plot(sma21, color=color.green, title="21 SMA", linewidth=2)
+p50 = plot(sma50, color=color.blue, title="50 SMA", linewidth=2)
 p100 = plot(sma100, color=color.orange, title="100 SMA", linewidth=2)
 p200 = plot(sma200, color=color.red, title="200 SMA", linewidth=2)
 
@@ -37,3 +37,18 @@ else
     na
 
 fill(p100, p200, color = fill_color, title="100/200 SMA Fill")
+
+// Fill Logic for 21/50 SMA
+// Green: 21 SMA > 50 SMA + 3 pips
+// Red:   21 SMA < 50 SMA - 3 pips
+threshold_21_50_long = sma50 + (3 * pip_val)
+threshold_21_50_short = sma50 - (3 * pip_val)
+
+fill_color_21_50 = if sma21 >= threshold_21_50_long
+    color.new(color.green, 70)
+else if sma21 <= threshold_21_50_short
+    color.new(color.red, 70)
+else
+    na
+
+fill(p21, p50, color = fill_color_21_50, title="21/50 SMA Fill")
