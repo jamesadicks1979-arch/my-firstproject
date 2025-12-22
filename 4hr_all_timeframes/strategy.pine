@@ -2,7 +2,7 @@
 // author © KivancOzbilgic
 // developer © KivancOzbilgic
 //@version=5
-indicator('AlphaTrend', shorttitle='AT', overlay=true, format=format.price, precision=2, timeframe='')
+indicator('AlphaTrend', shorttitle='AT', overlay=true, format=format.price, precision=2)
 coeff = input.float(1, 'Multiplier', step=0.1)
 AP = input(14, 'Common Period')
 ATR = ta.sma(ta.tr, AP)
