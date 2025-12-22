@@ -1,67 +1,76 @@
 //@version=5
-indicator("Moving Averages", overlay=true)
+indicator("Moving Averages (Unified)", overlay=true)
 
 // Input parameters
 len21 = input.int(21, "21 SMA Length")
 len50 = input.int(50, "50 SMA Length")
 len100 = input.int(100, "100 SMA Length")
 len200 = input.int(200, "200 SMA Length")
-tf = input.timeframe("D", "Timeframe")
+use_daily = input.bool(false, "Lock to Daily Timeframe?", tooltip="If checked, shows Daily SMAs regardless of chart timeframe. If unchecked, shows Chart Timeframe SMAs.")
 
-// Function to calculate all values in a tuple to send to request.security
-// This ensures all logic happens on the requested timeframe (Daily)
-calc_values() =>
+// Calculation Function (Reusable)
+calc_smas() =>
     s21 = ta.sma(close, len21)
     s50 = ta.sma(close, len50)
     s100 = ta.sma(close, len100)
     s200 = ta.sma(close, len200)
-    
-    // Pip Value inside the function (context sensitive)
-    pv = syminfo.mintick * 10
-    
-    // 100/200 Fill Logic
-    thresh_100_long = s200 + (8 * pv)
-    thresh_100_short = s200 - (8 * pv)
-    
-    // Determine Color 100/200
-    // Logic: Green if 100 > 200+8pips AND 21 >= 100
-    //        Red if 100 < 200-8pips AND 21 <= 100
-    c_100 = if s100 >= thresh_100_long and s21 >= s100
-        color.new(color.green, 70)
-    else if s100 <= thresh_100_short and s21 <= s100
-        color.new(color.red, 70)
-    else
-        na
-        
-    // 21/50 Fill Logic
-    thresh_21_long = s50 + (3 * pv)
-    thresh_21_short = s50 - (3 * pv)
-    
-    c_21 = if s21 >= thresh_21_long
-        color.new(color.green, 70)
-    else if s21 <= thresh_21_short
-        color.new(color.red, 70)
-    else
-        na
-        
-    [s21, s50, s100, s200, c_100, c_21]
+    [s21, s50, s100, s200]
 
-// Fetch Data from Higher Timeframe (Default "D")
-[d_sma21, d_sma50, d_sma100, d_sma200, d_color100, d_color21] = request.security(syminfo.tickerid, tf, calc_values())
+// 1. Chart Timeframe Values
+[c_s21, c_s50, c_s100, c_s200] = calc_smas()
 
-// Plot SMAs (now Daily values)
-p21 = plot(d_sma21, color=color.green, title="Daily 21 SMA", linewidth=2)
-p50 = plot(d_sma50, color=color.blue, title="Daily 50 SMA", linewidth=2)
-p100 = plot(d_sma100, color=color.orange, title="Daily 100 SMA", linewidth=2)
-p200 = plot(d_sma200, color=color.red, title="Daily 200 SMA", linewidth=2)
+// 2. Daily Timeframe Values
+[d_s21, d_s50, d_s100, d_s200] = request.security(syminfo.tickerid, "D", calc_smas())
 
-// Fill
-fill(p100, p200, color = d_color100, title="Daily 100/200 SMA Fill")
-fill(p21, p50, color = d_color21, title="Daily 21/50 SMA Fill")
+// 3. Select Values based on User Input
+s21 = use_daily ? d_s21 : c_s21
+s50 = use_daily ? d_s50 : c_s50
+s100 = use_daily ? d_s100 : c_s100
+s200 = use_daily ? d_s200 : c_s200
 
-// Update on Right: Add labels at the end of the lines
+// Pip Value
+pip_val = syminfo.mintick * 10
+
+// Plot SMAs
+p21 = plot(s21, color=color.green, title="21 SMA", linewidth=2)
+p50 = plot(s50, color=color.blue, title="50 SMA", linewidth=2)
+p100 = plot(s100, color=color.orange, title="100 SMA", linewidth=2)
+p200 = plot(s200, color=color.red, title="200 SMA", linewidth=2)
+
+// --- Fill Logic 100/200 ---
+// Green: 100 SMA > 200 SMA + 8 pips AND 21 >= 100
+// Red:   100 SMA < 200 SMA - 8 pips AND 21 <= 100
+thresh_100_long = s200 + (8 * pip_val)
+thresh_100_short = s200 - (8 * pip_val)
+
+c_100 = if s100 >= thresh_100_long and s21 >= s100
+    color.new(color.green, 70)
+else if s100 <= thresh_100_short and s21 <= s100
+    color.new(color.red, 70)
+else
+    na
+
+fill(p100, p200, color = c_100, title="100/200 SMA Fill")
+
+// --- Fill Logic 21/50 ---
+// Green: 21 SMA > 50 SMA + 3 pips
+// Red:   21 SMA < 50 SMA - 3 pips
+thresh_21_long = s50 + (3 * pip_val)
+thresh_21_short = s50 - (3 * pip_val)
+
+c_21 = if s21 >= thresh_21_long
+    color.new(color.green, 70)
+else if s21 <= thresh_21_short
+    color.new(color.red, 70)
+else
+    na
+
+fill(p21, p50, color = c_21, title="21/50 SMA Fill")
+
+// Update on Right: Add labels
 if barstate.islast
-    label.new(bar_index + 3, d_sma21, "21 SMA\n" + str.tostring(d_sma21, format.mintick), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
-    label.new(bar_index + 3, d_sma50, "50 SMA\n" + str.tostring(d_sma50, format.mintick), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
-    label.new(bar_index + 3, d_sma100, "100 SMA\n" + str.tostring(d_sma100, format.mintick), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
-    label.new(bar_index + 3, d_sma200, "200 SMA\n" + str.tostring(d_sma200, format.mintick), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label_prefix = use_daily ? "Daily " : ""
+    label.new(bar_index + 3, s21, label_prefix + "21 SMA\n" + str.tostring(s21, format.mintick), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label.new(bar_index + 3, s50, label_prefix + "50 SMA\n" + str.tostring(s50, format.mintick), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label.new(bar_index + 3, s100, label_prefix + "100 SMA\n" + str.tostring(s100, format.mintick), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label.new(bar_index + 3, s200, label_prefix + "200 SMA\n" + str.tostring(s200, format.mintick), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
