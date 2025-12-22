@@ -130,16 +130,24 @@ if array.size(active_setup_lows) > 0
         lbl_80_id = array.get(active_labels_80, i)
         
         // Update Line Levels
-        line.set_y1(l_38_id, lvl_38); line.set_y2(l_38_id, lvl_38)
-        line.set_y1(l_50_id, lvl_50); line.set_y2(l_50_id, lvl_50)
-        line.set_y1(l_61_id, lvl_61); line.set_y2(l_61_id, lvl_61)
-        line.set_y1(l_80_id, lvl_80); line.set_y2(l_80_id, lvl_80)
+        line.set_y1(l_38_id, lvl_38)
+        line.set_y2(l_38_id, lvl_38)
+        line.set_y1(l_50_id, lvl_50)
+        line.set_y2(l_50_id, lvl_50)
+        line.set_y1(l_61_id, lvl_61)
+        line.set_y2(l_61_id, lvl_61)
+        line.set_y1(l_80_id, lvl_80)
+        line.set_y2(l_80_id, lvl_80)
         
         // Update Label Levels and Text
-        label.set_y(lbl_38_id, lvl_38); label.set_text(lbl_38_id, "38.2% (" + str.tostring(lvl_38, format.mintick) + ")")
-        label.set_y(lbl_50_id, lvl_50); label.set_text(lbl_50_id, "50% (" + str.tostring(lvl_50, format.mintick) + ")")
-        label.set_y(lbl_61_id, lvl_61); label.set_text(lbl_61_id, "61.8% (" + str.tostring(lvl_61, format.mintick) + ")")
-        label.set_y(lbl_80_id, lvl_80); label.set_text(lbl_80_id, "80% (" + str.tostring(lvl_80, format.mintick) + ")")
+        label.set_y(lbl_38_id, lvl_38)
+        label.set_text(lbl_38_id, "38.2% (" + str.tostring(lvl_38, format.mintick) + ")")
+        label.set_y(lbl_50_id, lvl_50)
+        label.set_text(lbl_50_id, "50% (" + str.tostring(lvl_50, format.mintick) + ")")
+        label.set_y(lbl_61_id, lvl_61)
+        label.set_text(lbl_61_id, "61.8% (" + str.tostring(lvl_61, format.mintick) + ")")
+        label.set_y(lbl_80_id, lvl_80)
+        label.set_text(lbl_80_id, "80% (" + str.tostring(lvl_80, format.mintick) + ")")
         
         // Check if Price Touches 50% Level
         // We consider the trade triggered/completed when it touches 50%
@@ -147,16 +155,24 @@ if array.size(active_setup_lows) > 0
             // Touch detected!
             
             // 1. Stop extending lines
-            line.set_extend(l_38_id, extend.none); line.set_x2(l_38_id, bar_index)
-            line.set_extend(l_50_id, extend.none); line.set_x2(l_50_id, bar_index)
-            line.set_extend(l_61_id, extend.none); line.set_x2(l_61_id, bar_index)
-            line.set_extend(l_80_id, extend.none); line.set_x2(l_80_id, bar_index)
+            line.set_extend(l_38_id, extend.none)
+            line.set_x2(l_38_id, bar_index)
+            line.set_extend(l_50_id, extend.none)
+            line.set_x2(l_50_id, bar_index)
+            line.set_extend(l_61_id, extend.none)
+            line.set_x2(l_61_id, bar_index)
+            line.set_extend(l_80_id, extend.none)
+            line.set_x2(l_80_id, bar_index)
             
             // 2. Move labels to the end of the line
-            label.set_x(lbl_38_id, bar_index); label.set_style(lbl_38_id, label.style_label_right)
-            label.set_x(lbl_50_id, bar_index); label.set_style(lbl_50_id, label.style_label_right)
-            label.set_x(lbl_61_id, bar_index); label.set_style(lbl_61_id, label.style_label_right)
-            label.set_x(lbl_80_id, bar_index); label.set_style(lbl_80_id, label.style_label_right)
+            label.set_x(lbl_38_id, bar_index)
+            label.set_style(lbl_38_id, label.style_label_right)
+            label.set_x(lbl_50_id, bar_index)
+            label.set_style(lbl_50_id, label.style_label_right)
+            label.set_x(lbl_61_id, bar_index)
+            label.set_style(lbl_61_id, label.style_label_right)
+            label.set_x(lbl_80_id, bar_index)
+            label.set_style(lbl_80_id, label.style_label_right)
 
             // 4. Color the candle (set flag)
             should_color_purple := true
@@ -178,8 +194,14 @@ if array.size(active_setup_lows) > 0
         else if low < setup_low
             // Price broke the anchor low before retracing -> Invalid setup
             // Remove everything to clean up chart
-            line.delete(l_38_id); line.delete(l_50_id); line.delete(l_61_id); line.delete(l_80_id)
-            label.delete(lbl_38_id); label.delete(lbl_50_id); label.delete(lbl_61_id); label.delete(lbl_80_id)
+            line.delete(l_38_id)
+            line.delete(l_50_id)
+            line.delete(l_61_id)
+            line.delete(l_80_id)
+            label.delete(lbl_38_id)
+            label.delete(lbl_50_id)
+            label.delete(lbl_61_id)
+            label.delete(lbl_80_id)
             
             array.remove(active_setup_lows, i)
             array.remove(active_setup_highs, i)
