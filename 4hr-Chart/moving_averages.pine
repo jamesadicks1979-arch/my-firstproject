@@ -26,12 +26,13 @@ for i = 1 to 4
     if close[i] >= sma200[i]
         was_below_4 := false
 
+// Calculate lowest low of last 14 periods globally to ensure correct history
+lowest_low = ta.lowest(low, 14)
+lowest_offset = ta.lowestbars(low, 14)
+
 if cond_cross_over and was_below_4
     // Look back lowest of 14 periods
     // We include the current bar in the high calculation, and look back 14 bars for the low
-    // The user said "look back the lowest period of 14".
-    // Usually this means lowest low of the last 14 bars.
-    lowest_low = ta.lowest(low, 14)
     current_high = high // High of the breakout candle
 
     range_val = current_high - lowest_low
@@ -57,7 +58,7 @@ if cond_cross_over and was_below_4
 
     // Put a cross at the lowest low location
     // Find the offset of the lowest low in the last 14 bars
-    lowest_offset = ta.lowestbars(low, 14) // Returns a negative number like -5
+    // lowest_offset is already calculated globally
     label.new(bar_index + lowest_offset, lowest_low, text="X", style=label.style_none, textcolor=color.black, size=size.normal)
 
 // Plot trigger shape
