@@ -1,0 +1,10 @@
+//@version=5
+strategy("4hr All Timeframes Strategy", overlay=true)
+
+// Input parameters
+timeframe_4hr = input.timeframe("240", "4 Hour Timeframe")
+
+// Placeholder for logic
+// TODO: Implement multi-timeframe logic here
+
+plot(close, title="Close Price")
