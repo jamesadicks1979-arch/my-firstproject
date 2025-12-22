@@ -22,31 +22,17 @@ p200 = plot(sma200, color=color.red, title="200 SMA", linewidth=2)
 // Pip Calculation (Standard 10 * mintick)
 pip_val = syminfo.mintick * 10
 
-// 300 Pips Bands relative to 200 SMA
-band_top = sma200 + (300 * pip_val)
-band_bot = sma200 - (300 * pip_val)
+// 30 Pips Bands relative to 200 SMA
+band_top = sma200 + (30 * pip_val)
+band_bot = sma200 - (30 * pip_val)
 
-plot(band_top, color=color.gray, title="Upper 300 Pips", linewidth=1, style=plot.style_line)
-plot(band_bot, color=color.gray, title="Lower 300 Pips", linewidth=1, style=plot.style_line)
+plot(band_top, color=color.gray, title="Upper 30 Pips", linewidth=1, style=plot.style_circles)
+plot(band_bot, color=color.gray, title="Lower 30 Pips", linewidth=1, style=plot.style_circles)
 
 // Fill Logic
 // Fill between 100 SMA and 200 SMA with green color
-// ONLY when 100 SMA is more than 100 pips above the 200 SMA
-threshold_100_pips = sma200 + (100 * pip_val)
-fill_condition = sma100 >= threshold_100_pips
+// ONLY when 100 SMA is more than 10 pips above the 200 SMA
+threshold_fill = sma200 + (10 * pip_val)
+fill_condition = sma100 >= threshold_fill
 
-fill(p100, p200, color = fill_condition ? color.new(color.green, 70) : na, title="100 SMA > 200 SMA + 100 Pips Fill")
-
-// Debug Label to help troubleshoot visibility
-if barstate.islast
-    diff_pips = (sma100 - sma200) / pip_val
-    debug_txt = "Debug Info:\n" + 
-                "Pip Value: " + str.tostring(pip_val) + "\n" +
-                "SMA 200: " + str.tostring(sma200) + "\n" +
-                "Top Band (300 pips): " + str.tostring(band_top) + "\n" +
-                "Bot Band (300 pips): " + str.tostring(band_bot) + "\n" +
-                "SMA 100: " + str.tostring(sma100) + "\n" +
-                "Diff (Pips): " + str.tostring(diff_pips, "#.0") + "\n" +
-                "Fill Active?: " + str.tostring(fill_condition)
-    
-    label.new(bar_index, high, text=debug_txt, style=label.style_label_left, color=color.black, textcolor=color.white)
+fill(p100, p200, color = fill_condition ? color.new(color.green, 70) : na, title="100 SMA > 200 SMA + 10 Pips Fill")
