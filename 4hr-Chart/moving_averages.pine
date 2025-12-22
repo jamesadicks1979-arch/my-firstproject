@@ -6,49 +6,55 @@ len21 = input.int(21, "21 SMA Length")
 len50 = input.int(50, "50 SMA Length")
 len100 = input.int(100, "100 SMA Length")
 len200 = input.int(200, "200 SMA Length")
+tf = input.timeframe("D", "Timeframe")
 
-// Calculate SMAs
-sma21 = ta.sma(close, len21)
-sma50 = ta.sma(close, len50)
-sma100 = ta.sma(close, len100)
-sma200 = ta.sma(close, len200)
+// Function to calculate all values in a tuple to send to request.security
+// This ensures all logic happens on the requested timeframe (Daily)
+calc_values() =>
+    s21 = ta.sma(close, len21)
+    s50 = ta.sma(close, len50)
+    s100 = ta.sma(close, len100)
+    s200 = ta.sma(close, len200)
+    
+    // Pip Value inside the function (context sensitive)
+    pv = syminfo.mintick * 10
+    
+    // 100/200 Fill Logic
+    thresh_100_long = s200 + (8 * pv)
+    thresh_100_short = s200 - (8 * pv)
+    
+    // Determine Color 100/200
+    // Logic: Green if 100 > 200+8pips AND 21 >= 100
+    //        Red if 100 < 200-8pips AND 21 <= 100
+    c_100 = if s100 >= thresh_100_long and s21 >= s100
+        color.new(color.green, 70)
+    else if s100 <= thresh_100_short and s21 <= s100
+        color.new(color.red, 70)
+    else
+        na
+        
+    // 21/50 Fill Logic
+    thresh_21_long = s50 + (3 * pv)
+    thresh_21_short = s50 - (3 * pv)
+    
+    c_21 = if s21 >= thresh_21_long
+        color.new(color.green, 70)
+    else if s21 <= thresh_21_short
+        color.new(color.red, 70)
+    else
+        na
+        
+    [s21, s50, s100, s200, c_100, c_21]
 
-// Plot SMAs
-p21 = plot(sma21, color=color.green, title="21 SMA", linewidth=2)
-p50 = plot(sma50, color=color.blue, title="50 SMA", linewidth=2)
-p100 = plot(sma100, color=color.orange, title="100 SMA", linewidth=2)
-p200 = plot(sma200, color=color.red, title="200 SMA", linewidth=2)
+// Fetch Data from Higher Timeframe (Default "D")
+[d_sma21, d_sma50, d_sma100, d_sma200, d_color100, d_color21] = request.security(syminfo.tickerid, tf, calc_values())
 
-// Pip Calculation (Standard 10 * mintick)
-pip_val = syminfo.mintick * 10
+// Plot SMAs (now Daily values)
+p21 = plot(d_sma21, color=color.green, title="Daily 21 SMA", linewidth=2)
+p50 = plot(d_sma50, color=color.blue, title="Daily 50 SMA", linewidth=2)
+p100 = plot(d_sma100, color=color.orange, title="Daily 100 SMA", linewidth=2)
+p200 = plot(d_sma200, color=color.red, title="Daily 200 SMA", linewidth=2)
 
-
-// Fill Logic
-// Green: 100 SMA > 200 SMA + 8 pips
-// Red:   100 SMA < 200 SMA - 8 pips
-threshold_fill_long = sma200 + (8 * pip_val)
-threshold_fill_short = sma200 - (8 * pip_val)
-
-fill_color = if sma100 >= threshold_fill_long and sma21 >= sma100
-    color.new(color.green, 70)
-else if sma100 <= threshold_fill_short and sma21 <= sma100
-    color.new(color.red, 70)
-else
-    na
-
-fill(p100, p200, color = fill_color, title="100/200 SMA Fill")
-
-// Fill Logic for 21/50 SMA
-// Green: 21 SMA > 50 SMA + 3 pips
-// Red:   21 SMA < 50 SMA - 3 pips
-threshold_21_50_long = sma50 + (3 * pip_val)
-threshold_21_50_short = sma50 - (3 * pip_val)
-
-fill_color_21_50 = if sma21 >= threshold_21_50_long
-    color.new(color.green, 70)
-else if sma21 <= threshold_21_50_short
-    color.new(color.red, 70)
-else
-    na
-
-fill(p21, p50, color = fill_color_21_50, title="21/50 SMA Fill")
+// Fill
+fill(p100, p200, color = d_color100, title="Daily 100/200 SMA Fill")
+fill(p21, p50, color = d_color21, title="Daily 21/50 SMA Fill")
