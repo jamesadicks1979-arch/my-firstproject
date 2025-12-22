@@ -65,7 +65,7 @@ if cond_cross_over and was_below_4
     lbl_82 = label.new(bar_index + 5, level_82, "82% (" + str.tostring(level_82, format.mintick) + ")", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
 
     // Put a cross at the lowest low location
-    label.new(bar_index + lowest_offset, lowest_low, text="X", style=label.style_none, textcolor=color.black, size=size.normal)
+    label.new(bar_index + lowest_offset, lowest_low, text="X\nL:" + str.tostring(lowest_low), style=label.style_none, textcolor=color.black, size=size.normal)
     
     // Store in arrays
     array.push(active_setup_lows, lowest_low)
