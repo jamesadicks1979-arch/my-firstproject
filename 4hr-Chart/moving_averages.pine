@@ -22,13 +22,12 @@ p200 = plot(sma200, color=color.red, title="200 SMA", linewidth=2)
 // Pip Calculation (Standard 10 * mintick)
 pip_val = syminfo.mintick * 10
 
-// 60 Ticks Bands relative to 200 SMA
-// Note: 1 pip usually equals 10 ticks. 60 ticks is approx 6 pips.
-band_top = sma200 + (60 * syminfo.mintick)
-band_bot = sma200 - (60 * syminfo.mintick)
+// 200 Pips Bands relative to 200 SMA
+band_top = sma200 + (200 * pip_val)
+band_bot = sma200 - (200 * pip_val)
 
-plot(band_top, color=color.gray, title="Upper 60 Ticks", linewidth=1, style=plot.style_circles)
-plot(band_bot, color=color.gray, title="Lower 60 Ticks", linewidth=1, style=plot.style_circles)
+plot(band_top, color=color.gray, title="Upper 200 Pips", linewidth=1, style=plot.style_circles)
+plot(band_bot, color=color.gray, title="Lower 200 Pips", linewidth=1, style=plot.style_circles)
 
 // Fill Logic
 // Green: 100 SMA > 200 SMA + 10 pips
