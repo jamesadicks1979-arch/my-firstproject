@@ -31,22 +31,25 @@ plot(sma_4hr,    title="4hr 200 SMA",    color=color.green,  linewidth=2)
 plot(sma_2hr,    title="2hr 200 SMA",    color=color.blue,   linewidth=2)
 plot(sma_1hr,    title="1hr 200 SMA",    color=color.yellow, linewidth=2)
 
+// --- Trend Filter ---
+// Filter out signals if Price is below Daily SMA (Bearish)
+// We use close > sma_daily as a simple filter for Bullish Trend.
+trend_filter = close > sma_daily
 
 // --- Crossover Markings ---
 // We want the X to be exactly ON the cross point.
-// Since SMAs are continuous values, the cross point happens "between" bars or at the close of the bar.
-// We will plot the label at the value of the fast SMA at the moment of the cross.
+// Only show if in Bullish Daily Trend.
 
 // 1. Cross when 1hr SMA crosses above 2hr SMA
-if ta.crossover(sma_1hr, sma_2hr)
+if trend_filter and ta.crossover(sma_1hr, sma_2hr)
     label.new(bar_index, sma_1hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_center, size=size.tiny, tooltip="1h > 2h (First)", yloc=yloc.price)
 
 // 2. Cross when 2hr SMA crosses above 4hr SMA
-if ta.crossover(sma_2hr, sma_4hr)
+if trend_filter and ta.crossover(sma_2hr, sma_4hr)
     label.new(bar_index, sma_2hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_center, size=size.tiny, tooltip="2h > 4h (Second)", yloc=yloc.price)
 
 // 3. Cross when 4hr SMA crosses above 8hr SMA
-if ta.crossover(sma_4hr, sma_8hr)
+if trend_filter and ta.crossover(sma_4hr, sma_8hr)
     label.new(bar_index, sma_4hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_center, size=size.tiny, tooltip="4h > 8h (Third)", yloc=yloc.price)
 
 
@@ -66,9 +69,6 @@ var float potential_low = 10e10
 if close < sma_1hr
     potential_low := math.min(potential_low, low)
 
-// If we are currently in a potential setup (e.g. 1hr has crossed up but not yet 4hr > 8hr),
-// we do NOT reset potential_low. It must persist from the bottom.
-
 // Trigger Condition:
 // 1. 1hr > 2hr
 // 2. 2hr > 4hr
@@ -77,7 +77,8 @@ if close < sma_1hr
 full_bull_alignment = sma_1hr > sma_2hr and sma_2hr > sma_4hr and sma_4hr > sma_8hr
 
 // We activate if we hit full alignment AND we weren't active before.
-if full_bull_alignment and not is_active
+// ADDED: trend_filter (Must be above Daily SMA to start looking for Long Fibs)
+if trend_filter and full_bull_alignment and not is_active
     // Ensure we have a valid potential_low (not 10e10 initial value)
     if potential_low < 10e9
         is_active := true
@@ -121,3 +122,7 @@ if is_active
     l_50 := line.new(bar_index, level_50, time + three_weeks_ms, level_50, xloc=xloc.bar_time, color=color.red, width=2)
     l_618 := line.new(bar_index, level_618, time + three_weeks_ms, level_618, xloc=xloc.bar_time, color=color.red, width=2)
     l_82 := line.new(bar_index, level_82, time + three_weeks_ms, level_82, xloc=xloc.bar_time, color=color.red, width=2)
+    
+    // Golden Pocket Fill (Between 50% and 61.8%)
+    // Since lines are recreated, we fill between them.
+    line.fill(l_50, l_618, color=color.new(color.red, 80))
