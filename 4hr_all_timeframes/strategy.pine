@@ -10,6 +10,7 @@ tf_daily  = input.timeframe("1D", "Daily Timeframe")
 tf_8hr    = input.timeframe("480", "8 Hour Timeframe")
 tf_4hr    = input.timeframe("240", "4 Hour Timeframe")
 tf_2hr    = input.timeframe("120", "2 Hour Timeframe")
+tf_1hr    = input.timeframe("60", "1 Hour Timeframe")
 
 // Calculations
 // Function to get SMA from a specific timeframe
@@ -21,6 +22,7 @@ sma_daily  = get_sma(tf_daily, sma_length)
 sma_8hr    = get_sma(tf_8hr, sma_length)
 sma_4hr    = get_sma(tf_4hr, sma_length)
 sma_2hr    = get_sma(tf_2hr, sma_length)
+sma_1hr    = get_sma(tf_1hr, sma_length)
 
 // Plotting
 plot(sma_weekly, title="Weekly 200 SMA", color=color.purple, linewidth=2)
@@ -28,5 +30,97 @@ plot(sma_daily,  title="Daily 200 SMA",  color=color.red,    linewidth=2)
 plot(sma_8hr,    title="8hr 200 SMA",    color=color.orange, linewidth=2)
 plot(sma_4hr,    title="4hr 200 SMA",    color=color.green,  linewidth=2)
 plot(sma_2hr,    title="2hr 200 SMA",    color=color.blue,   linewidth=2)
+plot(sma_1hr,    title="1hr 200 SMA",    color=color.yellow, linewidth=2)
 
 plot(close, title="Close Price", color=color.gray)
+
+// --- Fib Logic ---
+
+// Variables to track state
+var float fib_low = na
+var float fib_high = na
+var bool fib_active = false
+var float potential_low = na
+
+// Lines
+var line l_50 = na
+var line l_618 = na
+var line l_82 = na
+
+// 1. Track Lowest Low while Price < 1hr SMA
+// If Price is below 1hr SMA, update potential_low
+// We reset potential_low when price crosses under 1hr SMA to start fresh tracking?
+// Or just keep tracking min.
+if close < sma_1hr
+    potential_low := na(potential_low) ? low : math.min(potential_low, low)
+
+// If price goes above 1hr SMA, we keep the last tracked potential_low until used or reset.
+if ta.crossunder(close, sma_1hr)
+    potential_low := low
+
+// 2. Trigger Condition
+// "if 1 hr crosses above the 2 hr 200 sma crosses above the 4hr sma"
+// Interpreted as: 1hr crosses over 2hr, AND 2hr is above 4hr.
+// Also ensuring we have a valid potential_low.
+trigger_condition = ta.crossover(sma_1hr, sma_2hr) and sma_2hr > sma_4hr
+
+if trigger_condition
+    fib_active := true
+    fib_low := potential_low
+    fib_high := high // Start high at current high
+    // Reset lines if new setup
+    line.delete(l_50)
+    line.delete(l_618)
+    line.delete(l_82)
+    l_50 := line.new(bar_index, close, bar_index + 1, close, color=color.red, width=1)
+    l_618 := line.new(bar_index, close, bar_index + 1, close, color=color.red, width=1)
+    l_82 := line.new(bar_index, close, bar_index + 1, close, color=color.red, width=1)
+
+// 3. Maintenance Condition
+// "keep this in as long as the 1hr sma is above the 4hr sma"
+if fib_active
+    if sma_1hr > sma_4hr
+        // Update High
+        fib_high := math.max(fib_high, high)
+        
+        // Calculate Levels
+        // Retracement from High down to Low? Or High to Low range?
+        // Standard Bullish Fib: Low=0%, High=100%. Retracements are from Top.
+        // 50% = High - 0.5 * (High - Low)
+        // 61.8% = High - 0.618 * (High - Low)
+        // 82% = High - 0.82 * (High - Low)
+        range = fib_high - fib_low
+        level_50 = fib_high - (range * 0.50)
+        level_618 = fib_high - (range * 0.618)
+        level_82 = fib_high - (range * 0.82)
+        
+        // Update Lines
+        // "keep them across for 3 months" -> x2 = time + 3 months
+        three_months = 1000 * 60 * 60 * 24 * 90 // ~90 days in ms
+        
+        line.set_xy1(l_50, bar_index, level_50) // Anchor x1? Or keep x1 at start?
+        // Let's set x1 to the current bar for a horizontal level? Or from the start?
+        // Usually levels are horizontal across the screen. 
+        // I will set x1 to active bar_index - 1 to make it look continuous or just current bar.
+        // Better: x1 = bar_index, x2 = time + 3 months (using xloc.bar_time)
+        
+        line.set_xloc(l_50, x1=time, x2=time + three_months, xloc=xloc.bar_time)
+        line.set_y1(l_50, level_50)
+        line.set_y2(l_50, level_50)
+        
+        line.set_xloc(l_618, x1=time, x2=time + three_months, xloc=xloc.bar_time)
+        line.set_y1(l_618, level_618)
+        line.set_y2(l_618, level_618)
+        
+        line.set_xloc(l_82, x1=time, x2=time + three_months, xloc=xloc.bar_time)
+        line.set_y1(l_82, level_82)
+        line.set_y2(l_82, level_82)
+        
+    else
+        // Condition Broken
+        fib_active := false
+        // Lines remain as they were? Or delete?
+        // "keep this in as long as..." implies removing if false?
+        // But "keep them across for 3 months" suggests persistence.
+        // I'll leave them. They stop updating.
+        // If the user wants them removed, they can re-trigger.
