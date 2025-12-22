@@ -35,9 +35,9 @@ plot(band_bot, color=color.gray, title="Lower 100 Pips", linewidth=1, style=plot
 threshold_fill_long = sma200 + (10 * pip_val)
 threshold_fill_short = sma200 - (10 * pip_val)
 
-fill_color = if sma100 >= threshold_fill_long
+fill_color = if sma100 >= threshold_fill_long and sma21 >= sma100
     color.new(color.green, 70)
-else if sma100 <= threshold_fill_short
+else if sma100 <= threshold_fill_short and sma21 <= sma100
     color.new(color.red, 70)
 else
     na
