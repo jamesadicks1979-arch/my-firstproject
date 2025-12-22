@@ -77,6 +77,8 @@ if cond_cross_over and was_below_4
 
 // Logic to check for touches and clean up lines
 // We iterate backwards to safely remove items
+should_color_purple = false
+
 if array.size(active_levels_50) > 0
     for i = array.size(active_levels_50) - 1 to 0
         lvl_50 = array.get(active_levels_50, i)
@@ -106,8 +108,8 @@ if array.size(active_levels_50) > 0
             label.set_style(lbl_50_id, label.style_label_right) // Flip style
             label.set_style(lbl_82_id, label.style_label_right) // Flip style
 
-            // 4. Color the candle
-            barcolor(color.purple) // Change current bar color to Purple
+            // 4. Color the candle (set flag)
+            should_color_purple := true
             
             // 5. Remove from arrays (stop tracking)
             array.remove(active_levels_50, i)
@@ -121,6 +123,9 @@ if array.size(active_levels_50) > 0
             // This keeps them visible on the far right
             label.set_x(lbl_50_id, bar_index + 5)
             label.set_x(lbl_82_id, bar_index + 5)
+
+// Apply bar color globally
+barcolor(should_color_purple ? color.purple : na)
 
 
 // Plot trigger shape
