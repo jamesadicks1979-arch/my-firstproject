@@ -35,20 +35,20 @@ plot(sma_1hr,    title="1hr 200 SMA",    color=color.yellow, linewidth=2)
 // --- Crossover Markings ---
 // 1. Cross when 1hr SMA crosses above 2hr SMA
 if ta.crossover(sma_1hr, sma_2hr)
-    label.new(bar_index, high, text="+", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="1h > 2h")
+    label.new(bar_index, high, text="X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="1h > 2h (First)")
 
 // 2. Cross when 2hr SMA crosses above 4hr SMA
 if ta.crossover(sma_2hr, sma_4hr)
-    label.new(bar_index, high, text="+", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="2h > 4h")
+    label.new(bar_index, high, text="X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="2h > 4h (Second)")
 
 // 3. Cross when 4hr SMA crosses above 8hr SMA
 if ta.crossover(sma_4hr, sma_8hr)
-    label.new(bar_index, high, text="X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="4h > 8h")
+    label.new(bar_index, high, text="X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="4h > 8h (Third)")
 
 
 // --- Fib Logic ---
 // "then after three look for low to high and work fibs"
-// Implication: Fibs are triggered when ALL 3 crossovers have occurred (or effectively when 4hr > 8hr, assuming the others are already true).
+// Implication: Fibs are triggered when ALL 3 crossovers have occurred.
 
 // State Variables
 var float fib_low = na
@@ -56,15 +56,14 @@ var float fib_high = na
 var bool is_active = false
 var float potential_low = 10e10
 
-// Track Lowest Low continuously when not active. 
-// "find the low below the 1 hr fib" -> Low must have occurred when Price < 1hr SMA.
-// We track minimum low whenever close is < 1hr SMA.
+// Track Lowest Low continuously
+// We reset this only if the entire structure breaks or on successful trigger usage.
+// If the trend is bearish (1hr < 4hr or 1hr < 8hr), we definitely want to track new lows.
 if close < sma_1hr
     potential_low := math.min(potential_low, low)
-// We do NOT reset potential_low if price goes above 1hr SMA, because the sequence might start shortly after.
-// However, if we don't trigger for a long time, this low might be stale.
-// But given the "after three" instruction, we likely want the low of the most recent dip.
-// We reset potential_low only when we successfully trigger a setup (consumed) or perhaps if the trend reverses completely (e.g. 1hr < 8hr).
+
+// If we are currently in a potential setup (e.g. 1hr has crossed up but not yet 4hr > 8hr),
+// we do NOT reset potential_low. It must persist from the bottom.
 
 // Trigger Condition:
 // 1. 1hr > 2hr
