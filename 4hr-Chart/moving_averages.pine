@@ -103,6 +103,84 @@ fill(dp21, dp50, color=show_daily ? d_col21 : na, title="Daily 21/50 Fill")
 
 
 // ==========================================
+// 4. BREAKOUT FIBONACCI LOGIC
+// ==========================================
+// Condition: Price trades below ALL SMAs (Chart & Daily)
+// Trigger: Price trades up and CLOSES above ALL SMAs
+// Action: Draw Fibs from Breakout High to Lowest Low during the "Below All" period
+
+// Combine all SMAs into checking variables
+// Note: We use nz() to handle potential NaN values early in history
+// We define "Below All" as close < EVERY SMA that is active
+// If user turns off chart or daily in inputs, should we still use them for calculation?
+// User query implies "all the sma's including the Daily", so we force check ALL 8 SMAs.
+
+// 1. Determine "All Below" State
+is_below_chart = close < c_s21 and close < c_s50 and close < c_s100 and close < c_s200
+is_below_daily = close < d_s21 and close < d_s50 and close < d_s100 and close < d_s200
+all_below = is_below_chart and is_below_daily
+
+// 2. Determine "All Above" State (Breakout)
+is_above_chart = close > c_s21 and close > c_s50 and close > c_s100 and close > c_s200
+is_above_daily = close > d_s21 and close > d_s50 and close > d_s100 and close > d_s200
+all_above = is_above_chart and is_above_daily
+
+// 3. State Management
+var float lowest_in_sequence = na
+var bool tracking_below = false
+
+// Logic Loop
+if all_below
+    if not tracking_below
+        // Start of a new "Below Sequence"
+        tracking_below := true
+        lowest_in_sequence := low
+    else
+        // Continue tracking lowest low
+        lowest_in_sequence := math.min(lowest_in_sequence, low)
+else
+    // We are NOT "All Below". Check for Breakout.
+    if tracking_below and all_above
+        // !!! BREAKOUT TRIGGERED !!!
+        trigger_price = high // Use Breakout Candle High as the anchor 0%? Or Close? "work out a 38.2% fib"
+        // Standard Retracement: High (0%) to Low (100%). Pullback target is 38.2% down from High.
+        // Level = High - (Range * 0.382)
+        
+        range_val = trigger_price - lowest_in_sequence
+        
+        lev_38 = trigger_price - (range_val * 0.382)
+        lev_50 = trigger_price - (range_val * 0.50)
+        lev_61 = trigger_price - (range_val * 0.618)
+        lev_80 = trigger_price - (range_val * 0.80)
+        
+        // Draw Lines (Duration: 1 Week)
+        t1 = time
+        t2 = time + (7 * 24 * 60 * 60 * 1000) // 1 Week in ms
+        
+        line.new(t1, lev_38, t2, lev_38, xloc=xloc.bar_time, color=color.purple, width=1, style=line.style_solid)
+        line.new(t1, lev_50, t2, lev_50, xloc=xloc.bar_time, color=color.blue, width=2, style=line.style_solid)
+        line.new(t1, lev_61, t2, lev_61, xloc=xloc.bar_time, color=color.purple, width=1, style=line.style_solid)
+        line.new(t1, lev_80, t2, lev_80, xloc=xloc.bar_time, color=color.red, width=2, style=line.style_solid)
+        
+        // Optional: Labels to ID them
+        // label.new(t1, lev_50, "50% Fib", xloc=xloc.bar_time, textcolor=color.blue, style=label.style_none)
+        
+        // Reset State
+        tracking_below := false
+        lowest_in_sequence := na
+        
+    else if tracking_below and not all_below
+        // "Messy Middle" (Transition).
+        // We are no longer "All Below", but not yet "All Above".
+        // The lowest low is preserved in 'lowest_in_sequence' waiting for the breakout.
+        // If price goes back to "All Below" next bar, the first 'if' block handles it (updates low if lower).
+        // If price stays here, we wait.
+        na
+
+// Plot Trigger Signal for Debugging
+plotchar(tracking_below and all_above, char="F", location=location.abovebar, color=color.purple, size=size.tiny, title="Fib Breakout")
+
+// ==========================================
 // 3. LABELS (Update on Right)
 // ==========================================
 if barstate.islast
