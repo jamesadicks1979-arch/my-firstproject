@@ -47,8 +47,8 @@ if cond_cross_over and was_below_4
     // Draw lines
     // We draw them starting from the current bar extending to the right
     // Using line.new
-    l_50 = line.new(bar_index, level_50, bar_index + 10, level_50, color=color.green, width=2)
-    l_82 = line.new(bar_index, level_82, bar_index + 10, level_82, color=color.red, width=2)
+    l_50 = line.new(bar_index, level_50, bar_index + 10, level_50, color=color.green, width=2, extend=extend.right)
+    l_82 = line.new(bar_index, level_82, bar_index + 10, level_82, color=color.red, width=2, extend=extend.right)
     
     // Optional: Add labels to identify the lines
     label.new(bar_index, level_50, "50%", color=color.green, textcolor=color.white, style=label.style_label_down, size=size.tiny)
