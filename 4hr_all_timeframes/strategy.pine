@@ -67,7 +67,7 @@ else
         // Reset tracking logic? 
         // User says "find the low below the 1 hr fib". 
         // So potential_low is the minimum low recorded while close was < sma_1hr.
-        pass
+        potential_low := potential_low
 
 // Trigger Condition:
 // Not explicitly defined in the latest prompt other than "set for long fibs is made".
