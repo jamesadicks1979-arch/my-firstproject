@@ -164,6 +164,21 @@ if trigger_bull
     // Debug
     label.new(bar_index, high, "Trigger", style=label.style_label_down, size=size.tiny)
 
+// ==========================================
+// 5. DEBUG DASHBOARD (Troubleshooting)
+// ==========================================
+if barstate.islast
+    debug_msg = "--- DEBUG DASHBOARD ---\n" +
+              "Trigger Conditions:\n" +
+              "1. Close > Daily 50 SMA: " + str.tostring(close > d_s50) + " (Close: " + str.tostring(close, format.mintick) + " | D50: " + str.tostring(d_s50, format.mintick) + ")\n" +
+              "2. Bars Below > 6: " + str.tostring(bars_below_d50[1] > 6) + " (Count: " + str.tostring(bars_below_d50[1]) + ")\n" +
+              "3. Close > Chart 200 SMA: " + str.tostring(close > c_s200) + " (C200: " + str.tostring(c_s200, format.mintick) + ")\n" +
+              "-----------------------\n" +
+              "Active Waves: " + str.tostring(array.size(active_anchors)) + "\n" +
+              "Latest Trigger: " + str.tostring(trigger_bull)
+              
+    label.new(bar_index + 15, high, debug_msg, style=label.style_label_left, color=color.black, textcolor=color.white, size=size.normal)
+
 // Process Active Setups
 if array.size(active_anchors) > 0
     for i = 0 to array.size(active_anchors) - 1
