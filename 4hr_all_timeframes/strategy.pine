@@ -89,10 +89,10 @@ if fib_active
         // 50% = High - 0.5 * (High - Low)
         // 61.8% = High - 0.618 * (High - Low)
         // 82% = High - 0.82 * (High - Low)
-        range = fib_high - fib_low
-        level_50 = fib_high - (range * 0.50)
-        level_618 = fib_high - (range * 0.618)
-        level_82 = fib_high - (range * 0.82)
+        fib_range = fib_high - fib_low
+        level_50 = fib_high - (fib_range * 0.50)
+        level_618 = fib_high - (fib_range * 0.618)
+        level_82 = fib_high - (fib_range * 0.82)
         
         // Update Lines
         // "keep them across for 3 months" -> x2 = time + 3 months
