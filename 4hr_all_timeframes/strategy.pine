@@ -42,15 +42,15 @@ trend_filter = close > sma_daily
 
 // 1. Cross when 1hr SMA crosses above 2hr SMA
 if trend_filter and ta.crossover(sma_1hr, sma_2hr)
-    label.new(bar_index, sma_1hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_center, size=size.tiny, tooltip="1h > 2h (First)", yloc=yloc.price)
+    label.new(bar_index, sma_1hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_left, size=size.tiny, tooltip="1h > 2h (First)", yloc=yloc.price)
 
 // 2. Cross when 2hr SMA crosses above 4hr SMA
 if trend_filter and ta.crossover(sma_2hr, sma_4hr)
-    label.new(bar_index, sma_2hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_center, size=size.tiny, tooltip="2h > 4h (Second)", yloc=yloc.price)
+    label.new(bar_index, sma_2hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_left, size=size.tiny, tooltip="2h > 4h (Second)", yloc=yloc.price)
 
 // 3. Cross when 4hr SMA crosses above 8hr SMA
 if trend_filter and ta.crossover(sma_4hr, sma_8hr)
-    label.new(bar_index, sma_4hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_center, size=size.tiny, tooltip="4h > 8h (Third)", yloc=yloc.price)
+    label.new(bar_index, sma_4hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_left, size=size.tiny, tooltip="4h > 8h (Third)", yloc=yloc.price)
 
 
 // --- Fib Logic ---
@@ -94,7 +94,8 @@ maintain_condition = sma_1hr > sma_4hr
 var line l_50 = na
 var line l_618 = na
 var line l_82 = na
-three_weeks_ms = 1000 * 60 * 60 * 24 * 21
+// Using extend.right for infinite lines to the right
+// three_weeks_ms = 1000 * 60 * 60 * 24 * 21 // No longer needed if using extend.right
 
 if is_active
     // Update High if alignment holds
@@ -118,11 +119,11 @@ if is_active
     level_618 = fib_high - (fib_range * 0.618)
     level_82 = fib_high - (fib_range * 0.82)
     
-    // Create new lines extending 3 weeks from current time
-    l_50 := line.new(bar_index, level_50, time + three_weeks_ms, level_50, xloc=xloc.bar_time, color=color.red, width=2)
-    l_618 := line.new(bar_index, level_618, time + three_weeks_ms, level_618, xloc=xloc.bar_time, color=color.red, width=2)
-    l_82 := line.new(bar_index, level_82, time + three_weeks_ms, level_82, xloc=xloc.bar_time, color=color.red, width=2)
+    // Create new lines extending to the right
+    l_50 := line.new(bar_index, level_50, bar_index + 1, level_50, extend=extend.right, color=color.red, width=2)
+    l_618 := line.new(bar_index, level_618, bar_index + 1, level_618, extend=extend.right, color=color.red, width=2)
+    l_82 := line.new(bar_index, level_82, bar_index + 1, level_82, extend=extend.right, color=color.red, width=2)
     
     // Golden Pocket Fill (Between 50% and 61.8%)
     // Since lines are recreated, we fill between them.
-    line.fill(l_50, l_618, color=color.new(color.red, 80))
+    linefill.new(l_50, l_618, color=color.new(color.red, 80))
