@@ -108,11 +108,12 @@ fill(dp21, dp50, color=show_daily ? d_col21 : na, title="Daily 21/50 Fill")
 
 
 // ==========================================
-// 4. MA CROSS FIBONACCI LOGIC
+// 4. MA CROSS FIBONACCI LOGIC (Refined)
 // ==========================================
-// Trigger: Chart 21 SMA crosses above Daily 21 SMA
-// Anchor: Lowest Low of last 14 bars before the cross
-// High: Running High since the cross
+// Trigger: BOTH Chart 21 > Daily 21 AND Chart 50 > Daily 50
+// (Wait for both to be true)
+// Anchor: Lowest Low relative to the Chart 21 SMA (Lowest price when price was trading below Chart 21)
+// High: Running High since the trigger
 // Lines: 50%, 61.8%, 80% (Red)
 
 // State Variables
@@ -130,19 +131,34 @@ var label x_lb61 = na
 var label x_lb80 = na
 
 // Conditions
-cross_21_bull = ta.crossover(c_s21, d_s21)
-cross_50_bull = ta.crossover(c_s50, d_s50)
+bool is_21_bull = c_s21 > d_s21
+bool is_50_bull = c_s50 > d_s50
+bool all_bull = is_21_bull and is_50_bull
 
-// Visual Markers for Crosses
-plotshape(cross_21_bull, title="21 Cross", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny, text="21X")
-plotshape(cross_50_bull, title="50 Cross", style=shape.triangleup, location=location.belowbar, color=color.blue, size=size.tiny, text="50X")
+// Trigger on the rising edge of "All Bull"
+bool trigger_cross = all_bull and not all_bull[1]
+
+// Visual Markers for individual crosses (Informational)
+plotshape(ta.crossover(c_s21, d_s21), title="21 Cross", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny, text="21X")
+plotshape(ta.crossover(c_s50, d_s50), title="50 Cross", style=shape.triangleup, location=location.belowbar, color=color.blue, size=size.tiny, text="50X")
 
 // Trigger Logic
-if cross_21_bull
+if trigger_cross
+    // Find Anchor: "Lowest Low below the 21 SMA"
+    // We look back to find the significant low that preceded this move.
+    // Heuristic: Look back up to 50 bars. Find the lowest 'low' where 'close < c_s21'.
+    
+    float found_low = low
+    // Search back
+    for i = 1 to 50
+        if close[i] < c_s21[i]
+            found_low := math.min(found_low, low[i])
+        // Break if we hit a point where we were previously all bull? No, keep simple.
+    
     // Reset/Start New Wave
     x_active := true
     x_start_time := time
-    x_anchor_low := ta.lowest(low, 14) // "find the low... since the 21 cross happened"? Usually implies low leading INTO it.
+    x_anchor_low := found_low
     x_running_high := high
     
     // Initialize Lines (if not exist)
@@ -161,25 +177,25 @@ if cross_21_bull
     x_lb50 := label.new(time, high, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.blue)
     x_lb61 := label.new(time, high, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.purple)
     x_lb80 := label.new(time, high, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.red)
+    
+    // Debug Label for Trigger
+    label.new(bar_index, low, "Dual Cross\nLow: " + str.tostring(x_anchor_low), style=label.style_label_up, color=color.lime, textcolor=color.black, size=size.tiny)
 
-// Update Logic (Run while 21 is above Daily 21? Or until 80% hit? Let's assume run while bullish alignment holds)
-// "leave on chart for a week" - implies constant update or static? 
-// Usually "update on right" implies dynamic.
-
+// Update Logic
 if x_active
     // Update High
     if high > x_running_high
         x_running_high := high
     
-    // Calculate Levels (Retracement from High down to Anchor)
+    // Calculate Levels
     range_v = x_running_high - x_anchor_low
     lvl_50 = x_running_high - (range_v * 0.50)
     lvl_61 = x_running_high - (range_v * 0.618)
     lvl_80 = x_running_high - (range_v * 0.80)
     
-    // Update Lines
+    // Update Lines (1 Week Duration)
     t_now = time
-    t_future = time + (7 * 24 * 60 * 60 * 1000) // 1 Week
+    t_future = time + (7 * 24 * 60 * 60 * 1000)
     
     line.set_xy1(x_l50, x_start_time, lvl_50)
     line.set_xy2(x_l50, t_future, lvl_50)
@@ -200,12 +216,14 @@ if x_active
     label.set_xy(x_lb80, t_future, lvl_80)
     label.set_text(x_lb80, "80%: " + str.tostring(lvl_80, format.mintick))
     
-    // Exit Condition? 
-    // If Chart 21 crosses BACK BELOW Daily 21, trend marks end? 
-    // Or if price hits 80%? 
-    // For now, let it run until next bullish cross resets it.
-    if ta.crossunder(c_s21, d_s21)
-        x_active := false
+    // Auto-reset if we lose the trend? 
+    // "leave on chart for a week" -> Usually implies static, but "work fibs" implies updating high.
+    // If we lose the "All Bull" status, we might want to stop updating the High but keep lines?
+    // For now, keep updating until next trigger resets it or we drift too far.
+    if not all_bull
+        // Optional: Freeze the high? Or just let it run.
+        // x_active := false // Uncomment to stop updating on trend loss
+        na
 
 
 // ==========================================
