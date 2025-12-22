@@ -12,6 +12,44 @@ sma50 = ta.sma(close, len50)
 sma21 = ta.sma(close, len21)
 
 // Plot SMAs
-plot(sma200, color=color.red, title="200 SMA", linewidth=2)
+plot(sma200, color=color.red, title="200 SMA", linewidth=4) // Thicker 200 SMA
 plot(sma50, color=color.blue, title="50 SMA", linewidth=2)
 plot(sma21, color=color.green, title="21 SMA", linewidth=2)
+
+// Logic: Close above 200 SMA after closing below for 4+ periods
+// Check if current close is above SMA200
+cond_cross_over = close > sma200 and close[1] < sma200[1]
+
+// Check if previous 4 candles were below SMA200
+was_below_4 = true
+for i = 1 to 4
+    if close[i] >= sma200[i]
+        was_below_4 := false
+
+if cond_cross_over and was_below_4
+    // Look back lowest of 14 periods
+    // We include the current bar in the high calculation, and look back 14 bars for the low
+    // The user said "look back the lowest period of 14".
+    // Usually this means lowest low of the last 14 bars.
+    lowest_low = ta.lowest(low, 14)
+    current_high = high // High of the breakout candle
+
+    range_val = current_high - lowest_low
+    
+    // 50% retracement level (Green Line)
+    // Retracement is measured from the High down.
+    level_50 = current_high - (range_val * 0.50)
+    
+    // 82% stop level (Red Line)
+    // 82% retracement from the High down.
+    level_82 = current_high - (range_val * 0.82)
+    
+    // Draw lines
+    // We draw them starting from the current bar extending to the right
+    // Using line.new
+    l_50 = line.new(bar_index, level_50, bar_index + 10, level_50, color=color.green, width=2)
+    l_82 = line.new(bar_index, level_82, bar_index + 10, level_82, color=color.red, width=2)
+    
+    // Optional: Add labels to identify the lines
+    label.new(bar_index, level_50, "50%", color=color.green, textcolor=color.white, style=label.style_label_down, size=size.tiny)
+    label.new(bar_index, level_82, "82%", color=color.red, textcolor=color.white, style=label.style_label_up, size=size.tiny)
