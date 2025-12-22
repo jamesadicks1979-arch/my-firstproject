@@ -1,5 +1,5 @@
 //@version=5
-indicator("Moving Averages (Combined)", overlay=true)
+indicator("Moving Averages (Combined)", overlay=true, max_lines_count=500, max_labels_count=500)
 
 // --- INPUTS ---
 grp_chart = "Chart Timeframe SMAs"
@@ -103,130 +103,144 @@ fill(dp21, dp50, color=show_daily ? d_col21 : na, title="Daily 21/50 Fill")
 
 
 // ==========================================
-// 4. BREAKOUT FIBONACCI LOGIC
+// 4. WAVE FIBONACCI LOGIC (Running Retracement)
 // ==========================================
-// Condition: Price trades below ALL SMAs (Chart & Daily)
-// Trigger: Price trades up and CLOSES above ALL SMAs
-// Action: Draw Fibs from Breakout High to Lowest Low during the "Below All" period
 
-// Combine all SMAs into checking variables
-// Note: We use nz() to handle potential NaN values early in history
-// We define "Below All" as close < EVERY SMA that is active
-// If user turns off chart or daily in inputs, should we still use them for calculation?
-// User query implies "all the sma's including the Daily", so we force check ALL 8 SMAs.
-
-// 1. Determine "All Below" State
-is_below_chart = close < c_s21 and close < c_s50 and close < c_s100 and close < c_s200
-is_below_daily = close < d_s21 and close < d_s50 and close < d_s100 and close < d_s200
-all_below = is_below_chart and is_below_daily
-
-// 2. Determine "All Above" State (Breakout)
-is_above_chart = close > c_s21 and close > c_s50 and close > c_s100 and close > c_s200
-is_above_daily = close > d_s21 and close > d_s50 and close > d_s100 and close > d_s200
-all_above = is_above_chart and is_above_daily
-
-// 3. State Management
-var float lowest_in_sequence = na
-var bool tracking_below = false
-
-// Pullback Monitoring Variables
-var float active_breakout_high = na
-var float active_breakout_50 = na
-var bool active_breakout_active = false
-
-// Logic Loop
-if all_below
-    if not tracking_below
-        // Start of a new "Below Sequence"
-        tracking_below := true
-        lowest_in_sequence := low
-    else
-        // Continue tracking lowest low
-        lowest_in_sequence := math.min(lowest_in_sequence, low)
+// Logic Vars
+var int bars_below_d50 = 0
+if close < d_s50
+    bars_below_d50 := bars_below_d50 + 1
 else
-    // We are NOT "All Below". Check for Breakout.
-    if tracking_below and all_above
-        // !!! BREAKOUT TRIGGERED !!!
-        trigger_price = high // Use Breakout Candle High as the anchor 0%? Or Close? "work out a 38.2% fib"
-        // Standard Retracement: High (0%) to Low (100%). Pullback target is 38.2% down from High.
-        // Level = High - (Range * 0.382)
-        
-        range_val = trigger_price - lowest_in_sequence
-        
-        lev_38 = trigger_price - (range_val * 0.382)
-        lev_50 = trigger_price - (range_val * 0.50)
-        lev_61 = trigger_price - (range_val * 0.618)
-        lev_80 = trigger_price - (range_val * 0.80)
-        
-        // Draw Lines (Duration: 2 Weeks)
-        t1 = time
-        t2 = time + (14 * 24 * 60 * 60 * 1000) // 2 Weeks in ms
-        
-        // Store IDs to manage or reference?
-        // For now just draw them.
-        line.new(t1, lev_38, t2, lev_38, xloc=xloc.bar_time, color=color.purple, width=1, style=line.style_solid)
-        line.new(t1, lev_50, t2, lev_50, xloc=xloc.bar_time, color=color.blue, width=2, style=line.style_solid)
-        line.new(t1, lev_61, t2, lev_61, xloc=xloc.bar_time, color=color.purple, width=1, style=line.style_solid)
-        line.new(t1, lev_80, t2, lev_80, xloc=xloc.bar_time, color=color.red, width=2, style=line.style_solid)
-        
-        // --- Active Breakout State for Pullback Monitoring ---
-        // We need to store these values to monitor for the 50% breach
-        // Since Pine Script variables reset on each bar unless 'var', we need arrays or var variables.
-        // But 'var' works for single instance. Arrays work for multiple.
-        // Assuming we monitor the *latest* breakout.
-        
-        active_breakout_high := trigger_price
-        active_breakout_50 := lev_50
-        active_breakout_active := true
-        
-        // Reset State for "Below Sequence"
-        tracking_below := false
-        lowest_in_sequence := na
-        
-    else if tracking_below and not all_below
-        // "Messy Middle" (Transition).
-        na
+    bars_below_d50 := 0
 
-// 4b. Pullback Monitoring (New Rule)
-// "when the price comes down a goes below 50% can you flag that and then take that as a new low and work fibs from there"
-// "looking for the next wave so the fibs and make then last a week on the charts"
+// Trigger Condition
+// 1. Close > Daily 50 SMA
+// 2. Was below Daily 50 SMA for > 6 periods (checking last bar's counter)
+// 3. Close > Chart 200 SMA
+trigger_bull = close > d_s50 and bars_below_d50[1] > 6 and close > c_s200
 
-is_pullback = false
-if active_breakout_active
-    // Check for breach
-    if low < active_breakout_50
-        // Flag it
-        is_pullback := true
-        
-        // Take that as a new low (Pullback Low)
-        pullback_low = low
-        
-        // Work Fibs from there (Breakout High to Pullback Low)
-        // Range = High - Pullback Low
-        pb_range = active_breakout_high - pullback_low
-        
-        pb_38 = active_breakout_high - (pb_range * 0.382)
-        pb_50 = active_breakout_high - (pb_range * 0.50)
-        pb_61 = active_breakout_high - (pb_range * 0.618)
-        pb_80 = active_breakout_high - (pb_range * 0.80)
-        
-        // Draw Lines (Duration: 1 Week)
-        t_pb_1 = time
-        t_pb_2 = time + (7 * 24 * 60 * 60 * 1000) // 1 Week
-        
-        // Use Dashed lines to distinguish secondary fibs
-        line.new(t_pb_1, pb_38, t_pb_2, pb_38, xloc=xloc.bar_time, color=color.new(color.purple, 30), width=1, style=line.style_dashed)
-        line.new(t_pb_1, pb_50, t_pb_2, pb_50, xloc=xloc.bar_time, color=color.new(color.blue, 30), width=2, style=line.style_dashed)
-        line.new(t_pb_1, pb_61, t_pb_2, pb_61, xloc=xloc.bar_time, color=color.new(color.purple, 30), width=1, style=line.style_dashed)
-        line.new(t_pb_1, pb_80, t_pb_2, pb_80, xloc=xloc.bar_time, color=color.new(color.red, 30), width=2, style=line.style_dashed)
-        
-        // Disable monitoring for this breakout to avoid re-triggering on every bar below 50%?
-        // User says "looking for the next wave", implying we set this up once.
-        active_breakout_active := false
+// State Arrays to manage multiple concurrent waves (though we usually focus on the latest)
+// We use arrays to persist line objects and state across bars
+var float[] active_anchors = array.new_float()
+var float[] active_highs = array.new_float()
+var int[] active_start_times = array.new_int()
+var bool[] active_is_valid = array.new_bool()
 
-// Plot Trigger Signal for Debugging
-plotchar(tracking_below and all_above, char="F", location=location.abovebar, color=color.purple, size=size.tiny, title="Fib Breakout")
-plotchar(is_pullback, char="P", location=location.belowbar, color=color.orange, size=size.tiny, title="50% Pullback")
+// Line Arrays (to update them)
+var line[] lines_38 = array.new_line()
+var line[] lines_50 = array.new_line()
+var line[] lines_61 = array.new_line()
+var line[] lines_80 = array.new_line()
+
+// New Setup on Trigger
+if trigger_bull
+    // Anchor Low: Lowest of last 14 periods
+    anchor_low = ta.lowest(low, 14)
+    start_high = high
+    
+    array.push(active_anchors, anchor_low)
+    array.push(active_highs, start_high)
+    array.push(active_start_times, time)
+    array.push(active_is_valid, true)
+    
+    // Create placeholders for lines
+    array.push(lines_38, line.new(na, na, na, na))
+    array.push(lines_50, line.new(na, na, na, na))
+    array.push(lines_61, line.new(na, na, na, na))
+    array.push(lines_80, line.new(na, na, na, na))
+    
+    // Debug
+    label.new(bar_index, high, "Trigger", style=label.style_label_down, size=size.tiny)
+
+// Process Active Setups
+if array.size(active_anchors) > 0
+    for i = 0 to array.size(active_anchors) - 1
+        if array.get(active_is_valid, i)
+            // Get Current State
+            a_low = array.get(active_anchors, i)
+            a_high = array.get(active_highs, i)
+            
+            // 1. Update High (Running High)
+            if high > a_high
+                a_high := high
+                array.set(active_highs, i, a_high)
+            
+            // 2. Calculate Levels (Retracement from High down to Low)
+            range_val = a_high - a_low
+            l38 = a_high - (range_val * 0.382)
+            l50 = a_high - (range_val * 0.50)
+            l61 = a_high - (range_val * 0.618)
+            l80 = a_high - (range_val * 0.80)
+            
+            // 3. Draw/Update Lines
+            t_start = array.get(active_start_times, i)
+            t_end = time + (7 * 24 * 60 * 60 * 1000) // 1 Week Duration from NOW (Rolling)
+            
+            ln38 = array.get(lines_38, i)
+            ln50 = array.get(lines_50, i)
+            ln61 = array.get(lines_61, i)
+            ln80 = array.get(lines_80, i)
+            
+            line.set_xy1(ln38, t_start, l38)
+            line.set_xy2(ln38, t_end, l38)
+            line.set_color(ln38, color.purple)
+            
+            line.set_xy1(ln50, t_start, l50)
+            line.set_xy2(ln50, t_end, l50)
+            line.set_color(ln50, color.blue)
+            line.set_width(ln50, 2)
+            
+            line.set_xy1(ln61, t_start, l61)
+            line.set_xy2(ln61, t_end, l61)
+            line.set_color(ln61, color.purple)
+            
+            line.set_xy1(ln80, t_start, l80)
+            line.set_xy2(ln80, t_end, l80)
+            line.set_color(ln80, color.red)
+            line.set_width(ln80, 2)
+            
+            // 4. Check Logic: Hit 50%?
+            if low <= l50
+                // Check 80% Survival
+                // "if the 50% fib is hit and doesnt trade below the 80% fib"
+                if low > l80
+                    // Valid Pullback / New Strong Low
+                    // Action: "take that as a new strong low and work fibs again on the high"
+                    
+                    // Creates a NEW chained setup starting from this low
+                    // But we must be careful not to create it continuously on every bar below 50%
+                    // We invalidate the CURRENT setup so it stops updating, 
+                    // and spawn a NEW one.
+                    
+                    // Invalidate current
+                    array.set(active_is_valid, i, false)
+                    
+                    // Spawn New
+                    new_anchor = low // The pullback low
+                    new_start_high = high // Current high (start of next wave)
+                    
+                    array.push(active_anchors, new_anchor)
+                    array.push(active_highs, new_start_high)
+                    array.push(active_start_times, time)
+                    array.push(active_is_valid, true)
+                    
+                    array.push(lines_38, line.new(na, na, na, na))
+                    array.push(lines_50, line.new(na, na, na, na))
+                    array.push(lines_61, line.new(na, na, na, na))
+                    array.push(lines_80, line.new(na, na, na, na))
+                    
+                    label.new(bar_index, low, "New Wave", style=label.style_label_up, size=size.tiny, color=color.orange)
+                    
+                else
+                    // Invalidated by hitting 80%
+                    array.set(active_is_valid, i, false)
+                    // Optional: Visual indicator of invalidation
+                    line.set_style(ln80, line.style_dashed)
+
+// Cleanup old/invalid arrays to prevent memory leak (optional but good practice)
+// Since max_lines_count handles display, we just need to keep array size manageable if script runs for years.
+// For now, simple logic is sufficient.
+
 
 // ==========================================
 // 3. LABELS (Update on Right)
