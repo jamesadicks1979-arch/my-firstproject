@@ -111,9 +111,9 @@ var label[] active_marker_labels = array.new_label() // To delete X markers if n
 if valid_long
     current_high = high
     range_val = current_high - lowest_low_dynamic
-        
-        // Initial Levels (Long)
-        level_38 = current_high - (range_val * 0.382)
+    
+    // Initial Levels (Long)
+    level_38 = current_high - (range_val * 0.382)
         level_50 = current_high - (range_val * 0.50)
         level_61 = current_high - (range_val * 0.618)
         level_80 = current_high - (range_val * 0.80)
@@ -157,10 +157,10 @@ if valid_short
     current_low = low
     // For Short: Range = Anchor (High) - Current Low
     range_val = highest_high_dynamic - current_low
-        
-        // Initial Levels (Short)
-        // Retracement goes UP from Low
-        level_38 = current_low + (range_val * 0.382)
+    
+    // Initial Levels (Short)
+    // Retracement goes UP from Low
+    level_38 = current_low + (range_val * 0.382)
         level_50 = current_low + (range_val * 0.50)
         level_61 = current_low + (range_val * 0.618)
         level_80 = current_low + (range_val * 0.80)
