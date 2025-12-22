@@ -58,3 +58,10 @@ p200 = plot(d_sma200, color=color.red, title="Daily 200 SMA", linewidth=2)
 // Fill
 fill(p100, p200, color = d_color100, title="Daily 100/200 SMA Fill")
 fill(p21, p50, color = d_color21, title="Daily 21/50 SMA Fill")
+
+// Update on Right: Add labels at the end of the lines
+if barstate.islast
+    label.new(bar_index + 3, d_sma21, "21 SMA\n" + str.tostring(d_sma21, format.mintick), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label.new(bar_index + 3, d_sma50, "50 SMA\n" + str.tostring(d_sma50, format.mintick), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label.new(bar_index + 3, d_sma100, "100 SMA\n" + str.tostring(d_sma100, format.mintick), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
+    label.new(bar_index + 3, d_sma200, "200 SMA\n" + str.tostring(d_sma200, format.mintick), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
