@@ -1,0 +1,216 @@
+//@version=5
+strategy("Bunds Open - London Start Strategy", overlay=true, max_lines_count=500, max_labels_count=500, default_qty_type=strategy.percent_of_equity, default_qty_value=10, initial_capital=10000)
+
+// Input for the time
+londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
+londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
+
+// Inputs for Offsets
+pipsOffset = input.float(10, "Pips Offset (x10 ticks)", minval=0)
+stopTicksInput = input.int(6, "Stop Loss Ticks (x10 ticks)", minval=0)
+
+// Strategy Inputs
+tp1Ticks = input.int(120, "TP1 Ticks (Half Off)", minval=0)
+tp2Ticks = input.int(250, "TP2 Ticks (Full Profit)", minval=0)
+
+// Function to check if the current bar is at the specific London time
+isLondonStart() =>
+    h = hour(time, "Europe/London")
+    m = minute(time, "Europe/London")
+    h == londonStartHour and m == londonStartMinute
+
+// Background color for start time
+bgcolor(isLondonStart() ? color.new(color.blue, 80) : na, title="London Start Background")
+
+// Variables to store the opening price of the 7:00 bar and High between 7:00 and 7:15
+var float openPrice700 = na
+var float highSince700 = na
+
+// Reset or Set Variables at 7:00
+if isLondonStart()
+    openPrice700 := open
+    highSince700 := high
+    // Draw vertical line for the start
+    line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
+
+// Track High price between 7:00 and 7:15
+isBetween700and715() =>
+    h = hour(time, "Europe/London")
+    m = minute(time, "Europe/London")
+    // Strict between 7:00 and 7:15 check
+    h == londonStartHour and m >= londonStartMinute and m < 15
+
+if isBetween700and715()
+    if high > highSince700
+        highSince700 := high
+
+// -------------------------------------------------------------------------
+// Check Logic at 7:05 - Primary Strategy Entry
+// -------------------------------------------------------------------------
+isCheckTime705() =>
+    h = hour(time, "Europe/London")
+    m = minute(time, "Europe/London")
+    targetM = londonStartMinute + 5
+    h == londonStartHour and m == targetM
+
+// State variables for the daily setup
+var float dailySellLevel = na
+var float dailyStopLevel = na
+var int dailySellLineEndTime = na
+var bool orderPlacedToday = false
+
+// Reset order flag at start of day (07:00)
+if isLondonStart()
+    orderPlacedToday := false
+    dailySellLevel := na
+    dailyStopLevel := na
+    dailySellLineEndTime := na
+    // Cancel any old orders from previous days (safety)
+    strategy.cancel_all()
+
+if isCheckTime705() and not na(openPrice700)
+    thresholdPrice = openPrice700 + (100 * syminfo.mintick)
+    
+    // Check if price is above threshold at 7:05
+    isAbove = close > thresholdPrice
+    
+    float sellOffsetTicks = na
+    float stopOffsetTicks = na
+    
+    if isAbove
+        sellOffsetTicks := 200
+        stopOffsetTicks := 260 
+    else
+        sellOffsetTicks := 100 
+        stopOffsetTicks := 160
+    
+    dailySellLevel := openPrice700 + (sellOffsetTicks * syminfo.mintick)
+    dailyStopLevel := openPrice700 + (stopOffsetTicks * syminfo.mintick)
+
+    // Duration: 2 hours
+    sellLineDuration = 2 * 60 * 60 * 1000
+    dailySellLineEndTime := time + sellLineDuration
+    
+    // Visuals
+    line.new(x1=time, y1=dailySellLevel, x2=dailySellLineEndTime, y2=dailySellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
+    label.new(dailySellLineEndTime, dailySellLevel, "Sell Entry", xloc=xloc.bar_time, color=color.green, textcolor=color.white, style=label.style_label_left)
+    
+    // Stop Duration: Until 12:00
+    timeTo12 = (5 * 60 * 60 * 1000) - (5 * 60 * 1000)
+    stopLineEndTime = time + timeTo12
+    line.new(x1=time, y1=dailyStopLevel, x2=stopLineEndTime, y2=dailyStopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
+    label.new(stopLineEndTime, dailyStopLevel, "Stop Loss", xloc=xloc.bar_time, color=color.red, textcolor=color.white, style=label.style_label_left)
+    
+    // Visualize TP Levels (Optional but helpful)
+    tp1Level = dailySellLevel - (tp1Ticks * syminfo.mintick)
+    tp2Level = dailySellLevel - (250 * syminfo.mintick)
+    
+    // Draw TP lines for visualization
+    line.new(x1=time, y1=tp1Level, x2=dailySellLineEndTime, y2=tp1Level, xloc=xloc.bar_time, color=color.green, style=line.style_dotted, width=1)
+    label.new(dailySellLineEndTime, tp1Level, "TP1", xloc=xloc.bar_time, color=color.green, textcolor=color.white, style=label.style_label_left)
+    
+    line.new(x1=time, y1=tp2Level, x2=dailySellLineEndTime, y2=tp2Level, xloc=xloc.bar_time, color=color.green, style=line.style_dotted, width=1)
+    label.new(dailySellLineEndTime, tp2Level, "TP2", xloc=xloc.bar_time, color=color.green, textcolor=color.white, style=label.style_label_left)
+    
+    // Strategy Entry: Place Limit Order
+    // We name the order "Sell Entry"
+    strategy.entry("Sell Entry", strategy.short, limit=dailySellLevel, comment="Sell Limit @" + str.tostring(dailySellLevel))
+    orderPlacedToday := true
+
+// -------------------------------------------------------------------------
+// SMAs (Current Timeframe)
+// -------------------------------------------------------------------------
+sma50 = ta.sma(close, 50)
+sma100 = ta.sma(close, 100)
+sma200 = ta.sma(close, 200)
+
+plot(sma50, "SMA 50", color=color.blue, linewidth=2)
+plot(sma100, "SMA 100", color=color.white, linewidth=2)
+plot(sma200, "SMA 200", color=color.purple, linewidth=2)
+
+// Labels for SMAs on the right side
+if barstate.islast
+    label.new(bar_index, sma50, "SMA 50", color=color.blue, textcolor=color.white, style=label.style_label_left)
+    label.new(bar_index, sma100, "SMA 100", color=color.white, textcolor=color.black, style=label.style_label_left)
+    label.new(bar_index, sma200, "SMA 200", color=color.purple, textcolor=color.white, style=label.style_label_left)
+
+// -------------------------------------------------------------------------
+// Manage Orders
+// -------------------------------------------------------------------------
+
+// Cancel order if time exceeds 2 hours and not filled
+if orderPlacedToday and time > dailySellLineEndTime and strategy.position_size == 0
+    strategy.cancel("Sell Entry")
+    orderPlacedToday := false // Stop checking
+
+// Exit Logic (Stop Loss & Take Profits)
+if strategy.position_size < 0
+    // Calculate Entry Price (Average)
+    entryPrice = strategy.position_avg_price
+    
+    // Trigger price for TP1 (120 ticks)
+    tp1Price = entryPrice - (tp1Ticks * syminfo.mintick)
+    
+    // Logic for Move to Breakeven:
+    // User requested: "stops and profit takes the same as before"
+    // "Before" meant: Once TP1 hit, Move Remaining to Breakeven (Scratch).
+    // And TP2 was 250 ticks.
+    
+    var bool isBreakeven = false
+    
+    if strategy.position_size == 0
+        isBreakeven := false
+    
+    // Check if TP1 was hit (price went below TP1 level)
+    if strategy.position_size < 0 and low <= tp1Price
+        isBreakeven := true
+        
+    // Dynamic Stop Level for Remaining Position
+    // If BE triggered, Stop is Entry Price. Else, it is Daily Stop Level.
+    currentStopLevel = isBreakeven ? entryPrice : dailyStopLevel
+    
+    // Setup Exits
+    
+    // Exit 1: Partial 50% at TP1 (120 ticks)
+    // Stop Loss: Daily Stop Level (Red Line)
+    strategy.exit("TP1", "Sell Entry", qty_percent=50, profit=tp1Ticks, stop=dailyStopLevel, comment_profit="TP1 Hit", comment_loss="Stop Hit")
+    
+    // Exit 2: Remaining Position
+    // Target: 250 ticks (as requested "same as before")
+    // Stop: Dynamic (Breakeven or Daily Stop)
+    strategy.exit("TP2", "Sell Entry", qty_percent=100, profit=250, stop=currentStopLevel, comment_profit="TP2 250 Ticks", comment_loss="Stop Hit/BE")
+
+
+
+// -------------------------------------------------------------------------
+// Check Logic at 7:15 (Secondary Setup - Visualization Only for now unless requested)
+// -------------------------------------------------------------------------
+isCheckTime715() =>
+    h = hour(time, "Europe/London")
+    m = minute(time, "Europe/London")
+    targetM = londonStartMinute + 15
+    h == londonStartHour and m == targetM
+
+var bool conditionMetAt715 = false
+
+if isCheckTime715()
+    threshold50Ticks = openPrice700 + (50 * syminfo.mintick)
+    if highSince700 <= threshold50Ticks
+        conditionMetAt715 := true
+    else
+        conditionMetAt715 := false
+
+// 7:20 Action
+isCheckTime720() =>
+    h = hour(time, "Europe/London")
+    m = minute(time, "Europe/London")
+    targetM = londonStartMinute + 20
+    h == londonStartHour and m == targetM
+
+if isCheckTime720() and conditionMetAt715
+    sellPrice720 = open
+    sellLineDuration = 2 * 60 * 60 * 1000
+    sellLineEndTime = time + sellLineDuration
+    line.new(x1=time, y1=sellPrice720, x2=sellLineEndTime, y2=sellPrice720, xloc=xloc.bar_time, color=color.orange, style=line.style_solid, width=2)
+    // Note: Strategy entry for this secondary line is not implemented yet to avoid conflict, 
+    // but can be added if requested.

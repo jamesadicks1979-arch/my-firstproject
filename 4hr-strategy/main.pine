@@ -1,0 +1,15 @@
+//@version=5
+strategy("4-Hour Strategy Setup", overlay=true)
+
+// Check if we are on the correct timeframe
+if timeframe.period != "240" and timeframe.isintraday
+    // Note: "240" is 4 hours (4 * 60)
+    // This is just a visual warning/label, scripts can technically run on any TF
+    var label warningLabel = na
+    if barstate.islast
+        label.new(bar_index, high, "Warning: Designed for 4h Chart", color=color.orange, textcolor=color.white)
+
+// Example 4h Logic Placeholder
+// You can add your specific indicators below
+
+plot(close, "Close", color=color.black)
