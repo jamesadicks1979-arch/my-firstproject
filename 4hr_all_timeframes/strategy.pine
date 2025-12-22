@@ -2,9 +2,31 @@
 strategy("4hr All Timeframes Strategy", overlay=true)
 
 // Input parameters
-timeframe_4hr = input.timeframe("240", "4 Hour Timeframe")
+sma_length = input.int(200, "SMA Length", minval=1)
 
-// Placeholder for logic
-// TODO: Implement multi-timeframe logic here
+// Timeframe Inputs
+tf_weekly = input.timeframe("1W", "Weekly Timeframe")
+tf_daily  = input.timeframe("1D", "Daily Timeframe")
+tf_8hr    = input.timeframe("480", "8 Hour Timeframe")
+tf_4hr    = input.timeframe("240", "4 Hour Timeframe")
+tf_2hr    = input.timeframe("120", "2 Hour Timeframe")
 
-plot(close, title="Close Price")
+// Calculations
+// Function to get SMA from a specific timeframe
+get_sma(tf, len) =>
+    request.security(syminfo.tickerid, tf, ta.sma(close, len))
+
+sma_weekly = get_sma(tf_weekly, sma_length)
+sma_daily  = get_sma(tf_daily, sma_length)
+sma_8hr    = get_sma(tf_8hr, sma_length)
+sma_4hr    = get_sma(tf_4hr, sma_length)
+sma_2hr    = get_sma(tf_2hr, sma_length)
+
+// Plotting
+plot(sma_weekly, title="Weekly 200 SMA", color=color.purple, linewidth=2)
+plot(sma_daily,  title="Daily 200 SMA",  color=color.red,    linewidth=2)
+plot(sma_8hr,    title="8hr 200 SMA",    color=color.orange, linewidth=2)
+plot(sma_4hr,    title="4hr 200 SMA",    color=color.green,  linewidth=2)
+plot(sma_2hr,    title="2hr 200 SMA",    color=color.blue,   linewidth=2)
+
+plot(close, title="Close Price", color=color.gray)
