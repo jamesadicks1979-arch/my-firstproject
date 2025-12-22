@@ -1,60 +1,182 @@
 //@version=5
-indicator("Moving Averages (Chart TF)", overlay=true)
+indicator("Moving Averages (Combined)", overlay=true, max_lines_count=500, max_labels_count=500)
 
-// Input parameters
-len21 = input.int(21, "21 SMA Length")
-len50 = input.int(50, "50 SMA Length")
-len100 = input.int(100, "100 SMA Length")
-len200 = input.int(200, "200 SMA Length")
+// --- INPUTS ---
+grp_chart = "Chart Timeframe SMAs"
+show_chart = input.bool(true, "Show Chart Timeframe SMAs?", group=grp_chart)
+len21 = input.int(21, "21 Length", group=grp_chart)
+len50 = input.int(50, "50 Length", group=grp_chart)
+len100 = input.int(100, "100 Length", group=grp_chart)
+len200 = input.int(200, "200 Length", group=grp_chart)
 
-// Calculate SMAs (Uses current chart timeframe)
-sma21 = ta.sma(close, len21)
-sma50 = ta.sma(close, len50)
-sma100 = ta.sma(close, len100)
-sma200 = ta.sma(close, len200)
+grp_daily = "Daily Timeframe SMAs (Locked)"
+show_daily = input.bool(true, "Show Daily SMAs?", group=grp_daily)
 
-// Pip Value
+grp_sell = "Sell Signal Logic"
+sell_cluster_pips = input.float(50.0, "Cluster Threshold (Pips)", group=grp_sell, tooltip="Max distance between 21, 50, and 100 SMAs to consider them 'clustered'.")
+sell_ext_pips = input.float(400.0, "Extension Threshold (Pips)", group=grp_sell, tooltip="Min distance between 100 and 200 SMAs to consider trend 'extended'.")
+show_sell_debug = input.bool(false, "Show Sell Signal Debug Labels?", group=grp_sell)
+show_missed = input.bool(true, "Show Missed Sell Reasons?", group=grp_sell, tooltip="Plots a small label on 21/100 crossunders that didn't trigger a sell, explaining why.")
+
+// --- CONSTANTS ---
 pip_val = syminfo.mintick * 10
 
-// Plot SMAs
-p21 = plot(sma21, color=color.green, title="21 SMA", linewidth=2)
-p50 = plot(sma50, color=color.blue, title="50 SMA", linewidth=2)
-p100 = plot(sma100, color=color.orange, title="100 SMA", linewidth=2)
-p200 = plot(sma200, color=color.red, title="200 SMA", linewidth=2)
+// ==========================================
+// 1. CHART TIMEFRAME LOGIC
+// ==========================================
+c_s21 = ta.sma(close, len21)
+c_s50 = ta.sma(close, len50)
+c_s100 = ta.sma(close, len100)
+c_s200 = ta.sma(close, len200)
 
-// --- Fill Logic 100/200 ---
-// Green: 100 SMA > 200 SMA + 8 pips AND 21 >= 100
-// Red:   100 SMA < 200 SMA - 8 pips AND 21 <= 100
-thresh_100_long = sma200 + (8 * pip_val)
-thresh_100_short = sma200 - (8 * pip_val)
+// Plot Chart SMAs (Thinner Lines: 1)
+cp21 = plot(show_chart ? c_s21 : na, color=color.green, title="Chart 21 SMA", linewidth=1)
+cp50 = plot(show_chart ? c_s50 : na, color=color.blue, title="Chart 50 SMA", linewidth=1)
+cp100 = plot(show_chart ? c_s100 : na, color=color.orange, title="Chart 100 SMA", linewidth=1)
+cp200 = plot(show_chart ? c_s200 : na, color=color.red, title="Chart 200 SMA", linewidth=1)
 
-c_100 = if sma100 >= thresh_100_long and sma21 >= sma100
+// Chart Fills
+// 100/200: Green if 100 > 200+8pips & 21>=100 | Red if 100 < 200-8pips & 21<=100
+c_thresh_100_long = c_s200 + (8 * pip_val)
+c_thresh_100_short = c_s200 - (8 * pip_val)
+
+c_col_100 = if show_chart and c_s100 >= c_thresh_100_long and c_s21 >= c_s100
     color.new(color.green, 70)
-else if sma100 <= thresh_100_short and sma21 <= sma100
+else if show_chart and c_s100 <= c_thresh_100_short and c_s21 <= c_s100
     color.new(color.red, 70)
 else
     na
+fill(cp100, cp200, color=c_col_100, title="Chart 100/200 Fill")
 
-fill(p100, p200, color = c_100, title="100/200 SMA Fill")
+// 21/50: Green if 21 > 50+3pips | Red if 21 < 50-3pips
+c_thresh_21_long = c_s50 + (3 * pip_val)
+c_thresh_21_short = c_s50 - (3 * pip_val)
 
-// --- Fill Logic 21/50 ---
-// Green: 21 SMA > 50 SMA + 3 pips
-// Red:   21 SMA < 50 SMA - 3 pips
-thresh_21_long = sma50 + (3 * pip_val)
-thresh_21_short = sma50 - (3 * pip_val)
-
-c_21 = if sma21 >= thresh_21_long
+c_col_21 = if show_chart and c_s21 >= c_thresh_21_long
     color.new(color.green, 70)
-else if sma21 <= thresh_21_short
+else if show_chart and c_s21 <= c_thresh_21_short
     color.new(color.red, 70)
 else
     na
+fill(cp21, cp50, color=c_col_21, title="Chart 21/50 Fill")
 
-fill(p21, p50, color = c_21, title="21/50 SMA Fill")
 
-// Update on Right: Add labels at the end of the lines
+// ==========================================
+// 2. DAILY TIMEFRAME LOGIC (LOCKED)
+// ==========================================
+calc_daily() =>
+    d21 = ta.sma(close, len21)
+    d50 = ta.sma(close, len50)
+    d100 = ta.sma(close, len100)
+    d200 = ta.sma(close, len200)
+    
+    // Fill Logic inside security to get correct colors per day
+    pv = syminfo.mintick * 10
+    
+    // 100/200
+    dt_100_long = d200 + (8 * pv)
+    dt_100_short = d200 - (8 * pv)
+    dc_100 = if d100 >= dt_100_long and d21 >= d100
+        color.new(color.green, 85) // Slightly more transparent for Daily
+    else if d100 <= dt_100_short and d21 <= d100
+        color.new(color.red, 85)
+    else
+        na
+        
+    // 21/50
+    dt_21_long = d50 + (3 * pv)
+    dt_21_short = d50 - (3 * pv)
+    dc_21 = if d21 >= dt_21_long
+        color.new(color.green, 85)
+    else if d21 <= dt_21_short
+        color.new(color.red, 85)
+    else
+        na
+    
+    [d21, d50, d100, d200, dc_100, dc_21]
+
+[d_s21, d_s50, d_s100, d_s200, d_col100, d_col21] = request.security(syminfo.tickerid, "D", calc_daily())
+
+// Plot Daily SMAs (Thicker Lines: 3)
+dp21 = plot(show_daily ? d_s21 : na, color=color.green, title="Daily 21 SMA", linewidth=3)
+dp50 = plot(show_daily ? d_s50 : na, color=color.blue, title="Daily 50 SMA", linewidth=3)
+dp100 = plot(show_daily ? d_s100 : na, color=color.orange, title="Daily 100 SMA", linewidth=3)
+dp200 = plot(show_daily ? d_s200 : na, color=color.red, title="Daily 200 SMA", linewidth=3)
+
+// Daily Fills
+fill(dp100, dp200, color=show_daily ? d_col100 : na, title="Daily 100/200 Fill")
+fill(dp21, dp50, color=show_daily ? d_col21 : na, title="Daily 21/50 Fill")
+
+
+// ==========================================
+// 4. SELL SIGNAL (Mean Reversion / Collapse)
+// ==========================================
+// Logic:
+// 1. 21 crosses below 100
+// 2. 21, 50, 100 are within X pips of each other (Cluster)
+// 3. 100 is > 200 by at least Y pips (Extension)
+// 4. Trend Alignment (Implicit in Extension, but explicit 50 > 100 > 200 helps)
+
+// Using Chart Timeframe SMAs for execution signals
+fast_cluster_max = math.max(c_s21, c_s50, c_s100)
+fast_cluster_min = math.min(c_s21, c_s50, c_s100)
+cluster_range = fast_cluster_max - fast_cluster_min
+trend_extension = c_s100 - c_s200
+
+// Conditions
+// Cluster: The difference between the highest and lowest of the fast moving averages
+cond_clustered = cluster_range <= (sell_cluster_pips * pip_val)
+
+// Extension: 100 SMA is significantly above 200 SMA
+cond_extended = trend_extension >= (sell_ext_pips * pip_val)
+
+// Trigger: 21 Crosses Under 100
+cond_cross = ta.crossunder(c_s21, c_s100)
+
+// Final Signal
+sell_signal = cond_cross and cond_clustered and cond_extended
+
+plotshape(sell_signal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, text="SELL")
+
+// Debugging for Sell Signal
+if barstate.isconfirmed and cond_cross
+    if sell_signal
+        // It worked, detailed label is redundant if we have the plotshape, but maybe useful?
+        na
+    else if show_missed
+        // Failed. Why?
+        fail_reason = ""
+        if not cond_clustered
+            fail_reason := fail_reason + "Cluster: " + str.tostring(cluster_range / pip_val, "#.0") + " > " + str.tostring(sell_cluster_pips) + "\n"
+        if not cond_extended
+            fail_reason := fail_reason + "Ext: " + str.tostring(trend_extension / pip_val, "#.0") + " < " + str.tostring(sell_ext_pips) + "\n"
+            
+        label.new(bar_index, high, text="Missed Sell:\n" + fail_reason, color=color.gray, textcolor=color.white, style=label.style_label_down, size=size.small)
+
+if show_sell_debug and barstate.islast
+    debug_txt = "SELL SIGNAL DEBUG\n" +
+              "Cluster Range: " + str.tostring(cluster_range / pip_val, "#.0") + " pips (Max: " + str.tostring(sell_cluster_pips) + ")\n" +
+              "Extension: " + str.tostring(trend_extension / pip_val, "#.0") + " pips (Min: " + str.tostring(sell_ext_pips) + ")\n" +
+              "21 < 100: " + str.tostring(c_s21 < c_s100) + "\n" +
+              "Last Signal: " + str.tostring(sell_signal)
+    
+    label.new(bar_index, high, debug_txt, color=color.black, textcolor=color.white, style=label.style_label_down)
+
+
+// ==========================================
+// 3. LABELS (Update on Right)
+// ==========================================
 if barstate.islast
-    label.new(bar_index + 3, sma21, "21 SMA\n" + str.tostring(sma21, format.mintick), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
-    label.new(bar_index + 3, sma50, "50 SMA\n" + str.tostring(sma50, format.mintick), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
-    label.new(bar_index + 3, sma100, "100 SMA\n" + str.tostring(sma100, format.mintick), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
-    label.new(bar_index + 3, sma200, "200 SMA\n" + str.tostring(sma200, format.mintick), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+    // Chart Labels (Offset +3)
+    if show_chart
+        label.new(bar_index + 3, c_s21, "Chart 21\n" + str.tostring(c_s21, format.mintick), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
+        label.new(bar_index + 3, c_s50, "Chart 50\n" + str.tostring(c_s50, format.mintick), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
+        label.new(bar_index + 3, c_s100, "Chart 100\n" + str.tostring(c_s100, format.mintick), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
+        label.new(bar_index + 3, c_s200, "Chart 200\n" + str.tostring(c_s200, format.mintick), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
+
+    // Daily Labels (Offset +10 to avoid overlap)
+    if show_daily
+        label.new(bar_index + 10, d_s21, "Daily 21\n" + str.tostring(d_s21, format.mintick), color=color.green, style=label.style_label_left, textcolor=color.white, size=size.small)
+        label.new(bar_index + 10, d_s50, "Daily 50\n" + str.tostring(d_s50, format.mintick), color=color.blue, style=label.style_label_left, textcolor=color.white, size=size.small)
+        label.new(bar_index + 10, d_s100, "Daily 100\n" + str.tostring(d_s100, format.mintick), color=color.orange, style=label.style_label_left, textcolor=color.white, size=size.small)
+        label.new(bar_index + 10, d_s200, "Daily 200\n" + str.tostring(d_s200, format.mintick), color=color.red, style=label.style_label_left, textcolor=color.white, size=size.small)
