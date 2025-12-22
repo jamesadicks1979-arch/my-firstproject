@@ -1,0 +1,53 @@
+//@version=5
+indicator("Moving Averages (Chart TF)", overlay=true)
+
+// Input parameters
+len21 = input.int(21, "21 SMA Length")
+len50 = input.int(50, "50 SMA Length")
+len100 = input.int(100, "100 SMA Length")
+len200 = input.int(200, "200 SMA Length")
+
+// Calculate SMAs (Uses current chart timeframe)
+sma21 = ta.sma(close, len21)
+sma50 = ta.sma(close, len50)
+sma100 = ta.sma(close, len100)
+sma200 = ta.sma(close, len200)
+
+// Pip Value
+pip_val = syminfo.mintick * 10
+
+// Plot SMAs
+p21 = plot(sma21, color=color.green, title="21 SMA", linewidth=2)
+p50 = plot(sma50, color=color.blue, title="50 SMA", linewidth=2)
+p100 = plot(sma100, color=color.orange, title="100 SMA", linewidth=2)
+p200 = plot(sma200, color=color.red, title="200 SMA", linewidth=2)
+
+// --- Fill Logic 100/200 ---
+// Green: 100 SMA > 200 SMA + 8 pips AND 21 >= 100
+// Red:   100 SMA < 200 SMA - 8 pips AND 21 <= 100
+thresh_100_long = sma200 + (8 * pip_val)
+thresh_100_short = sma200 - (8 * pip_val)
+
+c_100 = if sma100 >= thresh_100_long and sma21 >= sma100
+    color.new(color.green, 70)
+else if sma100 <= thresh_100_short and sma21 <= sma100
+    color.new(color.red, 70)
+else
+    na
+
+fill(p100, p200, color = c_100, title="100/200 SMA Fill")
+
+// --- Fill Logic 21/50 ---
+// Green: 21 SMA > 50 SMA + 3 pips
+// Red:   21 SMA < 50 SMA - 3 pips
+thresh_21_long = sma50 + (3 * pip_val)
+thresh_21_short = sma50 - (3 * pip_val)
+
+c_21 = if sma21 >= thresh_21_long
+    color.new(color.green, 70)
+else if sma21 <= thresh_21_short
+    color.new(color.red, 70)
+else
+    na
+
+fill(p21, p50, color = c_21, title="21/50 SMA Fill")
