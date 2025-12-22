@@ -191,11 +191,12 @@ else
 // "when the price comes down a goes below 50% can you flag that and then take that as a new low and work fibs from there"
 // "looking for the next wave so the fibs and make then last a week on the charts"
 
+is_pullback = false
 if active_breakout_active
     // Check for breach
     if low < active_breakout_50
         // Flag it
-        plotchar(true, char="P", location=location.belowbar, color=color.orange, size=size.tiny, title="50% Pullback")
+        is_pullback := true
         
         // Take that as a new low (Pullback Low)
         pullback_low = low
@@ -225,6 +226,7 @@ if active_breakout_active
 
 // Plot Trigger Signal for Debugging
 plotchar(tracking_below and all_above, char="F", location=location.abovebar, color=color.purple, size=size.tiny, title="Fib Breakout")
+plotchar(is_pullback, char="P", location=location.belowbar, color=color.orange, size=size.tiny, title="50% Pullback")
 
 // ==========================================
 // 3. LABELS (Update on Right)
