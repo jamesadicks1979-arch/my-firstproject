@@ -103,6 +103,30 @@ fill(dp21, dp50, color=show_daily ? d_col21 : na, title="Daily 21/50 Fill")
 
 
 // ==========================================
+// 4. SELL SIGNAL (Mean Reversion / Collapse)
+// ==========================================
+// Logic:
+// 1. 21 crosses below 100
+// 2. 21, 50, 100 are within 50 pips of each other
+// 3. 100 is > 200 by at least 400 pips
+
+// Using Chart Timeframe SMAs for execution signals
+fast_cluster_max = math.max(c_s21, c_s50, c_s100)
+fast_cluster_min = math.min(c_s21, c_s50, c_s100)
+cluster_range = fast_cluster_max - fast_cluster_min
+
+// Conditions
+cond_clustered = cluster_range <= (50 * pip_val)
+cond_extended = (c_s100 - c_s200) >= (400 * pip_val)
+cond_cross = ta.crossunder(c_s21, c_s100)
+
+// Trigger
+sell_signal = cond_cross and cond_clustered and cond_extended
+
+plotshape(sell_signal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, text="SELL")
+
+
+// ==========================================
 // 3. LABELS (Update on Right)
 // ==========================================
 if barstate.islast
