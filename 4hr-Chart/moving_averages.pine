@@ -1,0 +1,17 @@
+//@version=5
+indicator("Moving Averages", overlay=true)
+
+// Input parameters
+len200 = input.int(200, "200 SMA Length")
+len50 = input.int(50, "50 SMA Length")
+len21 = input.int(21, "21 SMA Length")
+
+// Calculate SMAs
+sma200 = ta.sma(close, len200)
+sma50 = ta.sma(close, len50)
+sma21 = ta.sma(close, len21)
+
+// Plot SMAs
+plot(sma200, color=color.red, title="200 SMA", linewidth=2)
+plot(sma50, color=color.blue, title="50 SMA", linewidth=2)
+plot(sma21, color=color.green, title="21 SMA", linewidth=2)
