@@ -132,6 +132,12 @@ var line[] lines_50 = array.new_line()
 var line[] lines_61 = array.new_line()
 var line[] lines_80 = array.new_line()
 
+// Label Arrays (to update them)
+var label[] labels_38 = array.new_label()
+var label[] labels_50 = array.new_label()
+var label[] labels_61 = array.new_label()
+var label[] labels_80 = array.new_label()
+
 // New Setup on Trigger
 if trigger_bull
     // Anchor Low: Lowest of last 14 periods
@@ -148,6 +154,12 @@ if trigger_bull
     array.push(lines_50, line.new(na, na, na, na, xloc=xloc.bar_time))
     array.push(lines_61, line.new(na, na, na, na, xloc=xloc.bar_time))
     array.push(lines_80, line.new(na, na, na, na, xloc=xloc.bar_time))
+    
+    // Create placeholders for labels
+    array.push(labels_38, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.purple))
+    array.push(labels_50, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.blue))
+    array.push(labels_61, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.purple))
+    array.push(labels_80, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.red))
     
     // Debug
     label.new(bar_index, high, "Trigger", style=label.style_label_down, size=size.tiny)
@@ -199,6 +211,24 @@ if array.size(active_anchors) > 0
             line.set_color(ln80, color.red)
             line.set_width(ln80, 2)
             
+            // Update Labels
+            lb38 = array.get(labels_38, i)
+            lb50 = array.get(labels_50, i)
+            lb61 = array.get(labels_61, i)
+            lb80 = array.get(labels_80, i)
+            
+            label.set_xy(lb38, t_end, l38)
+            label.set_text(lb38, "38.2%: " + str.tostring(l38, format.mintick))
+            
+            label.set_xy(lb50, t_end, l50)
+            label.set_text(lb50, "50%: " + str.tostring(l50, format.mintick))
+            
+            label.set_xy(lb61, t_end, l61)
+            label.set_text(lb61, "61.8%: " + str.tostring(l61, format.mintick))
+            
+            label.set_xy(lb80, t_end, l80)
+            label.set_text(lb80, "80%: " + str.tostring(l80, format.mintick))
+            
             // 4. Check Logic: Hit 50%?
             if low <= l50
                 // Check 80% Survival
@@ -228,6 +258,12 @@ if array.size(active_anchors) > 0
                     array.push(lines_50, line.new(na, na, na, na, xloc=xloc.bar_time))
                     array.push(lines_61, line.new(na, na, na, na, xloc=xloc.bar_time))
                     array.push(lines_80, line.new(na, na, na, na, xloc=xloc.bar_time))
+                    
+                    // Push labels for new wave
+                    array.push(labels_38, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.purple))
+                    array.push(labels_50, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.blue))
+                    array.push(labels_61, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.purple))
+                    array.push(labels_80, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.red))
                     
                     label.new(bar_index, low, "New Wave", style=label.style_label_up, size=size.tiny, color=color.orange)
                     
