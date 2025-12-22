@@ -129,6 +129,11 @@ all_above = is_above_chart and is_above_daily
 var float lowest_in_sequence = na
 var bool tracking_below = false
 
+// Pullback Monitoring Variables
+var float active_breakout_high = na
+var float active_breakout_50 = na
+var bool active_breakout_active = false
+
 // Logic Loop
 if all_below
     if not tracking_below
@@ -153,29 +158,70 @@ else
         lev_61 = trigger_price - (range_val * 0.618)
         lev_80 = trigger_price - (range_val * 0.80)
         
-        // Draw Lines (Duration: 1 Week)
+        // Draw Lines (Duration: 2 Weeks)
         t1 = time
-        t2 = time + (7 * 24 * 60 * 60 * 1000) // 1 Week in ms
+        t2 = time + (14 * 24 * 60 * 60 * 1000) // 2 Weeks in ms
         
+        // Store IDs to manage or reference?
+        // For now just draw them.
         line.new(t1, lev_38, t2, lev_38, xloc=xloc.bar_time, color=color.purple, width=1, style=line.style_solid)
         line.new(t1, lev_50, t2, lev_50, xloc=xloc.bar_time, color=color.blue, width=2, style=line.style_solid)
         line.new(t1, lev_61, t2, lev_61, xloc=xloc.bar_time, color=color.purple, width=1, style=line.style_solid)
         line.new(t1, lev_80, t2, lev_80, xloc=xloc.bar_time, color=color.red, width=2, style=line.style_solid)
         
-        // Optional: Labels to ID them
-        // label.new(t1, lev_50, "50% Fib", xloc=xloc.bar_time, textcolor=color.blue, style=label.style_none)
+        // --- Active Breakout State for Pullback Monitoring ---
+        // We need to store these values to monitor for the 50% breach
+        // Since Pine Script variables reset on each bar unless 'var', we need arrays or var variables.
+        // But 'var' works for single instance. Arrays work for multiple.
+        // Assuming we monitor the *latest* breakout.
         
-        // Reset State
+        active_breakout_high := trigger_price
+        active_breakout_50 := lev_50
+        active_breakout_active := true
+        
+        // Reset State for "Below Sequence"
         tracking_below := false
         lowest_in_sequence := na
         
     else if tracking_below and not all_below
         // "Messy Middle" (Transition).
-        // We are no longer "All Below", but not yet "All Above".
-        // The lowest low is preserved in 'lowest_in_sequence' waiting for the breakout.
-        // If price goes back to "All Below" next bar, the first 'if' block handles it (updates low if lower).
-        // If price stays here, we wait.
         na
+
+// 4b. Pullback Monitoring (New Rule)
+// "when the price comes down a goes below 50% can you flag that and then take that as a new low and work fibs from there"
+// "looking for the next wave so the fibs and make then last a week on the charts"
+
+if active_breakout_active
+    // Check for breach
+    if low < active_breakout_50
+        // Flag it
+        plotchar(true, char="P", location=location.belowbar, color=color.orange, size=size.tiny, title="50% Pullback")
+        
+        // Take that as a new low (Pullback Low)
+        pullback_low = low
+        
+        // Work Fibs from there (Breakout High to Pullback Low)
+        // Range = High - Pullback Low
+        pb_range = active_breakout_high - pullback_low
+        
+        pb_38 = active_breakout_high - (pb_range * 0.382)
+        pb_50 = active_breakout_high - (pb_range * 0.50)
+        pb_61 = active_breakout_high - (pb_range * 0.618)
+        pb_80 = active_breakout_high - (pb_range * 0.80)
+        
+        // Draw Lines (Duration: 1 Week)
+        t_pb_1 = time
+        t_pb_2 = time + (7 * 24 * 60 * 60 * 1000) // 1 Week
+        
+        // Use Dashed lines to distinguish secondary fibs
+        line.new(t_pb_1, pb_38, t_pb_2, pb_38, xloc=xloc.bar_time, color=color.new(color.purple, 30), width=1, style=line.style_dashed)
+        line.new(t_pb_1, pb_50, t_pb_2, pb_50, xloc=xloc.bar_time, color=color.new(color.blue, 30), width=2, style=line.style_dashed)
+        line.new(t_pb_1, pb_61, t_pb_2, pb_61, xloc=xloc.bar_time, color=color.new(color.purple, 30), width=1, style=line.style_dashed)
+        line.new(t_pb_1, pb_80, t_pb_2, pb_80, xloc=xloc.bar_time, color=color.new(color.red, 30), width=2, style=line.style_dashed)
+        
+        // Disable monitoring for this breakout to avoid re-triggering on every bar below 50%?
+        // User says "looking for the next wave", implying we set this up once.
+        active_breakout_active := false
 
 // Plot Trigger Signal for Debugging
 plotchar(tracking_below and all_above, char="F", location=location.abovebar, color=color.purple, size=size.tiny, title="Fib Breakout")
