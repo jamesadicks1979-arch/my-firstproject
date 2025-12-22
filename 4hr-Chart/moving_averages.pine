@@ -144,10 +144,10 @@ if trigger_bull
     array.push(active_is_valid, true)
     
     // Create placeholders for lines
-    array.push(lines_38, line.new(na, na, na, na))
-    array.push(lines_50, line.new(na, na, na, na))
-    array.push(lines_61, line.new(na, na, na, na))
-    array.push(lines_80, line.new(na, na, na, na))
+    array.push(lines_38, line.new(na, na, na, na, xloc=xloc.bar_time))
+    array.push(lines_50, line.new(na, na, na, na, xloc=xloc.bar_time))
+    array.push(lines_61, line.new(na, na, na, na, xloc=xloc.bar_time))
+    array.push(lines_80, line.new(na, na, na, na, xloc=xloc.bar_time))
     
     // Debug
     label.new(bar_index, high, "Trigger", style=label.style_label_down, size=size.tiny)
@@ -224,10 +224,10 @@ if array.size(active_anchors) > 0
                     array.push(active_start_times, time)
                     array.push(active_is_valid, true)
                     
-                    array.push(lines_38, line.new(na, na, na, na))
-                    array.push(lines_50, line.new(na, na, na, na))
-                    array.push(lines_61, line.new(na, na, na, na))
-                    array.push(lines_80, line.new(na, na, na, na))
+                    array.push(lines_38, line.new(na, na, na, na, xloc=xloc.bar_time))
+                    array.push(lines_50, line.new(na, na, na, na, xloc=xloc.bar_time))
+                    array.push(lines_61, line.new(na, na, na, na, xloc=xloc.bar_time))
+                    array.push(lines_80, line.new(na, na, na, na, xloc=xloc.bar_time))
                     
                     label.new(bar_index, low, "New Wave", style=label.style_label_up, size=size.tiny, color=color.orange)
                     
