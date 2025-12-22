@@ -62,11 +62,15 @@ valid_short = cross_down_condition and was_all_above_recently
 // and find the extreme value in that period.
 
 var float lowest_since_death_cross = high
+var int lowest_since_death_cross_idx = 0
 var float highest_since_golden_cross = low
+var int highest_since_golden_cross_idx = 0
 
 // Track lowest low while in "Death State" (All < 200)
 if all_below_long
-    lowest_since_death_cross := math.min(lowest_since_death_cross, low)
+    if low <= lowest_since_death_cross
+        lowest_since_death_cross := low
+        lowest_since_death_cross_idx := bar_index
 else if all_above_long
     // Reset when we are solidly in Golden State (handled by event trigger, but reset for next cycle)
     // Actually we only reset when we re-enter the Death State
@@ -75,18 +79,24 @@ else if all_above_long
 if all_below_long[1] == false and all_below_long
     // Just entered Death State, reset tracker
     lowest_since_death_cross := low
+    lowest_since_death_cross_idx := bar_index
 
 // Track highest high while in "Golden State" (All > 200)
 if all_above_short
-    highest_since_golden_cross := math.max(highest_since_golden_cross, high)
+    if high >= highest_since_golden_cross
+        highest_since_golden_cross := high
+        highest_since_golden_cross_idx := bar_index
 
 if all_above_short[1] == false and all_above_short
     // Just entered Golden State, reset tracker
     highest_since_golden_cross := high
+    highest_since_golden_cross_idx := bar_index
 
 // Use these dynamic anchors for the setup
 lowest_low_dynamic = lowest_since_death_cross
+lowest_low_dynamic_idx = lowest_since_death_cross_idx
 highest_high_dynamic = highest_since_golden_cross
+highest_high_dynamic_idx = highest_since_golden_cross_idx
 
 // State Management
 // We need to store DIRECTION: 1 for Long, -1 for Short
@@ -106,6 +116,7 @@ var label[] active_labels_50 = array.new_label()
 var label[] active_labels_61 = array.new_label()
 var label[] active_labels_80 = array.new_label()
 var label[] active_marker_labels = array.new_label() // To delete X markers if needed
+var line[] active_trendlines = array.new_line()
 
 // --- Add New Long Setup ---
 if valid_long
@@ -114,43 +125,47 @@ if valid_long
     
     // Initial Levels (Long)
     level_38 = current_high - (range_val * 0.382)
-        level_50 = current_high - (range_val * 0.50)
-        level_61 = current_high - (range_val * 0.618)
-        level_80 = current_high - (range_val * 0.80)
-        
-        // Create Lines
-        l_38 = line.new(bar_index, level_38, bar_index + 1, level_38, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
-        l_50 = line.new(bar_index, level_50, bar_index + 1, level_50, xloc=xloc.bar_index, color=color.green, width=2, extend=extend.right)
-        l_61 = line.new(bar_index, level_61, bar_index + 1, level_61, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
-        l_80 = line.new(bar_index, level_80, bar_index + 1, level_80, xloc=xloc.bar_index, color=color.red, width=2, extend=extend.right)
-        
-        // Create Labels
-        lbl_38 = label.new(bar_index + 5, level_38, "38.2%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
-        lbl_50 = label.new(bar_index + 5, level_50, "50%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
-        lbl_61 = label.new(bar_index + 5, level_61, "61.8%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
-        lbl_80 = label.new(bar_index + 5, level_80, "80%", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
-        
-        // Create Marker
-        lbl_marker = label.new(bar_index, lowest_low_dynamic, text="X_L\n" + str.tostring(lowest_low_dynamic), style=label.style_none, textcolor=color.black, size=size.normal)
-        // Create Anchor Line (Risk/Stop)
-        line.new(bar_index, lowest_low_dynamic, bar_index + 5, lowest_low_dynamic, color=color.black, width=1)
+    level_50 = current_high - (range_val * 0.50)
+    level_61 = current_high - (range_val * 0.618)
+    level_80 = current_high - (range_val * 0.80)
+    
+    // Create Lines
+    l_38 = line.new(bar_index, level_38, bar_index + 1, level_38, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
+    l_50 = line.new(bar_index, level_50, bar_index + 1, level_50, xloc=xloc.bar_index, color=color.green, width=2, extend=extend.right)
+    l_61 = line.new(bar_index, level_61, bar_index + 1, level_61, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
+    l_80 = line.new(bar_index, level_80, bar_index + 1, level_80, xloc=xloc.bar_index, color=color.red, width=2, extend=extend.right)
+    
+    // Create Labels
+    lbl_38 = label.new(bar_index + 5, level_38, "38.2%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_50 = label.new(bar_index + 5, level_50, "50%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_61 = label.new(bar_index + 5, level_61, "61.8%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_80 = label.new(bar_index + 5, level_80, "80%", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
+    
+    // Create Marker
+    lbl_marker = label.new(lowest_low_dynamic_idx, lowest_low_dynamic, text="X_L\n" + str.tostring(lowest_low_dynamic), style=label.style_none, textcolor=color.black, size=size.normal)
+    // Create Anchor Line (Risk/Stop)
+    line.new(lowest_low_dynamic_idx, lowest_low_dynamic, bar_index + 5, lowest_low_dynamic, color=color.black, width=1)
+    
+    // Create Trendline (Anchor to Breakout Low)
+    l_trend = line.new(lowest_low_dynamic_idx, lowest_low_dynamic, bar_index, low, color=color.orange, width=1, style=line.style_dashed)
 
-        // Push to Arrays
-        array.push(active_anchors, lowest_low_dynamic)
-        array.push(active_extremes, current_high)
-        array.push(active_directions, 1)
-        array.push(active_start_times, time)
-        
-        array.push(active_lines_38, l_38)
-        array.push(active_lines_50, l_50)
-        array.push(active_lines_61, l_61)
-        array.push(active_lines_80, l_80)
-        
-        array.push(active_labels_38, lbl_38)
-        array.push(active_labels_50, lbl_50)
-        array.push(active_labels_61, lbl_61)
-        array.push(active_labels_80, lbl_80)
-        array.push(active_marker_labels, lbl_marker)
+    // Push to Arrays
+    array.push(active_anchors, lowest_low_dynamic)
+    array.push(active_extremes, current_high)
+    array.push(active_directions, 1)
+    array.push(active_start_times, time)
+    
+    array.push(active_lines_38, l_38)
+    array.push(active_lines_50, l_50)
+    array.push(active_lines_61, l_61)
+    array.push(active_lines_80, l_80)
+    
+    array.push(active_labels_38, lbl_38)
+    array.push(active_labels_50, lbl_50)
+    array.push(active_labels_61, lbl_61)
+    array.push(active_labels_80, lbl_80)
+    array.push(active_marker_labels, lbl_marker)
+    array.push(active_trendlines, l_trend)
 
 // --- Add New Short Setup ---
 if valid_short
@@ -161,43 +176,47 @@ if valid_short
     // Initial Levels (Short)
     // Retracement goes UP from Low
     level_38 = current_low + (range_val * 0.382)
-        level_50 = current_low + (range_val * 0.50)
-        level_61 = current_low + (range_val * 0.618)
-        level_80 = current_low + (range_val * 0.80)
-        
-        // Create Lines
-        l_38 = line.new(bar_index, level_38, bar_index + 1, level_38, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
-        l_50 = line.new(bar_index, level_50, bar_index + 1, level_50, xloc=xloc.bar_index, color=color.green, width=2, extend=extend.right)
-        l_61 = line.new(bar_index, level_61, bar_index + 1, level_61, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
-        l_80 = line.new(bar_index, level_80, bar_index + 1, level_80, xloc=xloc.bar_index, color=color.red, width=2, extend=extend.right)
-        
-        // Create Labels
-        lbl_38 = label.new(bar_index + 5, level_38, "38.2%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
-        lbl_50 = label.new(bar_index + 5, level_50, "50%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
-        lbl_61 = label.new(bar_index + 5, level_61, "61.8%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
-        lbl_80 = label.new(bar_index + 5, level_80, "80%", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
-        
-        // Create Marker (High)
-        lbl_marker = label.new(bar_index, highest_high_dynamic, text="X_S\n" + str.tostring(highest_high_dynamic), style=label.style_none, textcolor=color.black, size=size.normal)
-        // Create Anchor Line (Risk/Stop)
-        line.new(bar_index, highest_high_dynamic, bar_index + 5, highest_high_dynamic, color=color.black, width=1)
+    level_50 = current_low + (range_val * 0.50)
+    level_61 = current_low + (range_val * 0.618)
+    level_80 = current_low + (range_val * 0.80)
+    
+    // Create Lines
+    l_38 = line.new(bar_index, level_38, bar_index + 1, level_38, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
+    l_50 = line.new(bar_index, level_50, bar_index + 1, level_50, xloc=xloc.bar_index, color=color.green, width=2, extend=extend.right)
+    l_61 = line.new(bar_index, level_61, bar_index + 1, level_61, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
+    l_80 = line.new(bar_index, level_80, bar_index + 1, level_80, xloc=xloc.bar_index, color=color.red, width=2, extend=extend.right)
+    
+    // Create Labels
+    lbl_38 = label.new(bar_index + 5, level_38, "38.2%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_50 = label.new(bar_index + 5, level_50, "50%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_61 = label.new(bar_index + 5, level_61, "61.8%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_80 = label.new(bar_index + 5, level_80, "80%", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
+    
+    // Create Marker (High)
+    lbl_marker = label.new(highest_high_dynamic_idx, highest_high_dynamic, text="X_S\n" + str.tostring(highest_high_dynamic), style=label.style_none, textcolor=color.black, size=size.normal)
+    // Create Anchor Line (Risk/Stop)
+    line.new(highest_high_dynamic_idx, highest_high_dynamic, bar_index + 5, highest_high_dynamic, color=color.black, width=1)
+    
+    // Create Trendline (Anchor to Breakout High)
+    l_trend = line.new(highest_high_dynamic_idx, highest_high_dynamic, bar_index, high, color=color.orange, width=1, style=line.style_dashed)
 
-        // Push to Arrays
-        array.push(active_anchors, highest_high_dynamic)
-        array.push(active_extremes, current_low)
-        array.push(active_directions, -1)
-        array.push(active_start_times, time)
-        
-        array.push(active_lines_38, l_38)
-        array.push(active_lines_50, l_50)
-        array.push(active_lines_61, l_61)
-        array.push(active_lines_80, l_80)
-        
-        array.push(active_labels_38, lbl_38)
-        array.push(active_labels_50, lbl_50)
-        array.push(active_labels_61, lbl_61)
-        array.push(active_labels_80, lbl_80)
-        array.push(active_marker_labels, lbl_marker)
+    // Push to Arrays
+    array.push(active_anchors, highest_high_dynamic)
+    array.push(active_extremes, current_low)
+    array.push(active_directions, -1)
+    array.push(active_start_times, time)
+    
+    array.push(active_lines_38, l_38)
+    array.push(active_lines_50, l_50)
+    array.push(active_lines_61, l_61)
+    array.push(active_lines_80, l_80)
+    
+    array.push(active_labels_38, lbl_38)
+    array.push(active_labels_50, lbl_50)
+    array.push(active_labels_61, lbl_61)
+    array.push(active_labels_80, lbl_80)
+    array.push(active_marker_labels, lbl_marker)
+    array.push(active_trendlines, l_trend)
 
 
 // Logic to check for touches and clean up lines
@@ -239,6 +258,9 @@ if array.size(active_anchors) > 0
             m_id = array.get(active_marker_labels, i)
             label.delete(m_id)
             
+            t_id = array.get(active_trendlines, i)
+            line.delete(t_id)
+            
             array.remove(active_anchors, i)
             array.remove(active_extremes, i)
             array.remove(active_directions, i)
@@ -252,6 +274,7 @@ if array.size(active_anchors) > 0
             array.remove(active_labels_61, i)
             array.remove(active_labels_80, i)
             array.remove(active_marker_labels, i)
+            array.remove(active_trendlines, i)
             continue // Skip to next iteration
 
         // 2. Logic for LONG Setup (direction == 1)
@@ -335,6 +358,7 @@ if array.size(active_anchors) > 0
                 array.remove(active_labels_61, i)
                 array.remove(active_labels_80, i)
                 array.remove(active_marker_labels, i)
+                array.remove(active_trendlines, i)
             
             // Check Invalidation (Long: Low < Anchor)
             else if low < setup_anchor
@@ -349,6 +373,8 @@ if array.size(active_anchors) > 0
                 label.delete(lbl_80_id)
                 m_id = array.get(active_marker_labels, i)
                 label.delete(m_id)
+                t_id = array.get(active_trendlines, i)
+                line.delete(t_id)
                 
                 array.remove(active_anchors, i)
                 array.remove(active_extremes, i)
@@ -363,6 +389,7 @@ if array.size(active_anchors) > 0
                 array.remove(active_labels_61, i)
                 array.remove(active_labels_80, i)
                 array.remove(active_marker_labels, i)
+                array.remove(active_trendlines, i)
             else
                 label.set_x(lbl_38_id, bar_index + 5)
                 label.set_x(lbl_50_id, bar_index + 5)
@@ -450,6 +477,7 @@ if array.size(active_anchors) > 0
                 array.remove(active_labels_61, i)
                 array.remove(active_labels_80, i)
                 array.remove(active_marker_labels, i)
+                array.remove(active_trendlines, i)
             
             // Check Invalidation (Short: High > Anchor)
             else if high > setup_anchor
@@ -464,6 +492,8 @@ if array.size(active_anchors) > 0
                 label.delete(lbl_80_id)
                 m_id = array.get(active_marker_labels, i)
                 label.delete(m_id)
+                t_id = array.get(active_trendlines, i)
+                line.delete(t_id)
                 
                 array.remove(active_anchors, i)
                 array.remove(active_extremes, i)
@@ -478,6 +508,7 @@ if array.size(active_anchors) > 0
                 array.remove(active_labels_61, i)
                 array.remove(active_labels_80, i)
                 array.remove(active_marker_labels, i)
+                array.remove(active_trendlines, i)
             else
                 label.set_x(lbl_38_id, bar_index + 5)
                 label.set_x(lbl_50_id, bar_index + 5)
