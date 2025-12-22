@@ -30,36 +30,98 @@ for i = 1 to 4
 lowest_low = ta.lowest(low, 14)
 lowest_offset = ta.lowestbars(low, 14)
 
-if cond_cross_over and was_below_4
-    // Look back lowest of 14 periods
-    // We include the current bar in the high calculation, and look back 14 bars for the low
-    current_high = high // High of the breakout candle
+// State Management for Lines
+// We use arrays to store information about active lines so we can manage them until they are touched.
+// We store:
+// 1. Level 50 value
+// 2. Level 82 value (stop)
+// 3. Line ID for 50%
+// 4. Line ID for 82%
+// 5. Label ID for 50%
+// 6. Label ID for 82%
 
+var float[] active_levels_50 = array.new_float()
+var float[] active_levels_82 = array.new_float()
+var line[] active_lines_50 = array.new_line()
+var line[] active_lines_82 = array.new_line()
+var label[] active_labels_50 = array.new_label()
+var label[] active_labels_82 = array.new_label()
+
+if cond_cross_over and was_below_4
+    // New setup detected
+    current_high = high // High of the breakout candle
     range_val = current_high - lowest_low
     
-    // 50% retracement level (Green Line)
-    // Retracement is measured from the High down.
+    // Calculate levels
     level_50 = current_high - (range_val * 0.50)
-    
-    // 82% stop level (Red Line)
-    // 82% retracement from the High down.
     level_82 = current_high - (range_val * 0.82)
     
-    // Draw lines
-    // We draw them starting from the current bar extending for 12 bars (approx 2 days on 4h chart)
-    idx_end = bar_index + 12
+    // Create Lines - Extend Right initially
+    l_50 = line.new(bar_index, level_50, bar_index + 1, level_50, xloc=xloc.bar_index, color=color.green, width=2, extend=extend.right)
+    l_82 = line.new(bar_index, level_82, bar_index + 1, level_82, xloc=xloc.bar_index, color=color.red, width=2, extend=extend.right)
     
-    l_50 = line.new(bar_index, level_50, idx_end, level_50, xloc=xloc.bar_index, color=color.green, width=2)
-    l_82 = line.new(bar_index, level_82, idx_end, level_82, xloc=xloc.bar_index, color=color.red, width=2)
-    
-    // Add labels to identify the lines and price
-    label.new(idx_end, level_50, "50% (" + str.tostring(level_50, format.mintick) + ")", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
-    label.new(idx_end, level_82, "82% (" + str.tostring(level_82, format.mintick) + ")", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
+    // Create Labels - Initially at bar_index + 5 to be visible
+    lbl_50 = label.new(bar_index + 5, level_50, "50% (" + str.tostring(level_50, format.mintick) + ")", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_82 = label.new(bar_index + 5, level_82, "82% (" + str.tostring(level_82, format.mintick) + ")", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
 
     // Put a cross at the lowest low location
-    // Find the offset of the lowest low in the last 14 bars
-    // lowest_offset is already calculated globally
     label.new(bar_index + lowest_offset, lowest_low, text="X", style=label.style_none, textcolor=color.black, size=size.normal)
+    
+    // Store in arrays
+    array.push(active_levels_50, level_50)
+    array.push(active_levels_82, level_82)
+    array.push(active_lines_50, l_50)
+    array.push(active_lines_82, l_82)
+    array.push(active_labels_50, lbl_50)
+    array.push(active_labels_82, lbl_82)
+
+// Logic to check for touches and clean up lines
+// We iterate backwards to safely remove items
+if array.size(active_levels_50) > 0
+    for i = array.size(active_levels_50) - 1 to 0
+        lvl_50 = array.get(active_levels_50, i)
+        l_50_id = array.get(active_lines_50, i)
+        l_82_id = array.get(active_lines_82, i)
+        lbl_50_id = array.get(active_labels_50, i)
+        lbl_82_id = array.get(active_labels_82, i)
+        
+        // Check if Price Touches 50% Level
+        // For a long setup (breakout UP), the 50% level is BELOW the high.
+        // We look for price coming DOWN to touch it.
+        // So Low <= Level 50
+        if low <= lvl_50
+            // Touch detected!
+            
+            // 1. Stop extending lines
+            line.set_extend(l_50_id, extend.none)
+            line.set_extend(l_82_id, extend.none)
+            
+            // 2. Set endpoint to current bar
+            line.set_x2(l_50_id, bar_index)
+            line.set_x2(l_82_id, bar_index)
+            
+            // 3. Move labels to the end of the line
+            label.set_x(lbl_50_id, bar_index)
+            label.set_x(lbl_82_id, bar_index)
+            label.set_style(lbl_50_id, label.style_label_right) // Flip style
+            label.set_style(lbl_82_id, label.style_label_right) // Flip style
+
+            // 4. Color the candle
+            barcolor(color.purple) // Change current bar color to Purple
+            
+            // 5. Remove from arrays (stop tracking)
+            array.remove(active_levels_50, i)
+            array.remove(active_levels_82, i)
+            array.remove(active_lines_50, i)
+            array.remove(active_lines_82, i)
+            array.remove(active_labels_50, i)
+            array.remove(active_labels_82, i)
+        else
+            // Update labels to stay ahead of price if not touched yet
+            // This keeps them visible on the far right
+            label.set_x(lbl_50_id, bar_index + 5)
+            label.set_x(lbl_82_id, bar_index + 5)
+
 
 // Plot trigger shape
 plotshape(cond_cross_over and was_below_4, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Breakout Signal")
