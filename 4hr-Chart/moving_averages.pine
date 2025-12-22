@@ -35,34 +35,47 @@ lowest_offset = ta.lowestbars(low, 14)
 // We store:
 // 1. Setup Low (Anchor)
 // 2. Setup High (Current Highest High)
-// 3. Line ID for 50%
-// 4. Line ID for 82%
-// 5. Label ID for 50%
-// 6. Label ID for 82%
+// 3. Line IDs for 38.2, 50, 61.8, 80
+// 4. Label IDs for 38.2, 50, 61.8, 80
 
 var float[] active_setup_lows = array.new_float()
 var float[] active_setup_highs = array.new_float()
-var line[] active_lines_50 = array.new_line()
-var line[] active_lines_82 = array.new_line()
-var label[] active_labels_50 = array.new_label()
-var label[] active_labels_82 = array.new_label()
 
-if cond_cross_over and was_below_4
+var line[] active_lines_38 = array.new_line()
+var line[] active_lines_50 = array.new_line()
+var line[] active_lines_61 = array.new_line()
+var line[] active_lines_80 = array.new_line()
+
+var label[] active_labels_38 = array.new_label()
+var label[] active_labels_50 = array.new_label()
+var label[] active_labels_61 = array.new_label()
+var label[] active_labels_80 = array.new_label()
+
+// New condition: 50 SMA > 200 SMA
+cond_trend = sma50 > sma200
+
+if cond_cross_over and was_below_4 and cond_trend
     // New setup detected
     current_high = high // High of the breakout candle
     range_val = current_high - lowest_low
     
     // Calculate initial levels
+    level_38 = current_high - (range_val * 0.382)
     level_50 = current_high - (range_val * 0.50)
-    level_82 = current_high - (range_val * 0.82)
+    level_61 = current_high - (range_val * 0.618)
+    level_80 = current_high - (range_val * 0.80)
     
     // Create Lines - Extend Right initially
+    l_38 = line.new(bar_index, level_38, bar_index + 1, level_38, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
     l_50 = line.new(bar_index, level_50, bar_index + 1, level_50, xloc=xloc.bar_index, color=color.green, width=2, extend=extend.right)
-    l_82 = line.new(bar_index, level_82, bar_index + 1, level_82, xloc=xloc.bar_index, color=color.red, width=2, extend=extend.right)
+    l_61 = line.new(bar_index, level_61, bar_index + 1, level_61, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
+    l_80 = line.new(bar_index, level_80, bar_index + 1, level_80, xloc=xloc.bar_index, color=color.red, width=2, extend=extend.right)
     
-    // Create Labels - Initially at bar_index + 5 to be visible
-    lbl_50 = label.new(bar_index + 5, level_50, "50% (" + str.tostring(level_50, format.mintick) + ")", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
-    lbl_82 = label.new(bar_index + 5, level_82, "82% (" + str.tostring(level_82, format.mintick) + ")", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
+    // Create Labels
+    lbl_38 = label.new(bar_index + 5, level_38, "38.2%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_50 = label.new(bar_index + 5, level_50, "50%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_61 = label.new(bar_index + 5, level_61, "61.8%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_80 = label.new(bar_index + 5, level_80, "80%", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
 
     // Put a cross at the lowest low location
     label.new(bar_index + lowest_offset, lowest_low, text="X\nL:" + str.tostring(lowest_low), style=label.style_none, textcolor=color.black, size=size.normal)
@@ -70,10 +83,16 @@ if cond_cross_over and was_below_4
     // Store in arrays
     array.push(active_setup_lows, lowest_low)
     array.push(active_setup_highs, current_high)
+    
+    array.push(active_lines_38, l_38)
     array.push(active_lines_50, l_50)
-    array.push(active_lines_82, l_82)
+    array.push(active_lines_61, l_61)
+    array.push(active_lines_80, l_80)
+    
+    array.push(active_labels_38, lbl_38)
     array.push(active_labels_50, lbl_50)
-    array.push(active_labels_82, lbl_82)
+    array.push(active_labels_61, lbl_61)
+    array.push(active_labels_80, lbl_80)
 
 // Logic to check for touches and clean up lines
 // We iterate backwards to safely remove items
@@ -93,43 +112,51 @@ if array.size(active_setup_lows) > 0
         
         // Recalculate levels based on (possibly new) High
         curr_range = setup_high - setup_low
+        lvl_38 = setup_high - (curr_range * 0.382)
         lvl_50 = setup_high - (curr_range * 0.50)
-        lvl_82 = setup_high - (curr_range * 0.82)
+        lvl_61 = setup_high - (curr_range * 0.618)
+        lvl_80 = setup_high - (curr_range * 0.80)
         
+        // Get Line IDs
+        l_38_id = array.get(active_lines_38, i)
         l_50_id = array.get(active_lines_50, i)
-        l_82_id = array.get(active_lines_82, i)
+        l_61_id = array.get(active_lines_61, i)
+        l_80_id = array.get(active_lines_80, i)
+        
+        // Get Label IDs
+        lbl_38_id = array.get(active_labels_38, i)
         lbl_50_id = array.get(active_labels_50, i)
-        lbl_82_id = array.get(active_labels_82, i)
+        lbl_61_id = array.get(active_labels_61, i)
+        lbl_80_id = array.get(active_labels_80, i)
         
         // Update Line Levels
-        line.set_y1(l_50_id, lvl_50)
-        line.set_y2(l_50_id, lvl_50)
-        line.set_y1(l_82_id, lvl_82)
-        line.set_y2(l_82_id, lvl_82)
+        line.set_y1(l_38_id, lvl_38); line.set_y2(l_38_id, lvl_38)
+        line.set_y1(l_50_id, lvl_50); line.set_y2(l_50_id, lvl_50)
+        line.set_y1(l_61_id, lvl_61); line.set_y2(l_61_id, lvl_61)
+        line.set_y1(l_80_id, lvl_80); line.set_y2(l_80_id, lvl_80)
         
         // Update Label Levels and Text
-        label.set_y(lbl_50_id, lvl_50)
-        label.set_text(lbl_50_id, "50% (" + str.tostring(lvl_50, format.mintick) + ")")
-        label.set_y(lbl_82_id, lvl_82)
-        label.set_text(lbl_82_id, "82% (" + str.tostring(lvl_82, format.mintick) + ")")
+        label.set_y(lbl_38_id, lvl_38); label.set_text(lbl_38_id, "38.2% (" + str.tostring(lvl_38, format.mintick) + ")")
+        label.set_y(lbl_50_id, lvl_50); label.set_text(lbl_50_id, "50% (" + str.tostring(lvl_50, format.mintick) + ")")
+        label.set_y(lbl_61_id, lvl_61); label.set_text(lbl_61_id, "61.8% (" + str.tostring(lvl_61, format.mintick) + ")")
+        label.set_y(lbl_80_id, lvl_80); label.set_text(lbl_80_id, "80% (" + str.tostring(lvl_80, format.mintick) + ")")
         
         // Check if Price Touches 50% Level
+        // We consider the trade triggered/completed when it touches 50%
         if low <= lvl_50 and low >= setup_low // Valid touch
             // Touch detected!
             
             // 1. Stop extending lines
-            line.set_extend(l_50_id, extend.none)
-            line.set_extend(l_82_id, extend.none)
+            line.set_extend(l_38_id, extend.none); line.set_x2(l_38_id, bar_index)
+            line.set_extend(l_50_id, extend.none); line.set_x2(l_50_id, bar_index)
+            line.set_extend(l_61_id, extend.none); line.set_x2(l_61_id, bar_index)
+            line.set_extend(l_80_id, extend.none); line.set_x2(l_80_id, bar_index)
             
-            // 2. Set endpoint to current bar
-            line.set_x2(l_50_id, bar_index)
-            line.set_x2(l_82_id, bar_index)
-            
-            // 3. Move labels to the end of the line
-            label.set_x(lbl_50_id, bar_index)
-            label.set_x(lbl_82_id, bar_index)
-            label.set_style(lbl_50_id, label.style_label_right) // Flip style
-            label.set_style(lbl_82_id, label.style_label_right) // Flip style
+            // 2. Move labels to the end of the line
+            label.set_x(lbl_38_id, bar_index); label.set_style(lbl_38_id, label.style_label_right)
+            label.set_x(lbl_50_id, bar_index); label.set_style(lbl_50_id, label.style_label_right)
+            label.set_x(lbl_61_id, bar_index); label.set_style(lbl_61_id, label.style_label_right)
+            label.set_x(lbl_80_id, bar_index); label.set_style(lbl_80_id, label.style_label_right)
 
             // 4. Color the candle (set flag)
             should_color_purple := true
@@ -137,30 +164,42 @@ if array.size(active_setup_lows) > 0
             // 5. Remove from arrays (stop tracking)
             array.remove(active_setup_lows, i)
             array.remove(active_setup_highs, i)
+            
+            array.remove(active_lines_38, i)
             array.remove(active_lines_50, i)
-            array.remove(active_lines_82, i)
+            array.remove(active_lines_61, i)
+            array.remove(active_lines_80, i)
+            
+            array.remove(active_labels_38, i)
             array.remove(active_labels_50, i)
-            array.remove(active_labels_82, i)
+            array.remove(active_labels_61, i)
+            array.remove(active_labels_80, i)
             
         else if low < setup_low
             // Price broke the anchor low before retracing -> Invalid setup
             // Remove everything to clean up chart
-            line.delete(l_50_id)
-            line.delete(l_82_id)
-            label.delete(lbl_50_id)
-            label.delete(lbl_82_id)
+            line.delete(l_38_id); line.delete(l_50_id); line.delete(l_61_id); line.delete(l_80_id)
+            label.delete(lbl_38_id); label.delete(lbl_50_id); label.delete(lbl_61_id); label.delete(lbl_80_id)
             
             array.remove(active_setup_lows, i)
             array.remove(active_setup_highs, i)
+            
+            array.remove(active_lines_38, i)
             array.remove(active_lines_50, i)
-            array.remove(active_lines_82, i)
+            array.remove(active_lines_61, i)
+            array.remove(active_lines_80, i)
+            
+            array.remove(active_labels_38, i)
             array.remove(active_labels_50, i)
-            array.remove(active_labels_82, i)
+            array.remove(active_labels_61, i)
+            array.remove(active_labels_80, i)
             
         else
             // Update labels to stay ahead of price if not touched yet
+            label.set_x(lbl_38_id, bar_index + 5)
             label.set_x(lbl_50_id, bar_index + 5)
-            label.set_x(lbl_82_id, bar_index + 5)
+            label.set_x(lbl_61_id, bar_index + 5)
+            label.set_x(lbl_80_id, bar_index + 5)
 
 // Apply bar color globally
 barcolor(should_color_purple ? color.purple : na)
