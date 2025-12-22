@@ -108,65 +108,104 @@ fill(dp21, dp50, color=show_daily ? d_col21 : na, title="Daily 21/50 Fill")
 
 
 // ==========================================
-// 4. SELL SIGNAL (Mean Reversion / Collapse)
+// 4. MA CROSS FIBONACCI LOGIC
 // ==========================================
-// Logic:
-// 1. 21 crosses below 100
-// 2. 21, 50, 100 are within X pips of each other (Cluster)
-// 3. 100 is > 200 by at least Y pips (Extension)
-// 4. Trend Alignment (Implicit in Extension, but explicit 50 > 100 > 200 helps)
+// Trigger: Chart 21 SMA crosses above Daily 21 SMA
+// Anchor: Lowest Low of last 14 bars before the cross
+// High: Running High since the cross
+// Lines: 50%, 61.8%, 80% (Red)
 
-// Using Chart Timeframe SMAs for execution signals
-fast_cluster_max = math.max(c_s21, c_s50, c_s100)
-fast_cluster_min = math.min(c_s21, c_s50, c_s100)
-cluster_range = fast_cluster_max - fast_cluster_min
-trend_extension = c_s100 - c_s200
+// State Variables
+var float x_anchor_low = na
+var float x_running_high = na
+var int x_start_time = na
+var bool x_active = false
+
+// Line Storage
+var line x_l50 = na
+var line x_l61 = na
+var line x_l80 = na
+var label x_lb50 = na
+var label x_lb61 = na
+var label x_lb80 = na
 
 // Conditions
-// Cluster: The difference between the highest and lowest of the fast moving averages
-cond_clustered = cluster_range <= (sell_cluster_pips * pip_val)
+cross_21_bull = ta.crossover(c_s21, d_s21)
+cross_50_bull = ta.crossover(c_s50, d_s50)
 
-// Extension: 100 SMA is significantly above 200 SMA
-cond_extended = trend_extension >= (sell_ext_pips * pip_val)
+// Visual Markers for Crosses
+plotshape(cross_21_bull, title="21 Cross", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny, text="21X")
+plotshape(cross_50_bull, title="50 Cross", style=shape.triangleup, location=location.belowbar, color=color.blue, size=size.tiny, text="50X")
 
-// Trend Alignment: 50 should be above 100 (before the collapse) and 100 above 200
-// We check if 100 > 200 (covered by Extension)
-// We might want to ensure 50 is somewhat high too, but the cluster logic implies 21, 50, 100 are grouped.
-
-// Trigger: 21 Crosses Under 100
-cond_cross = ta.crossunder(c_s21, c_s100)
-
-// Final Signal
-sell_signal = cond_cross and cond_clustered and cond_extended
-
-plotshape(sell_signal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, text="SELL")
-
-// Debugging for Sell Signal
-// Option to show "Missed" signals to help user tune parameters
-show_missed = input.bool(true, "Show Missed Sell Reasons?", group=grp_sell, tooltip="Plots a small label on 21/100 crossunders that didn't trigger a sell, explaining why.")
-
-if barstate.isconfirmed and cond_cross
-    if sell_signal
-        // It worked, detailed label is redundant if we have the plotshape, but maybe useful?
-        na
-    else if show_missed
-        // Failed. Why?
-        fail_reason = ""
-        if not cond_clustered
-            fail_reason := fail_reason + "Cluster: " + str.tostring(cluster_range / pip_val, "#.0") + " > " + str.tostring(sell_cluster_pips) + "\n"
-        if not cond_extended
-            fail_reason := fail_reason + "Ext: " + str.tostring(trend_extension / pip_val, "#.0") + " < " + str.tostring(sell_ext_pips) + "\n"
-            
-        label.new(bar_index, high, text="Missed Sell:\n" + fail_reason, color=color.gray, textcolor=color.white, style=label.style_label_down, size=size.small)
-
-if show_sell_debug and barstate.islast
-    debug_txt = "SELL SIGNAL DEBUG\n" +
-              "Cluster Range: " + str.tostring(cluster_range / pip_val, "#.0") + " pips (Max: " + str.tostring(sell_cluster_pips) + ")\n" +
-              "Extension: " + str.tostring(trend_extension / pip_val, "#.0") + " pips (Min: " + str.tostring(sell_ext_pips) + ")\n" +
-              "21 < 100: " + str.tostring(c_s21 < c_s100) + "\n" +
-              "Last Signal: " + str.tostring(sell_signal)
+// Trigger Logic
+if cross_21_bull
+    // Reset/Start New Wave
+    x_active := true
+    x_start_time := time
+    x_anchor_low := ta.lowest(low, 14) // "find the low... since the 21 cross happened"? Usually implies low leading INTO it.
+    x_running_high := high
     
-    label.new(bar_index, high, debug_txt, color=color.black, textcolor=color.white, style=label.style_label_down)
+    // Initialize Lines (if not exist)
+    if not na(x_l50)
+        line.delete(x_l50)
+        line.delete(x_l61)
+        line.delete(x_l80)
+        label.delete(x_lb50)
+        label.delete(x_lb61)
+        label.delete(x_lb80)
+        
+    x_l50 := line.new(time, high, time, high, xloc=xloc.bar_time, color=color.blue, width=2)
+    x_l61 := line.new(time, high, time, high, xloc=xloc.bar_time, color=color.purple, width=1)
+    x_l80 := line.new(time, high, time, high, xloc=xloc.bar_time, color=color.red, width=2)
+    
+    x_lb50 := label.new(time, high, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.blue)
+    x_lb61 := label.new(time, high, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.purple)
+    x_lb80 := label.new(time, high, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.red)
+
+// Update Logic (Run while 21 is above Daily 21? Or until 80% hit? Let's assume run while bullish alignment holds)
+// "leave on chart for a week" - implies constant update or static? 
+// Usually "update on right" implies dynamic.
+
+if x_active
+    // Update High
+    if high > x_running_high
+        x_running_high := high
+    
+    // Calculate Levels (Retracement from High down to Anchor)
+    range_v = x_running_high - x_anchor_low
+    lvl_50 = x_running_high - (range_v * 0.50)
+    lvl_61 = x_running_high - (range_v * 0.618)
+    lvl_80 = x_running_high - (range_v * 0.80)
+    
+    // Update Lines
+    t_now = time
+    t_future = time + (7 * 24 * 60 * 60 * 1000) // 1 Week
+    
+    line.set_xy1(x_l50, x_start_time, lvl_50)
+    line.set_xy2(x_l50, t_future, lvl_50)
+    
+    line.set_xy1(x_l61, x_start_time, lvl_61)
+    line.set_xy2(x_l61, t_future, lvl_61)
+    
+    line.set_xy1(x_l80, x_start_time, lvl_80)
+    line.set_xy2(x_l80, t_future, lvl_80)
+    
+    // Update Labels
+    label.set_xy(x_lb50, t_future, lvl_50)
+    label.set_text(x_lb50, "50%: " + str.tostring(lvl_50, format.mintick))
+    
+    label.set_xy(x_lb61, t_future, lvl_61)
+    label.set_text(x_lb61, "61.8%: " + str.tostring(lvl_61, format.mintick))
+    
+    label.set_xy(x_lb80, t_future, lvl_80)
+    label.set_text(x_lb80, "80%: " + str.tostring(lvl_80, format.mintick))
+    
+    // Exit Condition? 
+    // If Chart 21 crosses BACK BELOW Daily 21, trend marks end? 
+    // Or if price hits 80%? 
+    // For now, let it run until next bullish cross resets it.
+    if ta.crossunder(c_s21, d_s21)
+        x_active := false
 
 
 // ==========================================
