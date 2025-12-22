@@ -45,15 +45,19 @@ if cond_cross_over and was_below_4
     level_82 = current_high - (range_val * 0.82)
     
     // Draw lines
-    // We draw them starting from the current bar extending to the right
-    // Using line.new with xloc.bar_index explicitly to be safe
-    l_50 = line.new(bar_index, level_50, bar_index + 1, level_50, xloc=xloc.bar_index, color=color.green, width=2, extend=extend.right)
-    l_82 = line.new(bar_index, level_82, bar_index + 1, level_82, xloc=xloc.bar_index, color=color.red, width=2, extend=extend.right)
+    // We draw them starting from the current bar extending for 2 days
+    // 2 days in milliseconds = 2 * 24 * 60 * 60 * 1000 = 172800000
+    t_end = time + 172800000
     
-    // Optional: Add labels to identify the lines
-    // We place labels slightly to the right
-    label.new(bar_index + 5, level_50, "50%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
-    label.new(bar_index + 5, level_82, "82%", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
+    l_50 = line.new(time, level_50, t_end, level_50, xloc=xloc.bar_time, color=color.green, width=2)
+    l_82 = line.new(time, level_82, t_end, level_82, xloc=xloc.bar_time, color=color.red, width=2)
+    
+    // Optional: Add labels to identify the lines at the end of the line
+    label.new(t_end, level_50, "50%", xloc=xloc.bar_time, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    label.new(t_end, level_82, "82%", xloc=xloc.bar_time, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
+
+    // Put a cross at the lowest low
+    label.new(bar_index, lowest_low, text="X", style=label.style_none, textcolor=color.black, size=size.normal)
 
 // Plot trigger shape
 plotshape(cond_cross_over and was_below_4, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Breakout Signal")
