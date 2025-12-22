@@ -108,29 +108,32 @@ fill(dp21, dp50, color=show_daily ? d_col21 : na, title="Daily 21/50 Fill")
 
 
 // ==========================================
-// 4. MA CROSS FIBONACCI LOGIC (Refined)
+// 4. MA CROSS FIBONACCI LOGIC (Refined & Persistent)
 // ==========================================
 // Trigger: BOTH Chart 21 > Daily 21 AND Chart 50 > Daily 50
-// (Wait for both to be true)
-// Anchor: Lowest Low relative to the Chart 21 SMA (Lowest price when price was trading below Chart 21)
+// Anchor: Lowest Low recorded while Price < Chart 21 SMA (before the bull run)
 // High: Running High since the trigger
 // Lines: 50%, 61.8%, 80% (Red)
 
-// State Variables
-var float x_anchor_low = na
-var float x_running_high = na
-var int x_start_time = na
-var bool x_active = false
+// --- 1. TRACKING THE ANCHOR LOW ---
+// We need to track the lowest low whenever the price is "bearish" relative to the 21 SMA.
+// Reset tracker when we are in a confirmed bull trend?
+// Best approach: Continuous tracking.
+var float potential_anchor = na
 
-// Line Storage
-var line x_l50 = na
-var line x_l61 = na
-var line x_l80 = na
-var label x_lb50 = na
-var label x_lb61 = na
-var label x_lb80 = na
+// Reset tracker on trend shift? Or just track continuously?
+// If close < c_s21, we update the low.
+if close < c_s21
+    if na(potential_anchor)
+        potential_anchor := low
+    else
+        potential_anchor := math.min(potential_anchor, low)
 
-// Conditions
+// If we are significantly above, we might want to reset 'potential_anchor' 
+// only after we use it, or if we go back below.
+// For now, let's keep updating it when below.
+
+// --- 2. TRIGGER CONDITIONS ---
 bool is_21_bull = c_s21 > d_s21
 bool is_50_bull = c_s50 > d_s50
 bool all_bull = is_21_bull and is_50_bull
@@ -138,92 +141,116 @@ bool all_bull = is_21_bull and is_50_bull
 // Trigger on the rising edge of "All Bull"
 bool trigger_cross = all_bull and not all_bull[1]
 
-// Visual Markers for individual crosses (Informational)
+// Visual Markers for individual crosses
 plotshape(ta.crossover(c_s21, d_s21), title="21 Cross", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.tiny, text="21X")
 plotshape(ta.crossover(c_s50, d_s50), title="50 Cross", style=shape.triangleup, location=location.belowbar, color=color.blue, size=size.tiny, text="50X")
 
-// Trigger Logic
-if trigger_cross
-    // Find Anchor: "Lowest Low below the 21 SMA"
-    // We look back to find the significant low that preceded this move.
-    // Heuristic: Look back up to 50 bars. Find the lowest 'low' where 'close < c_s21'.
-    
-    float found_low = low
-    // Search back
-    for i = 1 to 50
-        if close[i] < c_s21[i]
-            found_low := math.min(found_low, low[i])
-        // Break if we hit a point where we were previously all bull? No, keep simple.
-    
-    // Reset/Start New Wave
-    x_active := true
-    x_start_time := time
-    x_anchor_low := found_low
-    x_running_high := high
-    
-    // Initialize Lines (if not exist)
-    if not na(x_l50)
-        line.delete(x_l50)
-        line.delete(x_l61)
-        line.delete(x_l80)
-        label.delete(x_lb50)
-        label.delete(x_lb61)
-        label.delete(x_lb80)
-        
-    x_l50 := line.new(time, high, time, high, xloc=xloc.bar_time, color=color.blue, width=2)
-    x_l61 := line.new(time, high, time, high, xloc=xloc.bar_time, color=color.purple, width=1)
-    x_l80 := line.new(time, high, time, high, xloc=xloc.bar_time, color=color.red, width=2)
-    
-    x_lb50 := label.new(time, high, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.blue)
-    x_lb61 := label.new(time, high, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.purple)
-    x_lb80 := label.new(time, high, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.red)
-    
-    // Debug Label for Trigger
-    label.new(bar_index, low, "Dual Cross\nLow: " + str.tostring(x_anchor_low), style=label.style_label_up, color=color.lime, textcolor=color.black, size=size.tiny)
+// --- 3. ARRAY STORAGE (For Persistence) ---
+var float[] x_anchors = array.new_float()
+var float[] x_highs = array.new_float()
+var int[] x_starts = array.new_int()
+var bool[] x_active = array.new_bool()
 
-// Update Logic
-if x_active
-    // Update High
-    if high > x_running_high
-        x_running_high := high
+// Lines/Labels
+var line[] x_lines_50 = array.new_line()
+var line[] x_lines_61 = array.new_line()
+var line[] x_lines_80 = array.new_line()
+var label[] x_lbls_50 = array.new_label()
+var label[] x_lbls_61 = array.new_label()
+var label[] x_lbls_80 = array.new_label()
+
+// --- 4. NEW SETUP LOGIC ---
+if trigger_cross
+    // Use the tracked low. If na, use recent low.
+    float use_low = na(potential_anchor) ? ta.lowest(low, 20) : potential_anchor
     
-    // Calculate Levels
-    range_v = x_running_high - x_anchor_low
-    lvl_50 = x_running_high - (range_v * 0.50)
-    lvl_61 = x_running_high - (range_v * 0.618)
-    lvl_80 = x_running_high - (range_v * 0.80)
+    // Debug Trigger
+    label.new(bar_index, low, "Dual Cross\nAnchor: " + str.tostring(use_low), style=label.style_label_up, color=color.lime, textcolor=color.black, size=size.tiny)
     
-    // Update Lines (1 Week Duration)
-    t_now = time
-    t_future = time + (7 * 24 * 60 * 60 * 1000)
+    // Push new setup
+    array.push(x_anchors, use_low)
+    array.push(x_highs, high)
+    array.push(x_starts, time)
+    array.push(x_active, true)
     
-    line.set_xy1(x_l50, x_start_time, lvl_50)
-    line.set_xy2(x_l50, t_future, lvl_50)
+    // Create Line Objects
+    array.push(x_lines_50, line.new(na, na, na, na, xloc=xloc.bar_time))
+    array.push(x_lines_61, line.new(na, na, na, na, xloc=xloc.bar_time))
+    array.push(x_lines_80, line.new(na, na, na, na, xloc=xloc.bar_time))
     
-    line.set_xy1(x_l61, x_start_time, lvl_61)
-    line.set_xy2(x_l61, t_future, lvl_61)
+    // Create Label Objects
+    array.push(x_lbls_50, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.blue))
+    array.push(x_lbls_61, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.purple))
+    array.push(x_lbls_80, label.new(na, na, text="", xloc=xloc.bar_time, style=label.style_label_left, size=size.tiny, textcolor=color.white, color=color.red))
     
-    line.set_xy1(x_l80, x_start_time, lvl_80)
-    line.set_xy2(x_l80, t_future, lvl_80)
-    
-    // Update Labels
-    label.set_xy(x_lb50, t_future, lvl_50)
-    label.set_text(x_lb50, "50%: " + str.tostring(lvl_50, format.mintick))
-    
-    label.set_xy(x_lb61, t_future, lvl_61)
-    label.set_text(x_lb61, "61.8%: " + str.tostring(lvl_61, format.mintick))
-    
-    label.set_xy(x_lb80, t_future, lvl_80)
-    label.set_text(x_lb80, "80%: " + str.tostring(lvl_80, format.mintick))
-    
-    // Auto-reset if we lose the trend? 
-    // "leave on chart for a week" -> Usually implies static, but "work fibs" implies updating high.
-    // If we lose the "All Bull" status, we might want to stop updating the High but keep lines?
-    // For now, keep updating until next trigger resets it or we drift too far.
-    if not all_bull
-        // Optional: Freeze the high? Or just let it run.
-        // x_active := false // Uncomment to stop updating on trend loss
-        na
+    // Reset Anchor Tracker for next cycle
+    potential_anchor := na
+
+// --- 5. UPDATE LOOP ---
+if array.size(x_anchors) > 0
+    for i = 0 to array.size(x_anchors) - 1
+        if array.get(x_active, i)
+            // Get State
+            a_low = array.get(x_anchors, i)
+            a_high = array.get(x_highs, i)
+            t_start = array.get(x_starts, i)
+            
+            // Update High
+            if high > a_high
+                a_high := high
+                array.set(x_highs, i, a_high)
+            
+            // Calculate Levels
+            rng = a_high - a_low
+            l50 = a_high - (rng * 0.50)
+            l61 = a_high - (rng * 0.618)
+            l80 = a_high - (rng * 0.80)
+            
+            // Update Lines (1 Week into future from NOW)
+            // User: "leave on chart for a week"
+            // We'll update the END time constantly so it stays 1 week ahead? 
+            // Or fixed 1 week from trigger? "leave on chart for a week" implies duration.
+            // Let's make it fixed 1 week duration from trigger, but extend if active?
+            // Usually "update on right" means extend. Let's extend from START to NOW + 1 Week.
+            t_end = time + (7 * 24 * 60 * 60 * 1000)
+            
+            ln50 = array.get(x_lines_50, i)
+            ln61 = array.get(x_lines_61, i)
+            ln80 = array.get(x_lines_80, i)
+            
+            line.set_xy1(ln50, t_start, l50)
+            line.set_xy2(ln50, t_end, l50)
+            line.set_color(ln50, color.blue)
+            line.set_width(ln50, 2)
+            
+            line.set_xy1(ln61, t_start, l61)
+            line.set_xy2(ln61, t_end, l61)
+            line.set_color(ln61, color.purple)
+            
+            line.set_xy1(ln80, t_start, l80)
+            line.set_xy2(ln80, t_end, l80)
+            line.set_color(ln80, color.red)
+            line.set_width(ln80, 2)
+            
+            // Update Labels
+            lb50 = array.get(x_lbls_50, i)
+            lb61 = array.get(x_lbls_61, i)
+            lb80 = array.get(x_lbls_80, i)
+            
+            label.set_xy(lb50, t_end, l50)
+            label.set_text(lb50, "50%: " + str.tostring(l50, format.mintick))
+            
+            label.set_xy(lb61, t_end, l61)
+            label.set_text(lb61, "61.8%: " + str.tostring(l61, format.mintick))
+            
+            label.set_xy(lb80, t_end, l80)
+            label.set_text(lb80, "80%: " + str.tostring(l80, format.mintick))
+            
+            // Stop condition? 
+            // If price drops below 80%? 
+            // If trend reverses (All Bull Lost)?
+            if not all_bull
+                array.set(x_active, i, false)
 
 
 // ==========================================
