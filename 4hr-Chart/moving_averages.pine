@@ -3,43 +3,64 @@ indicator("Moving Averages", overlay=true, max_lines_count=500, max_labels_count
 
 // Input parameters
 len200 = input.int(200, "200 SMA Length")
+len100 = input.int(100, "100 SMA Length")
 len50 = input.int(50, "50 SMA Length")
 len21 = input.int(21, "21 SMA Length")
 
 // Calculate SMAs
 sma200 = ta.sma(close, len200)
+sma100 = ta.sma(close, len100)
 sma50 = ta.sma(close, len50)
 sma21 = ta.sma(close, len21)
 
 // Plot SMAs
-plot(sma200, color=color.red, title="200 SMA", linewidth=4) // Thicker 200 SMA
+plot(sma200, color=color.red, title="200 SMA", linewidth=4)
+plot(sma100, color=color.orange, title="100 SMA", linewidth=2)
 plot(sma50, color=color.blue, title="50 SMA", linewidth=2)
 plot(sma21, color=color.green, title="21 SMA", linewidth=2)
 
-// Logic: Close above 200 SMA after closing below for 4+ periods
-// Check if current close is above SMA200
-cond_cross_over = close > sma200 and close[1] < sma200[1]
+// --- Logic for LONG Setups ---
+// 1. Close below 200 SMA for 4+ periods
+// 2. Breakout: Close > 200 SMA
+// 3. Trend Filter: 100 SMA > 200 SMA AND 50 SMA > 200 SMA
 
-// Check if previous 4 candles were below SMA200
-was_below_4 = true
+cond_long_breakout = close > sma200 and close[1] < sma200[1]
+was_below_4_long = true
 for i = 1 to 4
     if close[i] >= sma200[i]
-        was_below_4 := false
+        was_below_4_long := false
 
-// Calculate lowest low of last 14 periods globally to ensure correct history
-lowest_low = ta.lowest(low, 14)
-lowest_offset = ta.lowestbars(low, 14)
+cond_long_trend = sma100 > sma200 and sma50 > sma200
+valid_long = cond_long_breakout and was_below_4_long and cond_long_trend
 
-// State Management for Lines
-// We use arrays to store information about active lines so we can manage them until they are touched.
-// We store:
-// 1. Setup Low (Anchor)
-// 2. Setup High (Current Highest High)
-// 3. Line IDs for 38.2, 50, 61.8, 80
-// 4. Label IDs for 38.2, 50, 61.8, 80
+// --- Logic for SHORT Setups ---
+// 1. Close above 200 SMA for 4+ periods
+// 2. Breakout: Close < 200 SMA
+// 3. Trend Filter: 100 SMA < 200 SMA AND 50 SMA < 200 SMA
 
-var float[] active_setup_lows = array.new_float()
-var float[] active_setup_highs = array.new_float()
+cond_short_breakout = close < sma200 and close[1] > sma200[1]
+was_above_4_short = true
+for i = 1 to 4
+    if close[i] <= sma200[i]
+        was_above_4_short := false
+
+cond_short_trend = sma100 < sma200 and sma50 < sma200
+valid_short = cond_short_breakout and was_above_4_short and cond_short_trend
+
+// Calculate anchor points globally
+lowest_low_14 = ta.lowest(low, 14)
+lowest_offset_14 = ta.lowestbars(low, 14)
+
+highest_high_14 = ta.highest(high, 14)
+highest_offset_14 = ta.highestbars(high, 14)
+
+// State Management
+// We need to store DIRECTION: 1 for Long, -1 for Short
+// Also START TIME for expiration
+var float[] active_anchors = array.new_float() // Low for Long, High for Short
+var float[] active_extremes = array.new_float() // Running High for Long, Running Low for Short
+var int[] active_directions = array.new_int() // 1 or -1
+var int[] active_start_times = array.new_int() // Time in ms
 
 var line[] active_lines_38 = array.new_line()
 var line[] active_lines_50 = array.new_line()
@@ -50,22 +71,20 @@ var label[] active_labels_38 = array.new_label()
 var label[] active_labels_50 = array.new_label()
 var label[] active_labels_61 = array.new_label()
 var label[] active_labels_80 = array.new_label()
+var label[] active_marker_labels = array.new_label() // To delete X markers if needed
 
-// New condition: 50 SMA > 200 SMA
-cond_trend = sma50 > sma200
-
-if cond_cross_over and was_below_4 and cond_trend
-    // New setup detected
-    current_high = high // High of the breakout candle
-    range_val = current_high - lowest_low
+// --- Add New Long Setup ---
+if valid_long
+    current_high = high
+    range_val = current_high - lowest_low_14
     
-    // Calculate initial levels
+    // Initial Levels (Long)
     level_38 = current_high - (range_val * 0.382)
     level_50 = current_high - (range_val * 0.50)
     level_61 = current_high - (range_val * 0.618)
     level_80 = current_high - (range_val * 0.80)
     
-    // Create Lines - Extend Right initially
+    // Create Lines
     l_38 = line.new(bar_index, level_38, bar_index + 1, level_38, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
     l_50 = line.new(bar_index, level_50, bar_index + 1, level_50, xloc=xloc.bar_index, color=color.green, width=2, extend=extend.right)
     l_61 = line.new(bar_index, level_61, bar_index + 1, level_61, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
@@ -76,13 +95,17 @@ if cond_cross_over and was_below_4 and cond_trend
     lbl_50 = label.new(bar_index + 5, level_50, "50%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
     lbl_61 = label.new(bar_index + 5, level_61, "61.8%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
     lbl_80 = label.new(bar_index + 5, level_80, "80%", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
-
-    // Put a cross at the lowest low location
-    label.new(bar_index + lowest_offset, lowest_low, text="X\nL:" + str.tostring(lowest_low), style=label.style_none, textcolor=color.black, size=size.normal)
     
-    // Store in arrays
-    array.push(active_setup_lows, lowest_low)
-    array.push(active_setup_highs, current_high)
+    // Create Marker
+    lbl_marker = label.new(bar_index + lowest_offset_14, lowest_low_14, text="X_L", style=label.style_none, textcolor=color.black, size=size.normal)
+    // Create Anchor Line (Risk/Stop)
+    line.new(bar_index + lowest_offset_14, lowest_low_14, bar_index + 5, lowest_low_14, color=color.black, width=1)
+
+    // Push to Arrays
+    array.push(active_anchors, lowest_low_14)
+    array.push(active_extremes, current_high)
+    array.push(active_directions, 1)
+    array.push(active_start_times, time)
     
     array.push(active_lines_38, l_38)
     array.push(active_lines_50, l_50)
@@ -93,139 +116,231 @@ if cond_cross_over and was_below_4 and cond_trend
     array.push(active_labels_50, lbl_50)
     array.push(active_labels_61, lbl_61)
     array.push(active_labels_80, lbl_80)
+    array.push(active_marker_labels, lbl_marker)
+
+// --- Add New Short Setup ---
+if valid_short
+    current_low = low
+    // For Short: Range = Anchor (High) - Current Low
+    range_val = highest_high_14 - current_low
+    
+    // Initial Levels (Short)
+    // Retracement goes UP from Low
+    level_38 = current_low + (range_val * 0.382)
+    level_50 = current_low + (range_val * 0.50)
+    level_61 = current_low + (range_val * 0.618)
+    level_80 = current_low + (range_val * 0.80)
+    
+    // Create Lines
+    l_38 = line.new(bar_index, level_38, bar_index + 1, level_38, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
+    l_50 = line.new(bar_index, level_50, bar_index + 1, level_50, xloc=xloc.bar_index, color=color.green, width=2, extend=extend.right)
+    l_61 = line.new(bar_index, level_61, bar_index + 1, level_61, xloc=xloc.bar_index, color=color.green, width=1, extend=extend.right)
+    l_80 = line.new(bar_index, level_80, bar_index + 1, level_80, xloc=xloc.bar_index, color=color.red, width=2, extend=extend.right)
+    
+    // Create Labels
+    lbl_38 = label.new(bar_index + 5, level_38, "38.2%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_50 = label.new(bar_index + 5, level_50, "50%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_61 = label.new(bar_index + 5, level_61, "61.8%", xloc=xloc.bar_index, color=color.green, textcolor=color.white, style=label.style_label_left, size=size.small)
+    lbl_80 = label.new(bar_index + 5, level_80, "80%", xloc=xloc.bar_index, color=color.red, textcolor=color.white, style=label.style_label_left, size=size.small)
+    
+    // Create Marker (High)
+    lbl_marker = label.new(bar_index + highest_offset_14, highest_high_14, text="X_S", style=label.style_none, textcolor=color.black, size=size.normal)
+    // Create Anchor Line (Risk/Stop)
+    line.new(bar_index + highest_offset_14, highest_high_14, bar_index + 5, highest_high_14, color=color.black, width=1)
+
+    // Push to Arrays
+    array.push(active_anchors, highest_high_14)
+    array.push(active_extremes, current_low)
+    array.push(active_directions, -1)
+    array.push(active_start_times, time)
+    
+    array.push(active_lines_38, l_38)
+    array.push(active_lines_50, l_50)
+    array.push(active_lines_61, l_61)
+    array.push(active_lines_80, l_80)
+    
+    array.push(active_labels_38, lbl_38)
+    array.push(active_labels_50, lbl_50)
+    array.push(active_labels_61, lbl_61)
+    array.push(active_labels_80, lbl_80)
+    array.push(active_marker_labels, lbl_marker)
+
 
 // Logic to check for touches and clean up lines
 // We iterate backwards to safely remove items
 should_color_purple = false
 
-if array.size(active_setup_lows) > 0
-    for i = array.size(active_setup_lows) - 1 to 0
-        // Get current setup details
-        setup_low = array.get(active_setup_lows, i)
-        setup_high = array.get(active_setup_highs, i)
-        
-        // Update High if current bar is higher (Running Retracement Logic)
-        new_high = math.max(setup_high, high)
-        if new_high > setup_high
-            array.set(active_setup_highs, i, new_high)
-            setup_high := new_high
-        
-        // Recalculate levels based on (possibly new) High
-        curr_range = setup_high - setup_low
-        lvl_38 = setup_high - (curr_range * 0.382)
-        lvl_50 = setup_high - (curr_range * 0.50)
-        lvl_61 = setup_high - (curr_range * 0.618)
-        lvl_80 = setup_high - (curr_range * 0.80)
-        
-        // Get Line IDs
-        l_38_id = array.get(active_lines_38, i)
-        l_50_id = array.get(active_lines_50, i)
-        l_61_id = array.get(active_lines_61, i)
-        l_80_id = array.get(active_lines_80, i)
-        
-        // Get Label IDs
-        lbl_38_id = array.get(active_labels_38, i)
-        lbl_50_id = array.get(active_labels_50, i)
-        lbl_61_id = array.get(active_labels_61, i)
-        lbl_80_id = array.get(active_labels_80, i)
-        
-        // Update Line Levels
-        line.set_y1(l_38_id, lvl_38)
-        line.set_y2(l_38_id, lvl_38)
-        line.set_y1(l_50_id, lvl_50)
-        line.set_y2(l_50_id, lvl_50)
-        line.set_y1(l_61_id, lvl_61)
-        line.set_y2(l_61_id, lvl_61)
-        line.set_y1(l_80_id, lvl_80)
-        line.set_y2(l_80_id, lvl_80)
-        
-        // Update Label Levels and Text
-        label.set_y(lbl_38_id, lvl_38)
-        label.set_text(lbl_38_id, "38.2% (" + str.tostring(lvl_38, format.mintick) + ")")
-        label.set_y(lbl_50_id, lvl_50)
-        label.set_text(lbl_50_id, "50% (" + str.tostring(lvl_50, format.mintick) + ")")
-        label.set_y(lbl_61_id, lvl_61)
-        label.set_text(lbl_61_id, "61.8% (" + str.tostring(lvl_61, format.mintick) + ")")
-        label.set_y(lbl_80_id, lvl_80)
-        label.set_text(lbl_80_id, "80% (" + str.tostring(lvl_80, format.mintick) + ")")
-        
-        // Check if Price Touches 50% Level
-        // We consider the trade triggered/completed when it touches 50%
-        if low <= lvl_50 and low >= setup_low // Valid touch
-            // Touch detected!
-            
-            // 1. Stop extending lines
-            line.set_extend(l_38_id, extend.none)
-            line.set_x2(l_38_id, bar_index)
-            line.set_extend(l_50_id, extend.none)
-            line.set_x2(l_50_id, bar_index)
-            line.set_extend(l_61_id, extend.none)
-            line.set_x2(l_61_id, bar_index)
-            line.set_extend(l_80_id, extend.none)
-            line.set_x2(l_80_id, bar_index)
-            
-            // 2. Move labels to the end of the line
-            label.set_x(lbl_38_id, bar_index)
-            label.set_style(lbl_38_id, label.style_label_right)
-            label.set_x(lbl_50_id, bar_index)
-            label.set_style(lbl_50_id, label.style_label_right)
-            label.set_x(lbl_61_id, bar_index)
-            label.set_style(lbl_61_id, label.style_label_right)
-            label.set_x(lbl_80_id, bar_index)
-            label.set_style(lbl_80_id, label.style_label_right)
+// 5 days in milliseconds
+FIVE_DAYS_MS = 5 * 24 * 60 * 60 * 1000
 
-            // 4. Color the candle (set flag)
-            should_color_purple := true
+if array.size(active_anchors) > 0
+    for i = array.size(active_anchors) - 1 to 0
+        // Get current setup details
+        setup_anchor = array.get(active_anchors, i)
+        setup_extreme = array.get(active_extremes, i)
+        direction = array.get(active_directions, i)
+        start_t = array.get(active_start_times, i)
+        
+        // 1. Check for Expiration (5 days)
+        if time - start_t > FIVE_DAYS_MS
+            // Expired - Remove everything
+            l_38_id = array.get(active_lines_38, i); line.delete(l_38_id)
+            l_50_id = array.get(active_lines_50, i); line.delete(l_50_id)
+            l_61_id = array.get(active_lines_61, i); line.delete(l_61_id)
+            l_80_id = array.get(active_lines_80, i); line.delete(l_80_id)
             
-            // 5. Remove from arrays (stop tracking)
-            array.remove(active_setup_lows, i)
-            array.remove(active_setup_highs, i)
+            lbl_38_id = array.get(active_labels_38, i); label.delete(lbl_38_id)
+            lbl_50_id = array.get(active_labels_50, i); label.delete(lbl_50_id)
+            lbl_61_id = array.get(active_labels_61, i); label.delete(lbl_61_id)
+            lbl_80_id = array.get(active_labels_80, i); label.delete(lbl_80_id)
             
-            array.remove(active_lines_38, i)
-            array.remove(active_lines_50, i)
-            array.remove(active_lines_61, i)
-            array.remove(active_lines_80, i)
+            m_id = array.get(active_marker_labels, i); label.delete(m_id)
             
-            array.remove(active_labels_38, i)
-            array.remove(active_labels_50, i)
-            array.remove(active_labels_61, i)
-            array.remove(active_labels_80, i)
+            array.remove(active_anchors, i); array.remove(active_extremes, i); array.remove(active_directions, i); array.remove(active_start_times, i)
+            array.remove(active_lines_38, i); array.remove(active_lines_50, i); array.remove(active_lines_61, i); array.remove(active_lines_80, i)
+            array.remove(active_labels_38, i); array.remove(active_labels_50, i); array.remove(active_labels_61, i); array.remove(active_labels_80, i)
+            array.remove(active_marker_labels, i)
+            continue // Skip to next iteration
+
+        // 2. Logic for LONG Setup (direction == 1)
+        if direction == 1
+            // Running Retracement Logic: Update High if current bar is higher
+            new_high = math.max(setup_extreme, high)
+            if new_high > setup_extreme
+                array.set(active_extremes, i, new_high)
+                setup_extreme := new_high
             
-        else if low < setup_low
-            // Price broke the anchor low before retracing -> Invalid setup
-            // Remove everything to clean up chart
-            line.delete(l_38_id)
-            line.delete(l_50_id)
-            line.delete(l_61_id)
-            line.delete(l_80_id)
-            label.delete(lbl_38_id)
-            label.delete(lbl_50_id)
-            label.delete(lbl_61_id)
-            label.delete(lbl_80_id)
+            // Recalculate levels
+            range_val = setup_extreme - setup_anchor
+            lvl_38 = setup_extreme - (range_val * 0.382)
+            lvl_50 = setup_extreme - (range_val * 0.50)
+            lvl_61 = setup_extreme - (range_val * 0.618)
+            lvl_80 = setup_extreme - (range_val * 0.80)
             
-            array.remove(active_setup_lows, i)
-            array.remove(active_setup_highs, i)
+            // Get IDs
+            l_38_id = array.get(active_lines_38, i); l_50_id = array.get(active_lines_50, i); l_61_id = array.get(active_lines_61, i); l_80_id = array.get(active_lines_80, i)
+            lbl_38_id = array.get(active_labels_38, i); lbl_50_id = array.get(active_labels_50, i); lbl_61_id = array.get(active_labels_61, i); lbl_80_id = array.get(active_labels_80, i)
             
-            array.remove(active_lines_38, i)
-            array.remove(active_lines_50, i)
-            array.remove(active_lines_61, i)
-            array.remove(active_lines_80, i)
+            // Update Lines/Labels
+            line.set_y1(l_38_id, lvl_38); line.set_y2(l_38_id, lvl_38)
+            line.set_y1(l_50_id, lvl_50); line.set_y2(l_50_id, lvl_50)
+            line.set_y1(l_61_id, lvl_61); line.set_y2(l_61_id, lvl_61)
+            line.set_y1(l_80_id, lvl_80); line.set_y2(l_80_id, lvl_80)
             
-            array.remove(active_labels_38, i)
-            array.remove(active_labels_50, i)
-            array.remove(active_labels_61, i)
-            array.remove(active_labels_80, i)
+            label.set_y(lbl_38_id, lvl_38); label.set_text(lbl_38_id, "38.2% (" + str.tostring(lvl_38, format.mintick) + ")")
+            label.set_y(lbl_50_id, lvl_50); label.set_text(lbl_50_id, "50% (" + str.tostring(lvl_50, format.mintick) + ")")
+            label.set_y(lbl_61_id, lvl_61); label.set_text(lbl_61_id, "61.8% (" + str.tostring(lvl_61, format.mintick) + ")")
+            label.set_y(lbl_80_id, lvl_80); label.set_text(lbl_80_id, "80% (" + str.tostring(lvl_80, format.mintick) + ")")
             
-        else
-            // Update labels to stay ahead of price if not touched yet
-            label.set_x(lbl_38_id, bar_index + 5)
-            label.set_x(lbl_50_id, bar_index + 5)
-            label.set_x(lbl_61_id, bar_index + 5)
-            label.set_x(lbl_80_id, bar_index + 5)
+            // Check Touch (Long: Low <= 50%)
+            if low <= lvl_50 and low >= setup_anchor
+                // Touched!
+                line.set_extend(l_38_id, extend.none); line.set_x2(l_38_id, bar_index)
+                line.set_extend(l_50_id, extend.none); line.set_x2(l_50_id, bar_index)
+                line.set_extend(l_61_id, extend.none); line.set_x2(l_61_id, bar_index)
+                line.set_extend(l_80_id, extend.none); line.set_x2(l_80_id, bar_index)
+                
+                label.set_x(lbl_38_id, bar_index); label.set_style(lbl_38_id, label.style_label_right)
+                label.set_x(lbl_50_id, bar_index); label.set_style(lbl_50_id, label.style_label_right)
+                label.set_x(lbl_61_id, bar_index); label.set_style(lbl_61_id, label.style_label_right)
+                label.set_x(lbl_80_id, bar_index); label.set_style(lbl_80_id, label.style_label_right)
+                
+                should_color_purple := true
+                
+                // Cleanup arrays
+                array.remove(active_anchors, i); array.remove(active_extremes, i); array.remove(active_directions, i); array.remove(active_start_times, i)
+                array.remove(active_lines_38, i); array.remove(active_lines_50, i); array.remove(active_lines_61, i); array.remove(active_lines_80, i)
+                array.remove(active_labels_38, i); array.remove(active_labels_50, i); array.remove(active_labels_61, i); array.remove(active_labels_80, i)
+                array.remove(active_marker_labels, i)
+            
+            // Check Invalidation (Long: Low < Anchor)
+            else if low < setup_anchor
+                 // Invalid
+                line.delete(l_38_id); line.delete(l_50_id); line.delete(l_61_id); line.delete(l_80_id)
+                label.delete(lbl_38_id); label.delete(lbl_50_id); label.delete(lbl_61_id); label.delete(lbl_80_id)
+                m_id = array.get(active_marker_labels, i); label.delete(m_id)
+                
+                array.remove(active_anchors, i); array.remove(active_extremes, i); array.remove(active_directions, i); array.remove(active_start_times, i)
+                array.remove(active_lines_38, i); array.remove(active_lines_50, i); array.remove(active_lines_61, i); array.remove(active_lines_80, i)
+                array.remove(active_labels_38, i); array.remove(active_labels_50, i); array.remove(active_labels_61, i); array.remove(active_labels_80, i)
+                array.remove(active_marker_labels, i)
+            else
+                label.set_x(lbl_38_id, bar_index + 5)
+                label.set_x(lbl_50_id, bar_index + 5)
+                label.set_x(lbl_61_id, bar_index + 5)
+                label.set_x(lbl_80_id, bar_index + 5)
+        
+        // 3. Logic for SHORT Setup (direction == -1)
+        else if direction == -1
+            // Running Retracement Logic: Update Low if current bar is lower
+            new_low = math.min(setup_extreme, low)
+            if new_low < setup_extreme
+                array.set(active_extremes, i, new_low)
+                setup_extreme := new_low
+            
+            // Recalculate levels (Range = Anchor High - Low)
+            range_val = setup_anchor - setup_extreme
+            lvl_38 = setup_extreme + (range_val * 0.382)
+            lvl_50 = setup_extreme + (range_val * 0.50)
+            lvl_61 = setup_extreme + (range_val * 0.618)
+            lvl_80 = setup_extreme + (range_val * 0.80)
+            
+            // Get IDs
+            l_38_id = array.get(active_lines_38, i); l_50_id = array.get(active_lines_50, i); l_61_id = array.get(active_lines_61, i); l_80_id = array.get(active_lines_80, i)
+            lbl_38_id = array.get(active_labels_38, i); lbl_50_id = array.get(active_labels_50, i); lbl_61_id = array.get(active_labels_61, i); lbl_80_id = array.get(active_labels_80, i)
+            
+            // Update Lines/Labels
+            line.set_y1(l_38_id, lvl_38); line.set_y2(l_38_id, lvl_38)
+            line.set_y1(l_50_id, lvl_50); line.set_y2(l_50_id, lvl_50)
+            line.set_y1(l_61_id, lvl_61); line.set_y2(l_61_id, lvl_61)
+            line.set_y1(l_80_id, lvl_80); line.set_y2(l_80_id, lvl_80)
+            
+            label.set_y(lbl_38_id, lvl_38); label.set_text(lbl_38_id, "38.2% (" + str.tostring(lvl_38, format.mintick) + ")")
+            label.set_y(lbl_50_id, lvl_50); label.set_text(lbl_50_id, "50% (" + str.tostring(lvl_50, format.mintick) + ")")
+            label.set_y(lbl_61_id, lvl_61); label.set_text(lbl_61_id, "61.8% (" + str.tostring(lvl_61, format.mintick) + ")")
+            label.set_y(lbl_80_id, lvl_80); label.set_text(lbl_80_id, "80% (" + str.tostring(lvl_80, format.mintick) + ")")
+            
+            // Check Touch (Short: High >= 50%)
+            if high >= lvl_50 and high <= setup_anchor
+                // Touched!
+                line.set_extend(l_38_id, extend.none); line.set_x2(l_38_id, bar_index)
+                line.set_extend(l_50_id, extend.none); line.set_x2(l_50_id, bar_index)
+                line.set_extend(l_61_id, extend.none); line.set_x2(l_61_id, bar_index)
+                line.set_extend(l_80_id, extend.none); line.set_x2(l_80_id, bar_index)
+                
+                label.set_x(lbl_38_id, bar_index); label.set_style(lbl_38_id, label.style_label_right)
+                label.set_x(lbl_50_id, bar_index); label.set_style(lbl_50_id, label.style_label_right)
+                label.set_x(lbl_61_id, bar_index); label.set_style(lbl_61_id, label.style_label_right)
+                label.set_x(lbl_80_id, bar_index); label.set_style(lbl_80_id, label.style_label_right)
+                
+                should_color_purple := true
+                
+                // Cleanup arrays
+                array.remove(active_anchors, i); array.remove(active_extremes, i); array.remove(active_directions, i); array.remove(active_start_times, i)
+                array.remove(active_lines_38, i); array.remove(active_lines_50, i); array.remove(active_lines_61, i); array.remove(active_lines_80, i)
+                array.remove(active_labels_38, i); array.remove(active_labels_50, i); array.remove(active_labels_61, i); array.remove(active_labels_80, i)
+                array.remove(active_marker_labels, i)
+            
+            // Check Invalidation (Short: High > Anchor)
+            else if high > setup_anchor
+                 // Invalid
+                line.delete(l_38_id); line.delete(l_50_id); line.delete(l_61_id); line.delete(l_80_id)
+                label.delete(lbl_38_id); label.delete(lbl_50_id); label.delete(lbl_61_id); label.delete(lbl_80_id)
+                m_id = array.get(active_marker_labels, i); label.delete(m_id)
+                
+                array.remove(active_anchors, i); array.remove(active_extremes, i); array.remove(active_directions, i); array.remove(active_start_times, i)
+                array.remove(active_lines_38, i); array.remove(active_lines_50, i); array.remove(active_lines_61, i); array.remove(active_lines_80, i)
+                array.remove(active_labels_38, i); array.remove(active_labels_50, i); array.remove(active_labels_61, i); array.remove(active_labels_80, i)
+                array.remove(active_marker_labels, i)
+            else
+                label.set_x(lbl_38_id, bar_index + 5)
+                label.set_x(lbl_50_id, bar_index + 5)
+                label.set_x(lbl_61_id, bar_index + 5)
+                label.set_x(lbl_80_id, bar_index + 5)
 
 // Apply bar color globally
 barcolor(should_color_purple ? color.purple : na)
 
-
-// Plot trigger shape
-plotshape(cond_cross_over and was_below_4, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Breakout Signal")
+// Plot trigger shape (Combined)
+plotshape(valid_long, style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, title="Long Setup")
+plotshape(valid_short, style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, title="Short Setup")
