@@ -24,10 +24,10 @@ pip_val = syminfo.mintick * 10
 
 
 // Fill Logic
-// Green: 100 SMA > 200 SMA + 10 pips
-// Red:   100 SMA < 200 SMA - 10 pips
-threshold_fill_long = sma200 + (10 * pip_val)
-threshold_fill_short = sma200 - (10 * pip_val)
+// Green: 100 SMA > 200 SMA + 80 pips
+// Red:   100 SMA < 200 SMA - 80 pips
+threshold_fill_long = sma200 + (80 * pip_val)
+threshold_fill_short = sma200 - (80 * pip_val)
 
 fill_color = if sma100 >= threshold_fill_long and sma21 >= sma100
     color.new(color.green, 70)
