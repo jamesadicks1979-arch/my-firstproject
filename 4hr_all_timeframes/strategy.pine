@@ -33,17 +33,21 @@ plot(sma_1hr,    title="1hr 200 SMA",    color=color.yellow, linewidth=2)
 
 
 // --- Crossover Markings ---
+// We want the X to be exactly ON the cross point.
+// Since SMAs are continuous values, the cross point happens "between" bars or at the close of the bar.
+// We will plot the label at the value of the fast SMA at the moment of the cross.
+
 // 1. Cross when 1hr SMA crosses above 2hr SMA
 if ta.crossover(sma_1hr, sma_2hr)
-    label.new(bar_index, high, text="X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="1h > 2h (First)")
+    label.new(bar_index, sma_1hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_center, size=size.tiny, tooltip="1h > 2h (First)", yloc=yloc.price)
 
 // 2. Cross when 2hr SMA crosses above 4hr SMA
 if ta.crossover(sma_2hr, sma_4hr)
-    label.new(bar_index, high, text="X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="2h > 4h (Second)")
+    label.new(bar_index, sma_2hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_center, size=size.tiny, tooltip="2h > 4h (Second)", yloc=yloc.price)
 
 // 3. Cross when 4hr SMA crosses above 8hr SMA
 if ta.crossover(sma_4hr, sma_8hr)
-    label.new(bar_index, high, text="X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="4h > 8h (Third)")
+    label.new(bar_index, sma_4hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_center, size=size.tiny, tooltip="4h > 8h (Third)", yloc=yloc.price)
 
 
 // --- Fib Logic ---
