@@ -1,129 +1,187 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// author © KivancOzbilgic
+// developer © KivancOzbilgic
 //@version=5
-indicator("4hr All Timeframes Analysis", overlay=true)
+indicator('AlphaTrend', shorttitle='AT', overlay=true, format=format.price, precision=2, timeframe='')
+coeff = input.float(1, 'Multiplier', step=0.1)
+AP = input(14, 'Common Period')
+ATR = ta.sma(ta.tr, AP)
+src = input(close)
+showsignalsk = input(title='Show Signals?', defval=true)
+novolumedata = input(title='Change calculation (no volume data)?', defval=false)
+upT = low - ATR * coeff
+downT = high + ATR * coeff
+AlphaTrend = 0.0
+AlphaTrend := (novolumedata ? ta.rsi(src, AP) >= 50 : ta.mfi(hlc3, AP) >= 50) ? upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
 
-// Input parameters
-sma_length = input.int(200, "SMA Length", minval=1)
+color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
+k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
 
-// Timeframe Inputs
-tf_weekly = input.timeframe("1W", "Weekly Timeframe")
-tf_daily  = input.timeframe("1D", "Daily Timeframe")
-tf_8hr    = input.timeframe("480", "8 Hour Timeframe")
-tf_4hr    = input.timeframe("240", "4 Hour Timeframe")
-tf_2hr    = input.timeframe("120", "2 Hour Timeframe")
-tf_1hr    = input.timeframe("60", "1 Hour Timeframe")
+fill(k1, k2, color=color1)
 
-// Calculations
-get_sma(tf, len) =>
-    request.security(syminfo.tickerid, tf, ta.sma(close, len))
-
-sma_weekly = get_sma(tf_weekly, sma_length)
-sma_daily  = get_sma(tf_daily, sma_length)
-sma_8hr    = get_sma(tf_8hr, sma_length)
-sma_4hr    = get_sma(tf_4hr, sma_length)
-sma_2hr    = get_sma(tf_2hr, sma_length)
-sma_1hr    = get_sma(tf_1hr, sma_length)
-
-// Plotting SMAs
-plot(sma_weekly, title="Weekly 200 SMA", color=color.purple, linewidth=2)
-plot(sma_daily,  title="Daily 200 SMA",  color=color.red,    linewidth=2)
-plot(sma_8hr,    title="8hr 200 SMA",    color=color.orange, linewidth=2)
-plot(sma_4hr,    title="4hr 200 SMA",    color=color.green,  linewidth=2)
-plot(sma_2hr,    title="2hr 200 SMA",    color=color.blue,   linewidth=2)
-plot(sma_1hr,    title="1hr 200 SMA",    color=color.yellow, linewidth=2)
-
-// --- Trend Filter ---
-// Filter out signals if Price is below Daily SMA (Bearish)
-// We use close > sma_daily as a simple filter for Bullish Trend.
-trend_filter = close > sma_daily
-
-// --- Crossover Markings ---
-// We want the X to be exactly ON the cross point.
-// Only show if in Bullish Daily Trend.
-
-// 1. Cross when 1hr SMA crosses above 2hr SMA
-if trend_filter and ta.crossover(sma_1hr, sma_2hr)
-    label.new(bar_index, sma_1hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_left, size=size.tiny, tooltip="1h > 2h (First)", yloc=yloc.price)
-
-// 2. Cross when 2hr SMA crosses above 4hr SMA
-if trend_filter and ta.crossover(sma_2hr, sma_4hr)
-    label.new(bar_index, sma_2hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_left, size=size.tiny, tooltip="2h > 4h (Second)", yloc=yloc.price)
-
-// 3. Cross when 4hr SMA crosses above 8hr SMA
-if trend_filter and ta.crossover(sma_4hr, sma_8hr)
-    label.new(bar_index, sma_4hr, text="X", color=color.white, textcolor=color.black, style=label.style_label_left, size=size.tiny, tooltip="4h > 8h (Third)", yloc=yloc.price)
+buySignalk = ta.crossover(AlphaTrend, AlphaTrend[2])
+sellSignalk = ta.crossunder(AlphaTrend, AlphaTrend[2])
 
 
-// --- Fib Logic ---
-// "then after three look for low to high and work fibs"
-// Implication: Fibs are triggered when ALL 3 crossovers have occurred.
+K1 = ta.barssince(buySignalk)
+K2 = ta.barssince(sellSignalk)
+O1 = ta.barssince(buySignalk[1])
+O2 = ta.barssince(sellSignalk[1])
+
+// Valid Buy/Sell Conditions based on Kivanc's Logic
+validBuy = buySignalk and showsignalsk and O1 > K2
+validSell = sellSignalk and showsignalsk and O2 > K1
+
+plotshape(validBuy ? AlphaTrend[2] * 0.9999 : na, title='BUY', text='BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
+
+plotshape(validSell ? AlphaTrend[2] * 1.0001 : na, title='SELL', text='SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
+
+
+alertcondition(buySignalk and O1 > K2, title='Potential BUY Alarm', message='BUY SIGNAL!')
+alertcondition(sellSignalk and O2 > K1, title='Potential SELL Alarm', message='SELL SIGNAL!')
+
+alertcondition(buySignalk[1] and O1[1] > K2, title='Confirmed BUY Alarm', message='BUY SIGNAL APPROVED!')
+alertcondition(sellSignalk[1] and O2[1] > K1, title='Confirmed SELL Alarm', message='SELL SIGNAL APPROVED!')
+
+
+
+alertcondition(ta.cross(close, AlphaTrend), title='Price Cross Alert', message='Price - AlphaTrend Crossing!')
+alertcondition(ta.crossover(low, AlphaTrend), title='Candle CrossOver Alarm', message='LAST BAR is ABOVE ALPHATREND')
+alertcondition(ta.crossunder(high, AlphaTrend), title='Candle CrossUnder Alarm', message='LAST BAR is BELOW ALPHATREND!')
+
+alertcondition(ta.cross(close[1], AlphaTrend[1]), title='Price Cross Alert After Bar Close', message='Price - AlphaTrend Crossing!')
+alertcondition(ta.crossover(low[1], AlphaTrend[1]), title='Candle CrossOver Alarm After Bar Close', message='LAST BAR is ABOVE ALPHATREND!')
+alertcondition(ta.crossunder(high[1], AlphaTrend[1]), title='Candle CrossUnder Alarm After Bar Close', message='LAST BAR is BELOW ALPHATREND!')
+
+// --- CUSTOM FIBONACCI LOGIC ---
 
 // State Variables
-var float fib_low = na
-var float fib_high = na
-var bool is_active = false
-var float potential_low = 10e10
+var bool isLong = false
+var bool isShort = false
+var float anchor_price = na // Low for Longs, High for Shorts
+var float extreme_price = na // Highest High for Longs, Lowest Low for Shorts
 
-// Track Lowest Low continuously
-// We reset this only if the entire structure breaks or on successful trigger usage.
-// If the trend is bearish (1hr < 4hr or 1hr < 8hr), we definitely want to track new lows.
-if close < sma_1hr
-    potential_low := math.min(potential_low, low)
-
-// Trigger Condition:
-// 1. 1hr > 2hr
-// 2. 2hr > 4hr
-// 3. 4hr > 8hr
-// ALL MUST BE TRUE. 
-full_bull_alignment = sma_1hr > sma_2hr and sma_2hr > sma_4hr and sma_4hr > sma_8hr
-
-// We activate if we hit full alignment AND we weren't active before.
-// ADDED: trend_filter (Must be above Daily SMA to start looking for Long Fibs)
-if trend_filter and full_bull_alignment and not is_active
-    // Ensure we have a valid potential_low (not 10e10 initial value)
-    if potential_low < 10e9
-        is_active := true
-        fib_low := potential_low
-        fib_high := high
-        potential_low := 10e10 // Reset for next cycle
-
-// Maintenance:
-// "keep this in as long as the 1hr sma is above the 4hr sma"
-maintain_condition = sma_1hr > sma_4hr
-
-// Lines
+// Lines & Labels
 var line l_50 = na
 var line l_618 = na
 var line l_82 = na
-// Using extend.right for infinite lines to the right
-// three_weeks_ms = 1000 * 60 * 60 * 24 * 21 // No longer needed if using extend.right
+var linefill lf_fill = na
+var label trade_label = na
+var label stop_label = na
 
-if is_active
-    // Update High if alignment holds
-    if maintain_condition
-        fib_high := math.max(fib_high, high)
-    else
-        // Alignment broken. Setup is finished.
-        is_active := false
-    
-    // Draw/Update Lines
-    // While active, we update the lines. 
-    // Once inactive, they stop updating (frozen at last calculation) but remain on chart.
-    
-    // Delete previous iteration of lines FOR THIS ACTIVE SETUP to simulate updating.
+// Reset Function
+reset_fibs() =>
     line.delete(l_50)
     line.delete(l_618)
     line.delete(l_82)
+    linefill.delete(lf_fill)
+    // label.delete(trade_label) // We might want to keep history? 
+    // Usually markers should stay, but lines might clutter. 
+    // User asked to "put lines on chart". 
+    // I will delete OLD lines when a NEW signal comes to keep chart clean.
+    na
+
+// --- LONG LOGIC ---
+if validBuy
+    // New Buy Signal -> Start Fresh
+    reset_fibs()
+    isLong := true
+    isShort := false
+    anchor_price := low // Start from the Low of the Buy Signal candle (or slightly before? usually local low)
+    // To find the "Trend Low", we often look back. 
+    // But keeping it simple: Anchor at Signal Candle Low or recent Lowest Low.
+    // Let's use the lowest low since the last Sell Signal?
+    // K2 is bars since last Sell. 
+    lowest_since_sell = ta.lowest(low, K2 > 0 ? K2 : 1)
+    anchor_price := lowest_since_sell
     
-    fib_range = fib_high - fib_low
-    level_50 = fib_high - (fib_range * 0.50)
-    level_618 = fib_high - (fib_range * 0.618)
-    level_82 = fib_high - (fib_range * 0.82)
+    extreme_price := high // Reset high tracking
+
+// Maintenance for Long
+if isLong
+    // Update Highest High
+    extreme_price := math.max(extreme_price, high)
     
-    // Create new lines extending to the right
-    l_50 := line.new(bar_index, level_50, bar_index + 1, level_50, extend=extend.right, color=color.red, width=2)
-    l_618 := line.new(bar_index, level_618, bar_index + 1, level_618, extend=extend.right, color=color.red, width=2)
-    l_82 := line.new(bar_index, level_82, bar_index + 1, level_82, extend=extend.right, color=color.red, width=2)
+    // Calculate Levels (Retracement from High down to Low)
+    // Fib 0% = High, Fib 100% = Low (Anchor)
+    // 50% = High - 0.5 * Range
+    range_val = extreme_price - anchor_price
+    lev_50 = extreme_price - (range_val * 0.50)
+    lev_618 = extreme_price - (range_val * 0.618)
+    lev_82 = extreme_price - (range_val * 0.82)
     
-    // Golden Pocket Fill (Between 50% and 61.8%)
-    // Since lines are recreated, we fill between them.
-    linefill.new(l_50, l_618, color=color.new(color.red, 80))
+    // Update Lines
+    line.delete(l_50)
+    line.delete(l_618)
+    line.delete(l_82)
+    linefill.delete(lf_fill)
+    
+    l_50 := line.new(bar_index, lev_50, bar_index + 1, lev_50, extend=extend.right, color=color.green, width=1)
+    l_618 := line.new(bar_index, lev_618, bar_index + 1, lev_618, extend=extend.right, color=color.green, width=1)
+    l_82 := line.new(bar_index, lev_82, bar_index + 1, lev_82, extend=extend.right, color=color.red, width=2) // 82% is Stop zone
+    
+    lf_fill := linefill.new(l_50, l_618, color=color.new(color.green, 85))
+    
+    // "put long if it comes down to fib" (Touch 50-61.8 zone)
+    // Check if Low touches the zone
+    if low <= lev_50 and low >= lev_82 // Wide zone, or specifically 50-61.8?
+        // Let's mark it once per bar if touching
+        // To avoid spam, maybe only if it wasn't touching before?
+        // Or just a label "LONG" when it enters.
+        if high > lev_50 and low < lev_50 // Crossed into it
+            label.new(bar_index, low, "LONG", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.tiny)
+
+    // "put stopped if goes through 82%"
+    if low < lev_82
+        label.new(bar_index, lev_82, "STOPPED", style=label.style_label_up, color=color.red, textcolor=color.white, size=size.tiny)
+        isLong := false // Stop logic -> End setup?
+        reset_fibs()
+
+// --- SHORT LOGIC ---
+if validSell
+    // New Sell Signal
+    reset_fibs()
+    isLong := false
+    isShort := true
+    // Anchor High = Highest High since last Buy
+    highest_since_buy = ta.highest(high, K1 > 0 ? K1 : 1)
+    anchor_price := highest_since_buy
+    
+    extreme_price := low // Reset Low tracking
+
+// Maintenance for Short
+if isShort
+    // Update Lowest Low
+    extreme_price := math.min(extreme_price, low)
+    
+    // Calculate Levels (Retracement from Low up to High)
+    // Fib 0% = Low, Fib 100% = High (Anchor)
+    // 50% = Low + 0.5 * Range
+    range_val = anchor_price - extreme_price
+    lev_50 = extreme_price + (range_val * 0.50)
+    lev_618 = extreme_price + (range_val * 0.618)
+    lev_82 = extreme_price + (range_val * 0.82)
+    
+    // Update Lines
+    line.delete(l_50)
+    line.delete(l_618)
+    line.delete(l_82)
+    linefill.delete(lf_fill)
+    
+    l_50 := line.new(bar_index, lev_50, bar_index + 1, lev_50, extend=extend.right, color=color.red, width=1)
+    l_618 := line.new(bar_index, lev_618, bar_index + 1, lev_618, extend=extend.right, color=color.red, width=1)
+    l_82 := line.new(bar_index, lev_82, bar_index + 1, lev_82, extend=extend.right, color=color.red, width=2) // Stop zone
+    
+    lf_fill := linefill.new(l_50, l_618, color=color.new(color.red, 85))
+    
+    // "put short if it comes up to fib"
+    if high >= lev_50 and high <= lev_82
+        if low < lev_50 and high > lev_50 // Crossed up into it
+            label.new(bar_index, high, "SHORT", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.tiny)
+            
+    // "put stopped if goes through 82%"
+    if high > lev_82
+        label.new(bar_index, lev_82, "STOPPED", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.tiny)
+        isShort := false
+        reset_fibs()
