@@ -35,19 +35,20 @@ plot(sma_1hr,    title="1hr 200 SMA",    color=color.yellow, linewidth=2)
 // --- Crossover Markings ---
 // 1. Cross when 1hr SMA crosses above 2hr SMA
 if ta.crossover(sma_1hr, sma_2hr)
-    label.new(bar_index, high, "X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="1h > 2h")
+    label.new(bar_index, high, text="+", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="1h > 2h")
 
 // 2. Cross when 2hr SMA crosses above 4hr SMA
 if ta.crossover(sma_2hr, sma_4hr)
-    label.new(bar_index, high, "X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="2h > 4h")
+    label.new(bar_index, high, text="+", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="2h > 4h")
 
 // 3. Cross when 4hr SMA crosses above 8hr SMA
 if ta.crossover(sma_4hr, sma_8hr)
-    label.new(bar_index, high, "X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="4h > 8h")
+    label.new(bar_index, high, text="X", color=color.white, textcolor=color.black, style=label.style_label_down, size=size.tiny, tooltip="4h > 8h")
 
 
 // --- Fib Logic ---
-// "set for long fibs is made find the low below the the 1 hr fib and look for the high and draw on the chart 50% and 61.8% and a 82% red line and keep these lines on the chart for 3 weeks"
+// "then after three look for low to high and work fibs"
+// Implication: Fibs are triggered when ALL 3 crossovers have occurred (or effectively when 4hr > 8hr, assuming the others are already true).
 
 // State Variables
 var float fib_low = na
@@ -55,66 +56,55 @@ var float fib_high = na
 var bool is_active = false
 var float potential_low = 10e10
 
-// Track Lowest Low continuously when not active or whenever price is below 1hr SMA
-// If price is below 1hr SMA, that is a potential dip for a long setup
+// Track Lowest Low continuously when not active. 
+// "find the low below the 1 hr fib" -> Low must have occurred when Price < 1hr SMA.
+// We track minimum low whenever close is < 1hr SMA.
 if close < sma_1hr
     potential_low := math.min(potential_low, low)
-else
-    // If we are above 1hr SMA, we keep the potential_low as the swing low
-    // until we potentially trigger a new structure or reset.
-    // If price crosses back down, we might want to continue tracking deeper lows.
-    if ta.crossunder(close, sma_1hr)
-        // Reset tracking logic? 
-        // User says "find the low below the 1 hr fib". 
-        // So potential_low is the minimum low recorded while close was < sma_1hr.
-        potential_low := potential_low
+// We do NOT reset potential_low if price goes above 1hr SMA, because the sequence might start shortly after.
+// However, if we don't trigger for a long time, this low might be stale.
+// But given the "after three" instruction, we likely want the low of the most recent dip.
+// We reset potential_low only when we successfully trigger a setup (consumed) or perhaps if the trend reverses completely (e.g. 1hr < 8hr).
 
 // Trigger Condition:
-// Not explicitly defined in the latest prompt other than "set for long fibs is made".
-// Assuming the previous condition (1hr > 2hr > 4hr) or similar stacking implies "set is made".
-// Or perhaps when all crosses have happened?
-// Let's stick to the strongest confirmation: 1hr > 2hr AND 2hr > 4hr AND 4hr > 8hr ?
-// Or revert to the previous "1hr > 2hr > 4hr".
-// User mentioned: "find the low below the 1 hr fib".
-// I will use the condition: 1hr > 2hr AND 2hr > 4hr to start tracking Highs and drawing Fibs.
-bull_alignment = sma_1hr > sma_2hr and sma_2hr > sma_4hr
+// 1. 1hr > 2hr
+// 2. 2hr > 4hr
+// 3. 4hr > 8hr
+// ALL MUST BE TRUE. 
+full_bull_alignment = sma_1hr > sma_2hr and sma_2hr > sma_4hr and sma_4hr > sma_8hr
 
-if bull_alignment and not is_active
-    is_active := true
-    fib_low := potential_low
-    fib_high := high
-    potential_low := 10e10 // Reset for next time
+// We activate if we hit full alignment AND we weren't active before.
+if full_bull_alignment and not is_active
+    // Ensure we have a valid potential_low (not 10e10 initial value)
+    if potential_low < 10e9
+        is_active := true
+        fib_low := potential_low
+        fib_high := high
+        potential_low := 10e10 // Reset for next cycle
 
 // Maintenance:
-// "keep these lines on the chart for 3 weeks"
-// If alignment breaks, we stop updating Highs but lines might stay?
-// Or we just keep updating as long as alignment holds.
-if is_active
-    // Update High if alignment holds
-    if sma_1hr > sma_4hr 
-        fib_high := math.max(fib_high, high)
-    else
-        // Alignment broken.
-        // Should we stop making new lines?
-        is_active := false
-    
-    // Draw Lines
-    // "keep these lines on the chart for 3 weeks"
-    // I will use line.new every bar or update existing lines.
-    // To leave trails of past setups, we should create NEW lines when the setup finishes (or updates).
-    // But Pine Script deletes old lines after ~50-100 lines.
-    // Best approach: Maintain one set of lines for the CURRENT active setup.
-    // If the setup finishes (active becomes false), those lines persist at their last location.
-    
-    // Variables for lines need to be 'var' to persist across bars
-    
+// "keep this in as long as the 1hr sma is above the 4hr sma"
+maintain_condition = sma_1hr > sma_4hr
+
+// Lines
 var line l_50 = na
 var line l_618 = na
 var line l_82 = na
 three_weeks_ms = 1000 * 60 * 60 * 24 * 21
 
 if is_active
-    // Delete old lines of CURRENT setup to update them
+    // Update High if alignment holds
+    if maintain_condition
+        fib_high := math.max(fib_high, high)
+    else
+        // Alignment broken. Setup is finished.
+        is_active := false
+    
+    // Draw/Update Lines
+    // While active, we update the lines. 
+    // Once inactive, they stop updating (frozen at last calculation) but remain on chart.
+    
+    // Delete previous iteration of lines FOR THIS ACTIVE SETUP to simulate updating.
     line.delete(l_50)
     line.delete(l_618)
     line.delete(l_82)
@@ -124,7 +114,7 @@ if is_active
     level_618 = fib_high - (fib_range * 0.618)
     level_82 = fib_high - (fib_range * 0.82)
     
+    // Create new lines extending 3 weeks from current time
     l_50 := line.new(bar_index, level_50, time + three_weeks_ms, level_50, xloc=xloc.bar_time, color=color.red, width=2)
     l_618 := line.new(bar_index, level_618, time + three_weeks_ms, level_618, xloc=xloc.bar_time, color=color.red, width=2)
     l_82 := line.new(bar_index, level_82, time + three_weeks_ms, level_82, xloc=xloc.bar_time, color=color.red, width=2)
-
