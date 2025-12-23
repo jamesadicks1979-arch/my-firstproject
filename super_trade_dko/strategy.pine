@@ -273,9 +273,9 @@ if align_bull_100_200
             line.delete(l_fib_618_long)
             line.delete(l_fib_80_long)
             
-            l_fib_50_long := line.new(fib_long_anchor_bar, val_50, bar_index + 5, val_50, color=color.green, width=1)
-            l_fib_618_long := line.new(fib_long_anchor_bar, val_618, bar_index + 5, val_618, color=color.green, width=1)
-            l_fib_80_long := line.new(fib_long_anchor_bar, val_80, bar_index + 5, val_80, color=color.red, width=2)
+            l_fib_50_long := line.new(fib_long_anchor_bar, val_50, bar_index + 10, val_50, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+            l_fib_618_long := line.new(fib_long_anchor_bar, val_618, bar_index + 10, val_618, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+            l_fib_80_long := line.new(fib_long_anchor_bar, val_80, bar_index + 10, val_80, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=2)
 
 else
     // Reset if trend alignment breaks
@@ -329,9 +329,9 @@ if align_bear_100_200
             line.delete(l_fib_618_short)
             line.delete(l_fib_80_short)
             
-            l_fib_50_short := line.new(fib_short_anchor_bar, val_50, bar_index + 5, val_50, color=color.green, width=1)
-            l_fib_618_short := line.new(fib_short_anchor_bar, val_618, bar_index + 5, val_618, color=color.green, width=1)
-            l_fib_80_short := line.new(fib_short_anchor_bar, val_80, bar_index + 5, val_80, color=color.red, width=2)
+            l_fib_50_short := line.new(fib_short_anchor_bar, val_50, bar_index + 10, val_50, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+            l_fib_618_short := line.new(fib_short_anchor_bar, val_618, bar_index + 10, val_618, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+            l_fib_80_short := line.new(fib_short_anchor_bar, val_80, bar_index + 10, val_80, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=2)
 
 else
     fib_short_active := false
