@@ -55,12 +55,12 @@ else
 fill(cp21, cp50, color=c_col_21, title="Chart 21/50 Fill")
 
 // Determine if 21/50 is in Bullish or Bearish alignment based on fill color
-// We use the color logic: Green (Bullish), Red (Bearish), NA (Neutral/No Fill)
-// c_col_21 returns a color.new(...) object. We can check the alignment condition directly.
-// Bullish Alignment: 21 > 50 + 3 pips
 bool align_bull_21_50 = c_s21 >= c_thresh_21_long
-// Bearish Alignment: 21 < 50 - 3 pips
 bool align_bear_21_50 = c_s21 <= c_thresh_21_short
+
+// Determine if 100/200 is in Bullish or Bearish alignment based on fill color
+bool align_bull_100_200 = c_s100 >= c_thresh_100_long and c_s21 >= c_s100
+bool align_bear_100_200 = c_s100 <= c_thresh_100_short and c_s21 <= c_s100
 
 // ==========================================
 // 2. DAILY TIMEFRAME LOGIC (LOCKED)
@@ -106,12 +106,6 @@ fill(k1, k2, color=color1)
 // 4. STRATEGY LOGIC: 200 SMA RETEST + ALPHATREND
 // ==========================================
 
-// --- State Variables ---
-// 0: Neutral/Monitoring
-// 1: Base Established (Price below 200SMA for Buy, above for Sell)
-// 2: Breakout (Price crossed 200SMA)
-// 3: Retest Occurred (Price touched 200SMA)
-
 var int buy_state = 0
 var int buy_dip_timer = 0
 var int buy_base_counter = 0
@@ -121,26 +115,22 @@ var int sell_dip_timer = 0
 var int sell_base_counter = 0
 
 // --- BUY LOGIC (Long) ---
-// Condition A: Price below 200 SMA for 5 periods
 if close < c_s200
     buy_base_counter := buy_base_counter + 1
 else
     buy_base_counter := 0
 
 if buy_base_counter >= 5
-    buy_state := 1 // Bear Base Established
+    buy_state := 1
 
-// Condition B: Breakout (Price crosses above 200 SMA)
 if buy_state == 1 and ta.crossover(close, c_s200)
-    buy_state := 2 // Breakout
+    buy_state := 2
     buy_dip_timer := 0
 
-// Condition C: Retest (Touch or Dip below 200 SMA)
 if buy_state == 2
     if low <= c_s200
-        buy_state := 3 // Retest Occurred
+        buy_state := 3
 
-// Dip Monitoring
 if buy_state >= 2
     if close < c_s200
         buy_dip_timer := buy_dip_timer + 1
@@ -148,38 +138,31 @@ if buy_state >= 2
         buy_dip_timer := 0 
     
     if buy_dip_timer >= 5
-        buy_state := 1 // Failed breakout
+        buy_state := 1
 
-// Condition D: Trigger (Close above AlphaTrend)
-// ADDED: Confirmation 21 > 50 SMA (align_bull_21_50)
-// Must be Green Fill alignment
 trigger_buy = buy_state == 3 and ta.crossover(close, AlphaTrend) and align_bull_21_50
 
 if trigger_buy
     label.new(bar_index, low, "BUY", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
-    buy_state := 0 // Reset after signal
+    buy_state := 0
 
 // --- SELL LOGIC (Short) ---
-// Condition A: Price above 200 SMA for 5 periods
 if close > c_s200
     sell_base_counter := sell_base_counter + 1
 else
     sell_base_counter := 0
 
 if sell_base_counter >= 5
-    sell_state := 1 // Bull Base Established
+    sell_state := 1
 
-// Condition B: Breakout (Price crosses below 200 SMA)
 if sell_state == 1 and ta.crossunder(close, c_s200)
-    sell_state := 2 // Breakout
+    sell_state := 2
     sell_dip_timer := 0
 
-// Condition C: Retest (Touch or rise above 200 SMA)
 if sell_state == 2
     if high >= c_s200
-        sell_state := 3 // Retest Occurred
+        sell_state := 3
 
-// Dip Monitoring (Rise Monitoring)
 if sell_state >= 2
     if close > c_s200
         sell_dip_timer := sell_dip_timer + 1
@@ -187,19 +170,177 @@ if sell_state >= 2
         sell_dip_timer := 0
     
     if sell_dip_timer >= 5
-        sell_state := 1 // Failed breakdown
+        sell_state := 1
 
-// Condition D: Trigger (Close below AlphaTrend)
-// ADDED: Confirmation 21 < 50 SMA (align_bear_21_50)
-// Must be Red Fill alignment
 trigger_sell = sell_state == 3 and ta.crossunder(close, AlphaTrend) and align_bear_21_50
 
 if trigger_sell
     label.new(bar_index, high, "SELL", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
-    sell_state := 0 // Reset
+    sell_state := 0
 
 // ==========================================
-// 5. RIGHT SIDE LABELS
+// 5. FIBONACCI RETRACEMENT LOGIC (100/200 Trend)
+// ==========================================
+
+// State Variables for Fibs
+var bool fib_long_active = false
+var float fib_long_anchor = na
+var int fib_long_anchor_bar = na
+var line l_fib_50_long = na
+var line l_fib_618_long = na
+var line l_fib_80_long = na
+
+var bool fib_short_active = false
+var float fib_short_anchor = na
+var int fib_short_anchor_bar = na
+var line l_fib_50_short = na
+var line l_fib_618_short = na
+var line l_fib_80_short = na
+
+// --- LONG FIB LOGIC ---
+// Condition: 100 > 200 (Green Fill)
+// Trigger: Price trades below AlphaTrend then Closes back Above
+// Anchor: Lowest Low while below AlphaTrend
+
+if align_bull_100_200
+    // If not active, look for entry condition
+    if not fib_long_active
+        if ta.crossover(close, AlphaTrend)
+            // We just crossed back above. Did we dip below significantly?
+            // Let's check if there was a recent dip.
+            // Anchor is Lowest Low since price was last above AlphaTrend.
+            // Effectively, we look back to when we were below.
+            // A simple way is to find the lowest low of the recent "below" excursion.
+            // Look back N bars? Or track state?
+            // State tracking is better.
+            
+            // Let's assume valid dip if we closed below at least once recently.
+            if close[1] < AlphaTrend[1]
+                fib_long_active := true
+                // Find lowest low of the dip.
+                // We iterate back until close > AlphaTrend
+                lowest_dip = low
+                lowest_idx = bar_index
+                for i = 1 to 50 // Limit lookback
+                    if close[i] > AlphaTrend[i]
+                        break
+                    if low[i] < lowest_dip
+                        lowest_dip := low[i]
+                        lowest_idx := bar_index - i
+                
+                fib_long_anchor := lowest_dip
+                fib_long_anchor_bar := lowest_idx
+                
+                // Draw Initial Lines
+                // High point for Fib? Usually Fib is High to Low.
+                // If we are long, we measure retracement of the move UP? 
+                // OR extension from the low?
+                // User said: "work a 50% to 61% fibs... until it closes back below"
+                // Usually this means measuring the Swing Low (Anchor) to the current High.
+                // Lines update as High increases.
+                
+    // If active, update lines
+    if fib_long_active
+        // Check if condition broken (Close back below AlphaTrend)
+        if ta.crossunder(close, AlphaTrend)
+            fib_long_active := false
+            line.delete(l_fib_50_long)
+            line.delete(l_fib_618_long)
+            line.delete(l_fib_80_long)
+        else
+            // Update High
+            current_high = high // Using current high or tracking highest high since anchor?
+            // Usually Fibs are drawn from Swing Low to Swing High. 
+            // The Swing High is the highest point reached SO FAR in this move.
+            // But if we just crossed, the high is forming.
+            
+            // Let's track highest high since re-entry
+            var float fib_long_peak = na
+            if ta.crossover(close, AlphaTrend) // Reset peak on start
+                fib_long_peak := high
+            else
+                fib_long_peak := math.max(fib_long_peak, high)
+            
+            // Calculate Levels
+            // Range = Peak - Anchor
+            // 50% = Peak - 0.5 * Range
+            fib_range = fib_long_peak - fib_long_anchor
+            val_50 = fib_long_peak - (fib_range * 0.50)
+            val_618 = fib_long_peak - (fib_range * 0.618)
+            val_80 = fib_long_peak - (fib_range * 0.80)
+            
+            line.delete(l_fib_50_long)
+            line.delete(l_fib_618_long)
+            line.delete(l_fib_80_long)
+            
+            l_fib_50_long := line.new(fib_long_anchor_bar, val_50, bar_index + 5, val_50, color=color.green, width=1)
+            l_fib_618_long := line.new(fib_long_anchor_bar, val_618, bar_index + 5, val_618, color=color.green, width=1)
+            l_fib_80_long := line.new(fib_long_anchor_bar, val_80, bar_index + 5, val_80, color=color.red, width=2)
+
+else
+    // Reset if trend alignment breaks
+    fib_long_active := false
+    line.delete(l_fib_50_long)
+    line.delete(l_fib_618_long)
+    line.delete(l_fib_80_long)
+
+
+// --- SHORT FIB LOGIC ---
+// Condition: 100 < 200 (Red Fill)
+// Trigger: Price trades above AlphaTrend then Closes back Below
+// Anchor: Highest High while above AlphaTrend
+
+if align_bear_100_200
+    if not fib_short_active
+        if ta.crossunder(close, AlphaTrend)
+            if close[1] > AlphaTrend[1]
+                fib_short_active := true
+                highest_rally = high
+                highest_idx = bar_index
+                for i = 1 to 50
+                    if close[i] < AlphaTrend[i]
+                        break
+                    if high[i] > highest_rally
+                        highest_rally := high[i]
+                        highest_idx := bar_index - i
+                
+                fib_short_anchor := highest_rally
+                fib_short_anchor_bar := highest_idx
+    
+    if fib_short_active
+        if ta.crossover(close, AlphaTrend)
+            fib_short_active := false
+            line.delete(l_fib_50_short)
+            line.delete(l_fib_618_short)
+            line.delete(l_fib_80_short)
+        else
+            var float fib_short_trough = na
+            if ta.crossunder(close, AlphaTrend)
+                fib_short_trough := low
+            else
+                fib_short_trough := math.min(fib_short_trough, low)
+            
+            fib_range = fib_short_anchor - fib_short_trough
+            val_50 = fib_short_trough + (fib_range * 0.50)
+            val_618 = fib_short_trough + (fib_range * 0.618)
+            val_80 = fib_short_trough + (fib_range * 0.80)
+            
+            line.delete(l_fib_50_short)
+            line.delete(l_fib_618_short)
+            line.delete(l_fib_80_short)
+            
+            l_fib_50_short := line.new(fib_short_anchor_bar, val_50, bar_index + 5, val_50, color=color.green, width=1)
+            l_fib_618_short := line.new(fib_short_anchor_bar, val_618, bar_index + 5, val_618, color=color.green, width=1)
+            l_fib_80_short := line.new(fib_short_anchor_bar, val_80, bar_index + 5, val_80, color=color.red, width=2)
+
+else
+    fib_short_active := false
+    line.delete(l_fib_50_short)
+    line.delete(l_fib_618_short)
+    line.delete(l_fib_80_short)
+
+// ==========================================
+// 6. RIGHT SIDE LABELS
 // ==========================================
 if barstate.islast
     // Chart SMAs
