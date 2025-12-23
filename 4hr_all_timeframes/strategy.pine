@@ -88,7 +88,7 @@ if isLong
     // Logic: If we are actively tracking, and price touches 50%
     if low <= lev_50 and low >= lev_80
         if high > lev_50 and low < lev_50 // Just crossed
-             label.new(bar_index, low, "LONG", style=label.style_label_up, color=color.blue, textcolor=color.white, size=size.small)
+            label.new(bar_index, low, "LONG", style=label.style_label_up, color=color.blue, textcolor=color.white, size=size.small)
 
     // Stop logic at 80%?
     if low < lev_80
