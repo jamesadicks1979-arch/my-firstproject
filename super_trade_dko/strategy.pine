@@ -1,0 +1,5 @@
+//@version=5
+indicator("Super Trade DKO", overlay=true)
+
+// TODO: Add logic here
+plot(close)
