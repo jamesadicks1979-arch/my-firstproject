@@ -18,8 +18,8 @@ downT = high + ATR * coeff
 AlphaTrend = 0.0
 AlphaTrend := (novolumedata ? ta.rsi(src, AP) >= 50 : ta.mfi(hlc3, AP) >= 50) ? upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
 
-// We do NOT plot AlphaTrend lines or fills as requested.
-// Just using the signals.
+// Plot AlphaTrend temporarily with transparency to debug if signals are generated
+// plot(AlphaTrend, color=color.new(color.blue, 100))
 
 buySignalk = ta.crossover(AlphaTrend, AlphaTrend[2])
 sellSignalk = ta.crossunder(AlphaTrend, AlphaTrend[2])
@@ -40,6 +40,7 @@ var bool isLong = false
 var bool isShort = false
 var float anchor_price = na // Low for Longs, High for Shorts
 var float extreme_price = na // Highest High for Longs, Lowest Low for Shorts
+var int anchor_bar_index = na // Track WHERE the anchor happened
 
 // Lines & Labels
 var line l_50 = na
@@ -62,12 +63,20 @@ if validBuy
     isLong := true
     isShort := false
     
-    // Anchor at Lowest Low since the last Sell Signal (Trend Low)
-    lowest_since_sell = ta.lowest(low, K2 > 0 ? K2 : 1)
-    anchor_price := lowest_since_sell
+    // Find Anchor: Lowest Low since the last Sell Signal
+    // We need to look back 'K2' bars.
+    // If K2 is 0 (first bar), we look back 1.
+    // ta.lowest returns the value. To place the X, we need to know WHEN it happened.
+    // ta.lowestbars returns the offset (negative value).
+    lookback = K2 > 0 ? K2 : 1
+    lowest_offset = ta.lowestbars(low, lookback) 
+    anchor_price := low[math.abs(lowest_offset)]
+    anchor_bar_index := bar_index + lowest_offset
     
-    // Mark the Anchor
-    label.new(bar_index, anchor_price, "X", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.tiny, tooltip="Anchor Low")
+    // Mark the Anchor at the CORRECT historical bar
+    // label.new(bar_index, ... ) puts it on current bar. We want it in the past.
+    // Use xloc.bar_index
+    label.new(anchor_bar_index, anchor_price, "X", xloc=xloc.bar_index, style=label.style_label_up, color=color.black, textcolor=color.black, size=size.small, tooltip="Anchor Low")
     
     extreme_price := high // Reset high tracking
 
@@ -89,19 +98,29 @@ if isLong
     line.delete(l_82)
     linefill.delete(lf_fill)
     
-    l_50 := line.new(bar_index, lev_50, bar_index + 1, lev_50, extend=extend.right, color=color.green, width=1)
-    l_618 := line.new(bar_index, lev_618, bar_index + 1, lev_618, extend=extend.right, color=color.green, width=1)
-    l_82 := line.new(bar_index, lev_82, bar_index + 1, lev_82, extend=extend.right, color=color.red, width=2) // 82% is Stop zone
+    // Draw lines from Anchor Bar Index to Right? Or from Signal?
+    // User picture shows lines extending across.
+    // Drawing from Anchor Bar Index makes it look cleaner like a "Swing" tool.
+    // But lines must extend right.
+    
+    // IMPORTANT: If anchor was 50 bars ago, drawing a line from there might look cluttered if overlapping candles?
+    // User picture implies lines covering the "Setup" area.
+    
+    l_50 := line.new(anchor_bar_index, lev_50, bar_index + 10, lev_50, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+    l_618 := line.new(anchor_bar_index, lev_618, bar_index + 10, lev_618, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+    l_82 := line.new(anchor_bar_index, lev_82, bar_index + 10, lev_82, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=2)
     
     lf_fill := linefill.new(l_50, l_618, color=color.new(color.green, 85))
     
     // "put long if it comes down to fib"
     if high > lev_50 and low < lev_50 // Crossed into it
-        label.new(bar_index, low, "LONG", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, low, "LONG", style=label.style_label_up, color=color.blue, textcolor=color.white, size=size.small)
 
     // "put stopped if goes through 82%"
     if low < lev_82
-        label.new(bar_index, lev_82, "STOPPED", style=label.style_label_up, color=color.red, textcolor=color.white, size=size.tiny)
+        // label.new(bar_index, lev_82, "STOPPED", style=label.style_label_up, color=color.red, textcolor=color.white, size=size.tiny)
+        // User picture shows X at the stop point?
+        label.new(bar_index, low, "X", style=label.style_label_up, color=color.black, textcolor=color.black, size=size.small)
         isLong := false 
         reset_fibs()
 
@@ -112,12 +131,14 @@ if validSell
     isLong := false
     isShort := true
     
-    // Anchor at Highest High since last Buy Signal (Trend High)
-    highest_since_buy = ta.highest(high, K1 > 0 ? K1 : 1)
-    anchor_price := highest_since_buy
+    // Find Anchor: Highest High since last Buy
+    lookback = K1 > 0 ? K1 : 1
+    highest_offset = ta.highestbars(high, lookback)
+    anchor_price := high[math.abs(highest_offset)]
+    anchor_bar_index := bar_index + highest_offset
     
     // Mark the Anchor
-    label.new(bar_index, anchor_price, "X", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.tiny, tooltip="Anchor High")
+    label.new(anchor_bar_index, anchor_price, "X", xloc=xloc.bar_index, style=label.style_label_down, color=color.black, textcolor=color.black, size=size.small, tooltip="Anchor High")
     
     extreme_price := low // Reset Low tracking
 
@@ -139,18 +160,19 @@ if isShort
     line.delete(l_82)
     linefill.delete(lf_fill)
     
-    l_50 := line.new(bar_index, lev_50, bar_index + 1, lev_50, extend=extend.right, color=color.red, width=1)
-    l_618 := line.new(bar_index, lev_618, bar_index + 1, lev_618, extend=extend.right, color=color.red, width=1)
-    l_82 := line.new(bar_index, lev_82, bar_index + 1, lev_82, extend=extend.right, color=color.red, width=2) // Stop zone
+    l_50 := line.new(anchor_bar_index, lev_50, bar_index + 10, lev_50, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=1)
+    l_618 := line.new(anchor_bar_index, lev_618, bar_index + 10, lev_618, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=1)
+    l_82 := line.new(anchor_bar_index, lev_82, bar_index + 10, lev_82, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=2)
     
     lf_fill := linefill.new(l_50, l_618, color=color.new(color.red, 85))
     
     // "put short if it comes up to fib"
     if low < lev_50 and high > lev_50 // Crossed up into it
-        label.new(bar_index, high, "SHORT", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, high, "SHORT", style=label.style_label_down, color=color.maroon, textcolor=color.white, size=size.small)
             
     // "put stopped if goes through 82%"
     if high > lev_82
-        label.new(bar_index, lev_82, "STOPPED", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.tiny)
+        // label.new(bar_index, lev_82, "STOPPED", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, high, "X", style=label.style_label_down, color=color.black, textcolor=color.black, size=size.small)
         isShort := false
         reset_fibs()
