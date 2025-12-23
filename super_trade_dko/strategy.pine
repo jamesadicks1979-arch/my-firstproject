@@ -91,11 +91,11 @@ at_downT = high + at_atr * at_coeff
 AlphaTrend = 0.0
 AlphaTrend := (at_novolumedata ? ta.rsi(at_src, at_ap) >= 50 : ta.mfi(hlc3, at_ap) >= 50) ? at_upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : at_upT : at_downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : at_downT
 
-// AlphaTrend plotting disabled
-// color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
-// k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
-// k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
-// fill(k1, k2, color=color1)
+// AlphaTrend plotting enabled
+color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
+k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
+fill(k1, k2, color=color1)
 
 at_buySignal = ta.crossover(AlphaTrend, AlphaTrend[2])
 at_sellSignal = ta.crossunder(AlphaTrend, AlphaTrend[2])
