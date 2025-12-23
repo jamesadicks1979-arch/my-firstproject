@@ -112,3 +112,21 @@ at_sellSignal = ta.crossunder(AlphaTrend, AlphaTrend[2])
 // Alerts (Variables renamed to match integration)
 // alertcondition(at_buySignal and O1 > K2, title='Potential BUY Alarm', message='BUY SIGNAL!')
 // alertcondition(at_sellSignal and O2 > K1, title='Potential SELL Alarm', message='SELL SIGNAL!')
+
+// ==========================================
+// 4. RIGHT SIDE LABELS
+// ==========================================
+if barstate.islast
+    // Chart SMAs
+    if show_chart
+        label.new(bar_index, c_s21, "Chart 21", style=label.style_label_left, color=color.green, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, c_s50, "Chart 50", style=label.style_label_left, color=color.blue, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, c_s100, "Chart 100", style=label.style_label_left, color=color.orange, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, c_s200, "Chart 200", style=label.style_label_left, color=color.red, textcolor=color.white, size=size.tiny)
+    
+    // Daily SMAs
+    if show_daily
+        label.new(bar_index, d_s21, "Daily 21", style=label.style_label_left, color=color.green, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, d_s50, "Daily 50", style=label.style_label_left, color=color.blue, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, d_s100, "Daily 100", style=label.style_label_left, color=color.orange, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, d_s200, "Daily 200", style=label.style_label_left, color=color.red, textcolor=color.white, size=size.tiny)
