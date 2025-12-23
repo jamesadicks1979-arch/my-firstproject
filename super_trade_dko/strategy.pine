@@ -207,7 +207,8 @@ var line l_fib_80_short = na
 
 // --- LONG FIB LOGIC ---
 // Added: filter_long_daily50 check to activation
-if align_bull_100_200 and filter_long_daily50
+// REMOVED: align_bull_100_200 requirement to catch more signals
+if filter_long_daily50
     // If not active, look for entry condition
     if not fib_long_active
         if ta.crossover(close, AlphaTrend)
@@ -216,7 +217,7 @@ if align_bull_100_200 and filter_long_daily50
                 fib_long_active := true
                 lowest_dip = low
                 lowest_idx = bar_index
-                for i = 1 to 50 
+                for i = 1 to 100 // Increased to 100
                     if close[i] > AlphaTrend[i]
                         break
                     if low[i] < lowest_dip
@@ -225,6 +226,9 @@ if align_bull_100_200 and filter_long_daily50
                 
                 fib_long_anchor := lowest_dip
                 fib_long_anchor_bar := lowest_idx
+                
+                // Debug Label
+                // label.new(bar_index, high, "Fib Start", style=label.style_label_down, color=color.blue, size=size.tiny)
                 
     // If active, update lines
     if fib_long_active
@@ -256,7 +260,7 @@ if align_bull_100_200 and filter_long_daily50
             l_fib_80_long := line.new(fib_long_anchor_bar, val_80, bar_index + 10, val_80, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=2)
 
 else
-    // Reset if trend alignment breaks or Daily Filter fails
+    // Reset if Daily Filter fails (removed alignment check reset)
     fib_long_active := false
     line.delete(l_fib_50_long)
     line.delete(l_fib_618_long)
@@ -265,14 +269,15 @@ else
 
 // --- SHORT FIB LOGIC ---
 // Added: filter_short_daily50 check to activation
-if align_bear_100_200 and filter_short_daily50
+// REMOVED: align_bear_100_200 requirement
+if filter_short_daily50
     if not fib_short_active
         if ta.crossunder(close, AlphaTrend)
             if close[1] > AlphaTrend[1]
                 fib_short_active := true
                 highest_rally = high
                 highest_idx = bar_index
-                for i = 1 to 50
+                for i = 1 to 100 // Increased to 100
                     if close[i] < AlphaTrend[i]
                         break
                     if high[i] > highest_rally
@@ -281,6 +286,9 @@ if align_bear_100_200 and filter_short_daily50
                 
                 fib_short_anchor := highest_rally
                 fib_short_anchor_bar := highest_idx
+                
+                // Debug Label
+                // label.new(bar_index, low, "Fib Start", style=label.style_label_up, color=color.red, size=size.tiny)
     
     if fib_short_active
         if ta.crossover(close, AlphaTrend)
