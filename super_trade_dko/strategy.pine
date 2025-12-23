@@ -71,3 +71,44 @@ plot(show_daily ? d_s21 : na, color=color.green, title="Daily 21 SMA", linewidth
 plot(show_daily ? d_s50 : na, color=color.blue, title="Daily 50 SMA", linewidth=2)
 plot(show_daily ? d_s100 : na, color=color.orange, title="Daily 100 SMA", linewidth=2)
 plot(show_daily ? d_s200 : na, color=color.red, title="Daily 200 SMA", linewidth=2)
+
+// ==========================================
+// 3. ALPHATREND LOGIC (INTEGRATED)
+// ==========================================
+// Based on AlphaTrend by KivancOzbilgic
+// Logic retained, visual plotting removed as requested.
+
+grp_at = "AlphaTrend Settings"
+at_coeff = input.float(1, 'Multiplier', step=0.1, group=grp_at)
+at_ap = input(14, 'Common Period', group=grp_at)
+at_src = input(close, "Source", group=grp_at)
+at_showsignals = input(title='Show Signals?', defval=true, group=grp_at)
+at_novolumedata = input(title='Change calculation (no volume data)?', defval=false, group=grp_at)
+
+at_atr = ta.sma(ta.tr, at_ap)
+at_upT = low - at_atr * at_coeff
+at_downT = high + at_atr * at_coeff
+AlphaTrend = 0.0
+AlphaTrend := (at_novolumedata ? ta.rsi(at_src, at_ap) >= 50 : ta.mfi(hlc3, at_ap) >= 50) ? at_upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : at_upT : at_downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : at_downT
+
+// AlphaTrend plotting disabled
+// color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+// k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
+// k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
+// fill(k1, k2, color=color1)
+
+at_buySignal = ta.crossover(AlphaTrend, AlphaTrend[2])
+at_sellSignal = ta.crossunder(AlphaTrend, AlphaTrend[2])
+
+// K1 = ta.barssince(at_buySignal)
+// K2 = ta.barssince(at_sellSignal)
+// O1 = ta.barssince(at_buySignal[1])
+// O2 = ta.barssince(at_sellSignal[1])
+
+// Visual signals disabled
+// plotshape(at_buySignal and at_showsignals and O1 > K2 ? AlphaTrend[2] * 0.9999 : na, title='BUY', text='BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
+// plotshape(at_sellSignal and at_showsignals and O2 > K1 ? AlphaTrend[2] * 1.0001 : na, title='SELL', text='SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
+
+// Alerts (Variables renamed to match integration)
+// alertcondition(at_buySignal and O1 > K2, title='Potential BUY Alarm', message='BUY SIGNAL!')
+// alertcondition(at_sellSignal and O2 > K1, title='Potential SELL Alarm', message='SELL SIGNAL!')
