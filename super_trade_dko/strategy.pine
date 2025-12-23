@@ -81,7 +81,7 @@ plot(show_daily ? d_s100 : na, color=color.orange, title="Daily 100 SMA", linewi
 plot(show_daily ? d_s200 : na, color=color.red, title="Daily 200 SMA", linewidth=2)
 
 // ==========================================
-// 3. ALPHATREND LOGIC (INTEGRATED)
+// 3. DAILY 50 SMA FILTER & ALPHATREND LOGIC
 // ==========================================
 grp_at = "AlphaTrend Settings"
 at_coeff = input.float(1, 'Multiplier', step=0.1, group=grp_at)
@@ -101,6 +101,12 @@ color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80
 k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
 k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
 fill(k1, k2, color=color1)
+
+// --- Daily 50 SMA Filter ---
+// If Price > Daily 50, only LONGs allowed.
+// If Price < Daily 50, only SHORTs allowed.
+filter_long_daily50 = close > d_s50
+filter_short_daily50 = close < d_s50
 
 // ==========================================
 // 4. STRATEGY LOGIC: 200 SMA RETEST + ALPHATREND
@@ -140,7 +146,8 @@ if buy_state >= 2
     if buy_dip_timer >= 5
         buy_state := 1
 
-trigger_buy = buy_state == 3 and ta.crossover(close, AlphaTrend) and align_bull_21_50
+// Trigger Condition with Daily 50 Filter
+trigger_buy = buy_state == 3 and ta.crossover(close, AlphaTrend) and align_bull_21_50 and filter_long_daily50
 
 if trigger_buy
     label.new(bar_index, low, "BUY", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
@@ -172,7 +179,8 @@ if sell_state >= 2
     if sell_dip_timer >= 5
         sell_state := 1
 
-trigger_sell = sell_state == 3 and ta.crossunder(close, AlphaTrend) and align_bear_21_50
+// Trigger Condition with Daily 50 Filter
+trigger_sell = sell_state == 3 and ta.crossunder(close, AlphaTrend) and align_bear_21_50 and filter_short_daily50
 
 if trigger_sell
     label.new(bar_index, high, "SELL", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
@@ -198,30 +206,17 @@ var line l_fib_618_short = na
 var line l_fib_80_short = na
 
 // --- LONG FIB LOGIC ---
-// Condition: 100 > 200 (Green Fill)
-// Trigger: Price trades below AlphaTrend then Closes back Above
-// Anchor: Lowest Low while below AlphaTrend
-
-if align_bull_100_200
+// Added: filter_long_daily50 check to activation
+if align_bull_100_200 and filter_long_daily50
     // If not active, look for entry condition
     if not fib_long_active
         if ta.crossover(close, AlphaTrend)
-            // We just crossed back above. Did we dip below significantly?
-            // Let's check if there was a recent dip.
-            // Anchor is Lowest Low since price was last above AlphaTrend.
-            // Effectively, we look back to when we were below.
-            // A simple way is to find the lowest low of the recent "below" excursion.
-            // Look back N bars? Or track state?
-            // State tracking is better.
-            
             // Let's assume valid dip if we closed below at least once recently.
             if close[1] < AlphaTrend[1]
                 fib_long_active := true
-                // Find lowest low of the dip.
-                // We iterate back until close > AlphaTrend
                 lowest_dip = low
                 lowest_idx = bar_index
-                for i = 1 to 50 // Limit lookback
+                for i = 1 to 50 
                     if close[i] > AlphaTrend[i]
                         break
                     if low[i] < lowest_dip
@@ -230,14 +225,6 @@ if align_bull_100_200
                 
                 fib_long_anchor := lowest_dip
                 fib_long_anchor_bar := lowest_idx
-                
-                // Draw Initial Lines
-                // High point for Fib? Usually Fib is High to Low.
-                // If we are long, we measure retracement of the move UP? 
-                // OR extension from the low?
-                // User said: "work a 50% to 61% fibs... until it closes back below"
-                // Usually this means measuring the Swing Low (Anchor) to the current High.
-                // Lines update as High increases.
                 
     // If active, update lines
     if fib_long_active
@@ -249,21 +236,12 @@ if align_bull_100_200
             line.delete(l_fib_80_long)
         else
             // Update High
-            current_high = high // Using current high or tracking highest high since anchor?
-            // Usually Fibs are drawn from Swing Low to Swing High. 
-            // The Swing High is the highest point reached SO FAR in this move.
-            // But if we just crossed, the high is forming.
-            
-            // Let's track highest high since re-entry
             var float fib_long_peak = na
-            if ta.crossover(close, AlphaTrend) // Reset peak on start
+            if ta.crossover(close, AlphaTrend) 
                 fib_long_peak := high
             else
                 fib_long_peak := math.max(fib_long_peak, high)
             
-            // Calculate Levels
-            // Range = Peak - Anchor
-            // 50% = Peak - 0.5 * Range
             fib_range = fib_long_peak - fib_long_anchor
             val_50 = fib_long_peak - (fib_range * 0.50)
             val_618 = fib_long_peak - (fib_range * 0.618)
@@ -278,7 +256,7 @@ if align_bull_100_200
             l_fib_80_long := line.new(fib_long_anchor_bar, val_80, bar_index + 10, val_80, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=2)
 
 else
-    // Reset if trend alignment breaks
+    // Reset if trend alignment breaks or Daily Filter fails
     fib_long_active := false
     line.delete(l_fib_50_long)
     line.delete(l_fib_618_long)
@@ -286,11 +264,8 @@ else
 
 
 // --- SHORT FIB LOGIC ---
-// Condition: 100 < 200 (Red Fill)
-// Trigger: Price trades above AlphaTrend then Closes back Below
-// Anchor: Highest High while above AlphaTrend
-
-if align_bear_100_200
+// Added: filter_short_daily50 check to activation
+if align_bear_100_200 and filter_short_daily50
     if not fib_short_active
         if ta.crossunder(close, AlphaTrend)
             if close[1] > AlphaTrend[1]
