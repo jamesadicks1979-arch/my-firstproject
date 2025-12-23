@@ -1,0 +1,341 @@
+//@version=5
+indicator("Moving Averages (Combined)", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// --- INPUTS ---
+grp_chart = "Chart Timeframe SMAs"
+show_chart = input.bool(true, "Show Chart Timeframe SMAs?", group=grp_chart)
+len21 = input.int(21, "21 Length", group=grp_chart)
+len50 = input.int(50, "50 Length", group=grp_chart)
+len100 = input.int(100, "100 Length", group=grp_chart)
+len200 = input.int(200, "200 Length", group=grp_chart)
+
+grp_daily = "Daily Timeframe SMAs (Locked)"
+show_daily = input.bool(true, "Show Daily SMAs?", group=grp_daily)
+
+// --- CONSTANTS ---
+pip_val = syminfo.mintick * 10
+
+// ==========================================
+// 1. CHART TIMEFRAME LOGIC
+// ==========================================
+c_s21 = ta.sma(close, len21)
+c_s50 = ta.sma(close, len50)
+c_s100 = ta.sma(close, len100)
+c_s200 = ta.sma(close, len200)
+
+// Plot Chart SMAs (Thinner Lines: 1)
+cp21 = plot(show_chart ? c_s21 : na, color=color.green, title="Chart 21 SMA", linewidth=1)
+cp50 = plot(show_chart ? c_s50 : na, color=color.blue, title="Chart 50 SMA", linewidth=1)
+cp100 = plot(show_chart ? c_s100 : na, color=color.orange, title="Chart 100 SMA", linewidth=1)
+cp200 = plot(show_chart ? c_s200 : na, color=color.red, title="Chart 200 SMA", linewidth=1)
+
+// Chart Fills
+// 100/200: Green if 100 > 200+8pips & 21>=100 | Red if 100 < 200-8pips & 21<=100
+c_thresh_100_long = c_s200 + (8 * pip_val)
+c_thresh_100_short = c_s200 - (8 * pip_val)
+
+c_col_100 = if show_chart and c_s100 >= c_thresh_100_long and c_s21 >= c_s100
+    color.new(color.green, 70)
+else if show_chart and c_s100 <= c_thresh_100_short and c_s21 <= c_s100
+    color.new(color.red, 70)
+else
+    na
+fill(cp100, cp200, color=c_col_100, title="Chart 100/200 Fill")
+
+// 21/50: Green if 21 > 50+3pips | Red if 21 < 50-3pips
+c_thresh_21_long = c_s50 + (3 * pip_val)
+c_thresh_21_short = c_s50 - (3 * pip_val)
+
+c_col_21 = if show_chart and c_s21 >= c_thresh_21_long
+    color.new(color.green, 70)
+else if show_chart and c_s21 <= c_thresh_21_short
+    color.new(color.red, 70)
+else
+    na
+fill(cp21, cp50, color=c_col_21, title="Chart 21/50 Fill")
+
+// Determine if 21/50 is in Bullish or Bearish alignment based on fill color
+bool align_bull_21_50 = c_s21 >= c_thresh_21_long
+bool align_bear_21_50 = c_s21 <= c_thresh_21_short
+
+// Determine if 100/200 is in Bullish or Bearish alignment based on fill color
+bool align_bull_100_200 = c_s100 >= c_thresh_100_long and c_s21 >= c_s100
+bool align_bear_100_200 = c_s100 <= c_thresh_100_short and c_s21 <= c_s100
+
+// ==========================================
+// 2. DAILY TIMEFRAME LOGIC (LOCKED)
+// ==========================================
+calc_daily() =>
+    d21 = ta.sma(close, len21)
+    d50 = ta.sma(close, len50)
+    d100 = ta.sma(close, len100)
+    d200 = ta.sma(close, len200)
+    [d21, d50, d100, d200]
+
+[d_s21, d_s50, d_s100, d_s200] = request.security(syminfo.tickerid, "1D", calc_daily())
+
+// Plot Daily SMAs (Thicker Lines: 2)
+plot(show_daily ? d_s21 : na, color=color.green, title="Daily 21 SMA", linewidth=2)
+plot(show_daily ? d_s50 : na, color=color.blue, title="Daily 50 SMA", linewidth=2)
+plot(show_daily ? d_s100 : na, color=color.orange, title="Daily 100 SMA", linewidth=2)
+plot(show_daily ? d_s200 : na, color=color.red, title="Daily 200 SMA", linewidth=2)
+
+// ==========================================
+// 3. DAILY 50 SMA FILTER & ALPHATREND LOGIC
+// ==========================================
+grp_at = "AlphaTrend Settings"
+at_coeff = input.float(1, 'Multiplier', step=0.1, group=grp_at)
+at_ap = input(14, 'Common Period', group=grp_at)
+at_src = input(close, "Source", group=grp_at)
+at_showsignals = input(title='Show Signals?', defval=true, group=grp_at)
+at_novolumedata = input(title='Change calculation (no volume data)?', defval=false, group=grp_at)
+
+at_atr = ta.sma(ta.tr, at_ap)
+at_upT = low - at_atr * at_coeff
+at_downT = high + at_atr * at_coeff
+AlphaTrend = 0.0
+AlphaTrend := (at_novolumedata ? ta.rsi(at_src, at_ap) >= 50 : ta.mfi(hlc3, at_ap) >= 50) ? at_upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : at_upT : at_downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : at_downT
+
+// AlphaTrend plotting enabled
+color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
+k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
+fill(k1, k2, color=color1)
+
+// --- Daily 50 SMA Filter ---
+// If Price > Daily 50, only LONGs allowed.
+// If Price < Daily 50, only SHORTs allowed.
+filter_long_daily50 = close > d_s50
+filter_short_daily50 = close < d_s50
+
+// ==========================================
+// 4. STRATEGY LOGIC: 200 SMA RETEST + ALPHATREND
+// ==========================================
+
+var int buy_state = 0
+var int buy_dip_timer = 0
+var int buy_base_counter = 0
+
+var int sell_state = 0
+var int sell_dip_timer = 0
+var int sell_base_counter = 0
+
+// --- BUY LOGIC (Long) ---
+if close < c_s200
+    buy_base_counter := buy_base_counter + 1
+else
+    buy_base_counter := 0
+
+if buy_base_counter >= 5
+    buy_state := 1
+
+if buy_state == 1 and ta.crossover(close, c_s200)
+    buy_state := 2
+    buy_dip_timer := 0
+
+if buy_state == 2
+    if low <= c_s200
+        buy_state := 3
+
+if buy_state >= 2
+    if close < c_s200
+        buy_dip_timer := buy_dip_timer + 1
+    else
+        buy_dip_timer := 0 
+    
+    if buy_dip_timer >= 5
+        buy_state := 1
+
+// Trigger Condition with Daily 50 Filter
+trigger_buy = buy_state == 3 and ta.crossover(close, AlphaTrend) and align_bull_21_50 and filter_long_daily50
+
+if trigger_buy
+    label.new(bar_index, low, "BUY", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
+    buy_state := 0
+
+// --- SELL LOGIC (Short) ---
+if close > c_s200
+    sell_base_counter := sell_base_counter + 1
+else
+    sell_base_counter := 0
+
+if sell_base_counter >= 5
+    sell_state := 1
+
+if sell_state == 1 and ta.crossunder(close, c_s200)
+    sell_state := 2
+    sell_dip_timer := 0
+
+if sell_state == 2
+    if high >= c_s200
+        sell_state := 3
+
+if sell_state >= 2
+    if close > c_s200
+        sell_dip_timer := sell_dip_timer + 1
+    else
+        sell_dip_timer := 0
+    
+    if sell_dip_timer >= 5
+        sell_state := 1
+
+// Trigger Condition with Daily 50 Filter
+trigger_sell = sell_state == 3 and ta.crossunder(close, AlphaTrend) and align_bear_21_50 and filter_short_daily50
+
+if trigger_sell
+    label.new(bar_index, high, "SELL", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
+    sell_state := 0
+
+// ==========================================
+// 5. FIBONACCI RETRACEMENT LOGIC (100/200 Trend)
+// ==========================================
+
+// State Variables for Fibs
+var bool fib_long_active = false
+var float fib_long_anchor = na
+var int fib_long_anchor_bar = na
+var line l_fib_50_long = na
+var line l_fib_618_long = na
+var line l_fib_80_long = na
+
+var bool fib_short_active = false
+var float fib_short_anchor = na
+var int fib_short_anchor_bar = na
+var line l_fib_50_short = na
+var line l_fib_618_short = na
+var line l_fib_80_short = na
+
+// --- LONG FIB LOGIC ---
+// Added: filter_long_daily50 check to activation
+// REMOVED: align_bull_100_200 requirement to catch more signals
+if filter_long_daily50
+    // If not active, look for entry condition
+    if not fib_long_active
+        if ta.crossover(close, AlphaTrend)
+            // Let's assume valid dip if we closed below at least once recently.
+            if close[1] < AlphaTrend[1]
+                fib_long_active := true
+                lowest_dip = low
+                lowest_idx = bar_index
+                for i = 1 to 100 // Increased to 100
+                    if close[i] > AlphaTrend[i]
+                        break
+                    if low[i] < lowest_dip
+                        lowest_dip := low[i]
+                        lowest_idx := bar_index - i
+                
+                fib_long_anchor := lowest_dip
+                fib_long_anchor_bar := lowest_idx
+                
+                // Debug Label
+                // label.new(bar_index, high, "Fib Start", style=label.style_label_down, color=color.blue, size=size.tiny)
+                
+    // If active, update lines
+    if fib_long_active
+        // Check if condition broken (Close back below AlphaTrend)
+        if ta.crossunder(close, AlphaTrend)
+            fib_long_active := false
+            line.delete(l_fib_50_long)
+            line.delete(l_fib_618_long)
+            line.delete(l_fib_80_long)
+        else
+            // Update High
+            var float fib_long_peak = na
+            if ta.crossover(close, AlphaTrend) 
+                fib_long_peak := high
+            else
+                fib_long_peak := math.max(fib_long_peak, high)
+            
+            fib_range = fib_long_peak - fib_long_anchor
+            val_50 = fib_long_peak - (fib_range * 0.50)
+            val_618 = fib_long_peak - (fib_range * 0.618)
+            val_80 = fib_long_peak - (fib_range * 0.80)
+            
+            line.delete(l_fib_50_long)
+            line.delete(l_fib_618_long)
+            line.delete(l_fib_80_long)
+            
+            l_fib_50_long := line.new(fib_long_anchor_bar, val_50, bar_index + 10, val_50, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+            l_fib_618_long := line.new(fib_long_anchor_bar, val_618, bar_index + 10, val_618, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+            l_fib_80_long := line.new(fib_long_anchor_bar, val_80, bar_index + 10, val_80, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=2)
+
+else
+    // Reset if Daily Filter fails (removed alignment check reset)
+    fib_long_active := false
+    line.delete(l_fib_50_long)
+    line.delete(l_fib_618_long)
+    line.delete(l_fib_80_long)
+
+
+// --- SHORT FIB LOGIC ---
+// Added: filter_short_daily50 check to activation
+// REMOVED: align_bear_100_200 requirement
+if filter_short_daily50
+    if not fib_short_active
+        if ta.crossunder(close, AlphaTrend)
+            if close[1] > AlphaTrend[1]
+                fib_short_active := true
+                highest_rally = high
+                highest_idx = bar_index
+                for i = 1 to 100 // Increased to 100
+                    if close[i] < AlphaTrend[i]
+                        break
+                    if high[i] > highest_rally
+                        highest_rally := high[i]
+                        highest_idx := bar_index - i
+                
+                fib_short_anchor := highest_rally
+                fib_short_anchor_bar := highest_idx
+                
+                // Debug Label
+                // label.new(bar_index, low, "Fib Start", style=label.style_label_up, color=color.red, size=size.tiny)
+    
+    if fib_short_active
+        if ta.crossover(close, AlphaTrend)
+            fib_short_active := false
+            line.delete(l_fib_50_short)
+            line.delete(l_fib_618_short)
+            line.delete(l_fib_80_short)
+        else
+            var float fib_short_trough = na
+            if ta.crossunder(close, AlphaTrend)
+                fib_short_trough := low
+            else
+                fib_short_trough := math.min(fib_short_trough, low)
+            
+            fib_range = fib_short_anchor - fib_short_trough
+            val_50 = fib_short_trough + (fib_range * 0.50)
+            val_618 = fib_short_trough + (fib_range * 0.618)
+            val_80 = fib_short_trough + (fib_range * 0.80)
+            
+            line.delete(l_fib_50_short)
+            line.delete(l_fib_618_short)
+            line.delete(l_fib_80_short)
+            
+            l_fib_50_short := line.new(fib_short_anchor_bar, val_50, bar_index + 10, val_50, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+            l_fib_618_short := line.new(fib_short_anchor_bar, val_618, bar_index + 10, val_618, xloc=xloc.bar_index, extend=extend.right, color=color.green, width=1)
+            l_fib_80_short := line.new(fib_short_anchor_bar, val_80, bar_index + 10, val_80, xloc=xloc.bar_index, extend=extend.right, color=color.red, width=2)
+
+else
+    fib_short_active := false
+    line.delete(l_fib_50_short)
+    line.delete(l_fib_618_short)
+    line.delete(l_fib_80_short)
+
+// ==========================================
+// 6. RIGHT SIDE LABELS
+// ==========================================
+if barstate.islast
+    // Chart SMAs
+    if show_chart
+        label.new(bar_index, c_s21, "Chart 21", style=label.style_label_left, color=color.green, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, c_s50, "Chart 50", style=label.style_label_left, color=color.blue, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, c_s100, "Chart 100", style=label.style_label_left, color=color.orange, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, c_s200, "Chart 200", style=label.style_label_left, color=color.red, textcolor=color.white, size=size.tiny)
+    
+    // Daily SMAs
+    if show_daily
+        label.new(bar_index, d_s21, "Daily 21", style=label.style_label_left, color=color.green, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, d_s50, "Daily 50", style=label.style_label_left, color=color.blue, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, d_s100, "Daily 100", style=label.style_label_left, color=color.orange, textcolor=color.white, size=size.tiny)
+        label.new(bar_index, d_s200, "Daily 200", style=label.style_label_left, color=color.red, textcolor=color.white, size=size.tiny)
