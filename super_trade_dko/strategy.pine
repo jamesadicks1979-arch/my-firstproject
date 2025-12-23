@@ -75,9 +75,6 @@ plot(show_daily ? d_s200 : na, color=color.red, title="Daily 200 SMA", linewidth
 // ==========================================
 // 3. ALPHATREND LOGIC (INTEGRATED)
 // ==========================================
-// Based on AlphaTrend by KivancOzbilgic
-// Logic retained, visual plotting removed as requested.
-
 grp_at = "AlphaTrend Settings"
 at_coeff = input.float(1, 'Multiplier', step=0.1, group=grp_at)
 at_ap = input(14, 'Common Period', group=grp_at)
@@ -97,24 +94,105 @@ k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
 k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
 fill(k1, k2, color=color1)
 
-at_buySignal = ta.crossover(AlphaTrend, AlphaTrend[2])
-at_sellSignal = ta.crossunder(AlphaTrend, AlphaTrend[2])
+// ==========================================
+// 4. STRATEGY LOGIC: 200 SMA RETEST + ALPHATREND
+// ==========================================
 
-// K1 = ta.barssince(at_buySignal)
-// K2 = ta.barssince(at_sellSignal)
-// O1 = ta.barssince(at_buySignal[1])
-// O2 = ta.barssince(at_sellSignal[1])
+// --- State Variables ---
+// 0: Neutral/Monitoring
+// 1: Base Established (Price below 200SMA for Buy, above for Sell)
+// 2: Breakout (Price crossed 200SMA)
+// 3: Retest Occurred (Price touched 200SMA)
 
-// Visual signals disabled
-// plotshape(at_buySignal and at_showsignals and O1 > K2 ? AlphaTrend[2] * 0.9999 : na, title='BUY', text='BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
-// plotshape(at_sellSignal and at_showsignals and O2 > K1 ? AlphaTrend[2] * 1.0001 : na, title='SELL', text='SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
+var int buy_state = 0
+var int buy_dip_timer = 0
+var int buy_base_counter = 0
 
-// Alerts (Variables renamed to match integration)
-// alertcondition(at_buySignal and O1 > K2, title='Potential BUY Alarm', message='BUY SIGNAL!')
-// alertcondition(at_sellSignal and O2 > K1, title='Potential SELL Alarm', message='SELL SIGNAL!')
+var int sell_state = 0
+var int sell_dip_timer = 0
+var int sell_base_counter = 0
+
+// --- BUY LOGIC (Long) ---
+// Condition A: Price below 200 SMA for 5 periods
+if close < c_s200
+    buy_base_counter := buy_base_counter + 1
+else
+    buy_base_counter := 0
+
+if buy_base_counter >= 5
+    buy_state := 1 // Bear Base Established
+
+// Condition B: Breakout (Price crosses above 200 SMA)
+// Only valid if coming from a Bear Base (State 1) or we are already tracking (State 2/3)
+// We need to transition from State 1 to 2 ON the crossover
+if buy_state == 1 and ta.crossover(close, c_s200)
+    buy_state := 2 // Breakout
+    buy_dip_timer := 0
+
+// Condition C: Retest (Touch or Dip below 200 SMA)
+// Valid if in State 2 (Breakout)
+if buy_state == 2
+    if low <= c_s200
+        buy_state := 3 // Retest Occurred
+
+// Dip Monitoring: If price stays below 200 SMA for >= 5 periods after breakout, invalidate
+if buy_state >= 2 // Breakout or Retest phase
+    if close < c_s200
+        buy_dip_timer := buy_dip_timer + 1
+    else
+        buy_dip_timer := 0 // Reset if we close back above? User said "for less than 5 periods", usually consecutive.
+    
+    if buy_dip_timer >= 5
+        buy_state := 1 // Failed breakout, back to Bear Base (since we are below)
+
+// Condition D: Trigger (Close above AlphaTrend)
+// Valid if we have retested (State 3)
+// User: "when it trades and closes above the ALPHATREND line"
+trigger_buy = buy_state == 3 and ta.crossover(close, AlphaTrend)
+
+if trigger_buy
+    label.new(bar_index, low, "BUY", style=label.style_label_up, color=color.green, textcolor=color.white, size=size.small)
+    buy_state := 0 // Reset after signal
+
+// --- SELL LOGIC (Short) ---
+// Condition A: Price above 200 SMA for 5 periods
+if close > c_s200
+    sell_base_counter := sell_base_counter + 1
+else
+    sell_base_counter := 0
+
+if sell_base_counter >= 5
+    sell_state := 1 // Bull Base Established
+
+// Condition B: Breakout (Price crosses below 200 SMA)
+if sell_state == 1 and ta.crossunder(close, c_s200)
+    sell_state := 2 // Breakout
+    sell_dip_timer := 0
+
+// Condition C: Retest (Touch or rise above 200 SMA)
+if sell_state == 2
+    if high >= c_s200
+        sell_state := 3 // Retest Occurred
+
+// Dip Monitoring (Rise Monitoring)
+if sell_state >= 2
+    if close > c_s200
+        sell_dip_timer := sell_dip_timer + 1
+    else
+        sell_dip_timer := 0
+    
+    if sell_dip_timer >= 5
+        sell_state := 1 // Failed breakdown
+
+// Condition D: Trigger (Close below AlphaTrend)
+trigger_sell = sell_state == 3 and ta.crossunder(close, AlphaTrend)
+
+if trigger_sell
+    label.new(bar_index, high, "SELL", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small)
+    sell_state := 0 // Reset
 
 // ==========================================
-// 4. RIGHT SIDE LABELS
+// 5. RIGHT SIDE LABELS
 // ==========================================
 if barstate.islast
     // Chart SMAs
