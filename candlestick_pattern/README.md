@@ -32,7 +32,7 @@ Currently, it implements the **AlphaTrend** indicator and **Outside Bar** patter
 
 | Platform | File to Use | Action |
 |----------|-------------|--------|
-| **TradingView** | `src/alphatrend.pine` | Copy/Paste content into Pine Editor (Note: Only AlphaTrend, not Python patterns) |
+| **TradingView** | `src/alphatrend.pine` | Copy/Paste content into Pine Editor (Includes AlphaTrend + Outside Bars) |
 | **Local Python** | `src/main.py` | Run via terminal (see below) |
 
 ## Setup & Usage (Python)

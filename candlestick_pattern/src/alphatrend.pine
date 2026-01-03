@@ -49,3 +49,21 @@ alertcondition(ta.crossunder(high, AlphaTrend), title='Candle CrossUnder Alarm',
 alertcondition(ta.cross(close[1], AlphaTrend[1]), title='Price Cross Alert After Bar Close', message='Price - AlphaTrend Crossing!')
 alertcondition(ta.crossover(low[1], AlphaTrend[1]), title='Candle CrossOver Alarm After Bar Close', message='LAST BAR is ABOVE ALPHATREND!')
 alertcondition(ta.crossunder(high[1], AlphaTrend[1]), title='Candle CrossUnder Alarm After Bar Close', message='LAST BAR is BELOW ALPHATREND!')
+
+// --- Outside Bar Detection ---
+// Outside Bar: Current High > Prev High AND Current Low < Prev Low
+isOutsideBar = high > high[1] and low < low[1]
+
+// Bullish Outside: Outside Bar AND Close > Open
+bullishOutside = isOutsideBar and close > open
+
+// Bearish Outside: Outside Bar AND Close < Open
+bearishOutside = isOutsideBar and close < open
+
+// Plotting
+plotshape(bullishOutside, title="Bullish Outside Bar", location=location.belowbar, color=color.cyan, style=shape.circle, size=size.small, text="Out\nBull")
+plotshape(bearishOutside, title="Bearish Outside Bar", location=location.abovebar, color=color.magenta, style=shape.circle, size=size.small, text="Out\nBear")
+
+alertcondition(bullishOutside, title='Bullish Outside Bar', message='Bullish Outside Bar Detected!')
+alertcondition(bearishOutside, title='Bearish Outside Bar', message='Bearish Outside Bar Detected!')
+
