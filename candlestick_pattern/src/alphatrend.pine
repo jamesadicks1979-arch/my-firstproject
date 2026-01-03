@@ -61,8 +61,8 @@ bullishOutside = isOutsideBar and close > open
 bearishOutside = isOutsideBar and close < open
 
 // Plotting
-plotshape(bullishOutside, title="Bullish Outside Bar", location=location.belowbar, color=color.new(color.cyan, 0), style=shape.circle, size=size.small, text="Out\nBull", textcolor=color.new(color.cyan, 0))
-plotshape(bearishOutside, title="Bearish Outside Bar", location=location.abovebar, color=color.new(color.magenta, 0), style=shape.circle, size=size.small, text="Out\nBear", textcolor=color.new(color.magenta, 0))
+plotshape(bullishOutside, title="Bullish Outside Bar", location=location.belowbar, color=color.cyan, style=shape.circle, size=size.small, text="Out\nBull", textcolor=color.cyan)
+plotshape(bearishOutside, title="Bearish Outside Bar", location=location.abovebar, color=color.magenta, style=shape.circle, size=size.small, text="Out\nBear", textcolor=color.magenta)
 
 alertcondition(bullishOutside, title='Bullish Outside Bar', message='Bullish Outside Bar Detected!')
 alertcondition(bearishOutside, title='Bearish Outside Bar', message='Bearish Outside Bar Detected!')
