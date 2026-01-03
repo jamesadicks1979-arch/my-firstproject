@@ -54,38 +54,69 @@ alertcondition(ta.cross(close[1], AlphaTrend[1]), title='Price Cross Alert After
 alertcondition(ta.crossover(low[1], AlphaTrend[1]), title='Candle CrossOver Alarm After Bar Close', message='LAST BAR is ABOVE ALPHATREND!')
 alertcondition(ta.crossunder(high[1], AlphaTrend[1]), title='Candle CrossUnder Alarm After Bar Close', message='LAST BAR is BELOW ALPHATREND!')
 
-// --- Outside Bar Detection ---
-// Outside Bar: Current High > Prev High AND Current Low < Prev Low
-isOutsideBar = high > high[1] and low < low[1]
+// --- Outside Bar Detection on 2-Day Timeframe ---
+// Get 2D data using request.security
+// We use "2D" as the timeframe string.
+// We need High, Low, Open, Close from the 2D timeframe.
+[h2d, l2d, o2d, c2d] = request.security(syminfo.tickerid, "2D", [high, low, open, close])
 
-// Bullish Outside: Outside Bar AND Close > Open
-bullishOutside = isOutsideBar and close > open
+// Since security returns the value for the *current* 2D bar, we need to compare it to the *previous* 2D bar.
+// request.security returns a series where the value changes only when the higher timeframe bar closes or updates.
+// To detect the "Outside Bar" pattern properly on the higher timeframe, we need to check if the *completed* 2D bar was an outside bar, 
+// OR if the *current forming* 2D bar is an outside bar relative to the previous 2D bar.
 
-// Bearish Outside: Outside Bar AND Close < Open
-bearishOutside = isOutsideBar and close < open
+// Typically, patterns are confirmed on close.
+// Let's detect if the Current 2D Bar is an Outside Bar relative to the Previous 2D Bar.
+h2d_prev = h2d[1]
+l2d_prev = l2d[1]
 
-// Plotting
-// Show dots on the NEXT candlestick (offset=1)
-plotshape(bullishOutside, title="Bullish Outside Bar", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull", textcolor=#00FFFF, offset=1)
-plotshape(bearishOutside, title="Bearish Outside Bar", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear", textcolor=#FF00FF, offset=1)
+isOutsideBar2D = h2d > h2d_prev and l2d < l2d_prev
+bullishOutside2D = isOutsideBar2D and c2d > o2d
+bearishOutside2D = isOutsideBar2D and c2d < o2d
 
-// --- Fibonacci on Outside Bar ---
-if isOutsideBar
-    // Calculate range
-    barRange = high - low
+// We only want to trigger the alert/plot ONCE per 2D bar, or continuously if it's forming. 
+// However, since we are on a lower timeframe (e.g., 1H), 'isOutsideBar2D' will be true for every 1H bar that is inside that 2D bar.
+// To avoid clutter, we can check if the 2D bar has *changed* or check specifically for the transition.
+// But the user asked: "when you go to a smaller timeframe it still shows this".
+// This implies they want to see the 2D pattern overlay.
+
+// Plotting (Visualizing 2D pattern on current chart)
+// We plot only if the condition is met. 
+// Note: This will plot dots on *every* lower timeframe bar that exists within the valid 2D outside bar.
+// If we want it to appear once, we need to detect the *start* of the new 2D bar or similar. 
+// Simpler approach: Plot it, but maybe restricting it to the last bar of the session might be complex without session logic.
+// Let's stick to showing it when the condition holds true.
+
+// --- Fibonacci on Outside Bar (2D) ---
+// We need to draw lines based on the 2D High/Low
+if isOutsideBar2D
+    barRange = h2d - l2d
+    // We draw lines at the price levels of the 2D bar
+    // Using line.new here on every lower timeframe bar will create millions of lines.
+    // We must only draw it ONCE per 2D bar instance, or delete old ones. 
+    // Better strategy: Use `line.delete` to keep only the latest set, or check if `time` matches the start of the 2D bar.
     
-    // Draw lines for this bar only
-    // 0 (Low)
-    line.new(bar_index, low, bar_index + 1, low, color=color.new(#808080, 50))
-    // 1 (High)
-    line.new(bar_index, high, bar_index + 1, high, color=color.new(#808080, 50))
-    // 0.5 (Mid)
-    line.new(bar_index, low + barRange * 0.5, bar_index + 1, low + barRange * 0.5, color=color.new(#FFFF00, 0))
-    // 0.618
-    line.new(bar_index, low + barRange * 0.618, bar_index + 1, low + barRange * 0.618, color=color.new(#0000FF, 50))
-    // 0.382
-    line.new(bar_index, low + barRange * 0.382, bar_index + 1, low + barRange * 0.382, color=color.new(#0000FF, 50))
+    // Check if it's a new 2D bar:
+    isNew2DBar = ta.change(time("2D"))
+    
+    if isNew2DBar
+        // Draw lines
+        // 0 (Low)
+        line.new(bar_index, l2d, bar_index + 1, l2d, color=color.new(#808080, 50))
+        // 1 (High)
+        line.new(bar_index, h2d, bar_index + 1, h2d, color=color.new(#808080, 50))
+        // 0.5 (Mid)
+        line.new(bar_index, l2d + barRange * 0.5, bar_index + 1, l2d + barRange * 0.5, color=color.new(#FFFF00, 0))
+        // 0.618
+        line.new(bar_index, l2d + barRange * 0.618, bar_index + 1, l2d + barRange * 0.618, color=color.new(#0000FF, 50))
+        // 0.382
+        line.new(bar_index, l2d + barRange * 0.382, bar_index + 1, l2d + barRange * 0.382, color=color.new(#0000FF, 50))
 
-alertcondition(bullishOutside, title='Bullish Outside Bar', message='Bullish Outside Bar Detected!')
-alertcondition(bearishOutside, title='Bearish Outside Bar', message='Bearish Outside Bar Detected!')
+// Plot Shapes for 2D Pattern
+// We use `ta.change(time("2D"))` to ensure we only plot the shape once at the beginning of the 2D bar logic
+plotshape(bullishOutside2D and ta.change(time("2D")), title="Bullish Outside Bar (2D)", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull\n(2D)", textcolor=#00FFFF, offset=1)
+plotshape(bearishOutside2D and ta.change(time("2D")), title="Bearish Outside Bar (2D)", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear\n(2D)", textcolor=#FF00FF, offset=1)
+
+alertcondition(bullishOutside2D, title='Bullish Outside Bar (2D)', message='Bullish Outside Bar Detected on 2D Timeframe!')
+alertcondition(bearishOutside2D, title='Bearish Outside Bar (2D)', message='Bearish Outside Bar Detected on 2D Timeframe!')
 
