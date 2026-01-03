@@ -1,10 +1,113 @@
+// This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) https://creativecommons.org/licenses/by-nc-sa/4.0/
+// © LuxAlgo
 //@version=5
-strategy("My Strategy", overlay=true, margin_long=100, margin_short=100)
-
-longCondition = ta.crossover(ta.sma(close, 14), ta.sma(close, 28))
-if (longCondition)
-    strategy.entry("My Long Entry Id", strategy.long)
-
-shortCondition = ta.crossunder(ta.sma(close, 14), ta.sma(close, 28))
-if (shortCondition)
-    strategy.entry("My Short Entry Id", strategy.short)
+strategy("DKO Pattern Strategy + SMA Filter", overlay = true, format=format.price, precision=2, max_lines_count = 500, max_labels_count = 500, max_bars_back=500)
+// ==========================================
+// 1. INPUTS
+// ==========================================
+useTrendFilter = input.bool(true, "Use SMA Trend Filter?")
+fastLen        = input.int(5, "Fast SMA Length", minval=1)
+slowLen        = input.int(9, "Slow SMA Length", minval=1)
+trendLen       = input.int(21, "Trend SMA Length", minval=1)
+rangePct       = input.float(0.60, "Min Candle Range Pct (0.60 = 60%)", minval=0.0, maxval=1.0)
+minPips        = input.float(20.0, "Min Body Size (Pips)", minval=0.0, tooltip="Difference between Open and Close in Pips (1 Pip = 10 Minticks)")
+extensionPips  = input.float(20.0, "Min Extension vs Prev (Pips)", minval=0.0, tooltip="Candle must exceed prev high/low by this many pips")
+extremeLen     = input.int(20, "Extreme Lookback Length", minval=1)
+// ==========================================
+// 2. TREND FILTER (SMA 5, 9, 21)
+// ==========================================
+smaFast  = ta.sma(close, fastLen) // SMA 5
+smaSlow  = ta.sma(close, slowLen) // SMA 9
+smaTrend = ta.sma(close, trendLen) // SMA 21
+// Plot SMAs for visual reference
+plot(useTrendFilter ? smaFast  : na, "Fast SMA (5)", color=color.blue, linewidth=1)
+plot(useTrendFilter ? smaSlow  : na, "Slow SMA (9)", color=color.orange, linewidth=1)
+plot(useTrendFilter ? smaTrend : na, "Trend SMA (21)", color=color.white, linewidth=2)
+// Trend Logic:
+// Uptrend: 5 > 9 AND 9 > 21
+// Downtrend: 5 < 9 AND 9 < 21
+isUptrend   = not useTrendFilter or (smaFast > smaSlow and smaSlow > smaTrend)
+isDowntrend = not useTrendFilter or (smaFast < smaSlow and smaSlow < smaTrend)
+// ==========================================
+// 3. EXTREME FILTER (20-bar Low/High)
+// ==========================================
+// Check if current candle matches the 20-bar extreme
+isLowest20  = (low <= ta.lowest(low, extremeLen))
+isHighest20 = (high >= ta.highest(high, extremeLen))
+// ==========================================
+// 4. PATTERN DEFINITIONS (DKO)
+// ==========================================
+// Helper: Calculate where the close is relative to the High-Low range (0.0 to 1.0)
+candleRange = high - low
+rangePos    = (candleRange > 0) ? (close - low) / candleRange : 0.5
+// Helper: Body Size and Pips
+pipSize     = syminfo.mintick * 10
+bodySize    = math.abs(close - open)
+isBigEnough = bodySize >= (minPips * pipSize)
+// Helper: Extension logic
+// Sell: High must be >= Prev High + Extension
+// Buy:  Low  must be <= Prev Low  - Extension
+extVal      = extensionPips * pipSize
+isHighExt   = high >= (high[1] + extVal)
+isLowExt    = low  <= (low[1] - extVal)
+// COVER (sell) pattern
+// Logic: Higher Low, Close < Open (Bearish), Higher High
+// Added: Close < 40% of range (Strict)
+// Added: Body Size > Min Pips
+// Added: High Extension > 20 Pips above prev High
+dkoCover = (low > low[1]) and (close < open) and (high > high[1]) and (rangePos < (1.0 - rangePct)) and isBigEnough and isHighExt
+// PER (buy) pattern
+// Logic: Lower High, Close > Open (Bullish), Lower Low
+// Added: Close > 60% of range (Strict)
+// Added: Body Size > Min Pips
+// Added: Low Extension > 20 Pips below prev Low
+dkoPer   = (high < high[1]) and (close > open) and (low < low[1]) and (rangePos > rangePct) and isBigEnough and isLowExt
+// ==========================================
+// 5. STRATEGY EXECUTION
+// ==========================================
+// Reversal ATR Target
+atr14 = ta.atr(14)
+// --- SELL LOGIC ---
+// Priority 1: Reversal (Highest High of 20)
+if (dkoCover and isHighest20)
+    // Entry: Market order on next open (standard strategy behavior for 'process_orders_on_close=false')
+    // Stop Loss: 80% retracement into candle range.
+    // If candle is Bearish (High to Low), 80% up from Low = Low + 0.8 * Range
+    stopLevel = low + (candleRange * 0.80)
+    profitTarget = close - (atr14 * 2) // Target is 2 ATR down from close
+    strategy.entry("Sell Reversal", strategy.short)
+    strategy.exit("Exit Sell Rev", "Sell Reversal", stop=stopLevel, limit=profitTarget)
+    alert("Sell Reversal (Highest 20)", alert.freq_once_per_bar_close)
+// Priority 2: Trend Follow (Standard)
+else if (dkoCover and isDowntrend)
+    strategy.entry("Sell Trend", strategy.short, stop=low)
+    alert("Sell Trend", alert.freq_once_per_bar_close)
+// --- BUY LOGIC ---
+// Priority 1: Reversal (Lowest Low of 20)
+if (dkoPer and isLowest20)
+    // Stop Loss: 80% retracement into candle range.
+    // If candle is Bullish (Low to High), 80% down from High = High - 0.8 * Range (or Low + 0.2 * Range)
+    stopLevel = high - (candleRange * 0.80)
+    profitTarget = close + (atr14 * 2) // Target is 2 ATR up from close
+    strategy.entry("Buy Reversal", strategy.long)
+    strategy.exit("Exit Buy Rev", "Buy Reversal", stop=stopLevel, limit=profitTarget)
+    alert("Buy Reversal (Lowest 20)", alert.freq_once_per_bar_close)
+// Priority 2: Trend Follow (Standard)
+else if (dkoPer and isUptrend)
+    strategy.entry("Buy Trend", strategy.long, stop=high)
+    alert("Buy Trend", alert.freq_once_per_bar_close)
+// ==========================================
+// 6. VISUALS (Signals)
+// ==========================================
+plotshape(dkoCover and isHighest20, title="Sell Rev", location=location.abovebar, style=shape.labeldown, color=color.maroon, size=size.small, text="REV\nSELL", textcolor=color.white)
+plotshape(dkoCover and isDowntrend and not isHighest20, title="Sell Trend", location=location.abovebar, style=shape.triangledown, color=color.red, size=size.small, text="COVER")
+plotshape(dkoPer and isLowest20, title="Buy Rev", location=location.belowbar, style=shape.labelup, color=color.green, size=size.small, text="REV\nBUY", textcolor=color.white)
+plotshape(dkoPer and isUptrend and not isLowest20, title="Buy Trend", location=location.belowbar, style=shape.triangleup, color=color.lime, size=size.small, text="PER")
+// ==========================================
+// 7. VISUALS (Win/Loss Labels)
+// ==========================================
+// We check if a trade closed on the current bar
+if strategy.closedtrades > strategy.closedtrades[1]
+    pnl = strategy.closedtrades.profit(strategy.closedtrades - 1)
+    isWin = pnl > 0
+    label.new(bar_index, high + syminfo.mintick*20, text = isWin ? "WIN" : "LOSS", color = isWin ? color.green : color.red, textcolor = color.white, style = label.style_label_down, size=size.small)
