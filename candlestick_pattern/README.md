@@ -20,6 +20,13 @@ Currently, it implements the **AlphaTrend** indicator (originally by KivancOzbil
 - `src/alphatrend.py`: Python implementation of the AlphaTrend logic.
 - `src/alphatrend.pine`: **Pine Script** source code for use in TradingView.
 
+## Which file should I use?
+
+| Platform | File to Use | Action |
+|----------|-------------|--------|
+| **TradingView** | `src/alphatrend.pine` | Copy/Paste content into Pine Editor |
+| **Local Python** | `src/main.py` | Run via terminal (see below) |
+
 ## Setup & Usage (Python)
 
 1. **Install dependencies:**
@@ -37,6 +44,6 @@ Currently, it implements the **AlphaTrend** indicator (originally by KivancOzbil
 ## Usage (TradingView)
 
 If you want to use the indicator in TradingView:
-1. Open `src/alphatrend.pine`.
-2. Copy the content.
-3. Paste it into the Pine Editor in TradingView.
+1. Open the file `candlestick_pattern/src/alphatrend.pine` in the explorer on the left.
+2. Copy the entire content of that file.
+3. Go to TradingView, open the Pine Editor, and paste the code there.
