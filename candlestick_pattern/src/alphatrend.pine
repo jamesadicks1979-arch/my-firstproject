@@ -11,112 +11,92 @@ showsignalsk = input(title='Show Signals?', defval=true)
 novolumedata = input(title='Change calculation (no volume data)?', defval=false)
 upT = low - ATR * coeff
 downT = high + ATR * coeff
-AlphaTrend = 0.0
+// Function to calculate AlphaTrend logic
+calcAlphaTrend(_src, _close, _low, _high, _hlc3, _coeff, _AP, _novolumedata) =>
+    _atr = ta.sma(ta.tr, _AP) // Note: ta.tr might use current timeframe inside function if not careful, but usually request.security handles this if called in context
+    // Actually, ta.tr needs high, low, close.
+    // The simple way is to pass ta.tr calculated in the higher timeframe, or rely on implicit context.
+    // "request.security" executes the entire expression in the requested timeframe.
+    // So if we put all logic here, it works.
+    
+    _upT = _low - _atr * _coeff
+    _downT = _high + _atr * _coeff
+    
+    _rsi = ta.rsi(_src, _AP)
+    _mfi = ta.mfi(_hlc3, _AP)
+    
+    _alphaTrend = 0.0
+    _alphaTrend := (_novolumedata ? _rsi >= 50 : _mfi >= 50) ? (_upT < nz(_alphaTrend[1]) ? nz(_alphaTrend[1]) : _upT) : (_downT > nz(_alphaTrend[1]) ? nz(_alphaTrend[1]) : _downT)
+    
+    // Return values needed for plotting
+    [_alphaTrend, _alphaTrend[2]]
 
-rsiVal = ta.rsi(src, AP)
-mfiVal = ta.mfi(hlc3, AP)
+// --- Calculate Everything on 2D Timeframe ---
+// We create a tuple of results from the 2D timeframe
+// Note: We need to pass the arguments that don't change (inputs)
+// We define a wrapper function to call inside request.security
+f_calc() =>
+    // AlphaTrend Calculation
+    myATR = ta.sma(ta.tr, AP)
+    myUpT = low - myATR * coeff
+    myDownT = high + myATR * coeff
+    
+    myRsi = ta.rsi(src, AP)
+    myMfi = ta.mfi(hlc3, AP)
+    
+    myAT = 0.0
+    myAT := (novolumedata ? myRsi >= 50 : myMfi >= 50) ? (myUpT < nz(myAT[1]) ? nz(myAT[1]) : myUpT) : (myDownT > nz(myAT[1]) ? nz(myAT[1]) : myDownT)
+    
+    // Outside Bar Logic
+    isOut = high > high[1] and low < low[1]
+    isBull = isOut and close > open
+    isBear = isOut and close < open
+    
+    [myAT, myAT[2], isBull, isBear, high, low, open, close]
 
-AlphaTrend := (novolumedata ? rsiVal >= 50 : mfiVal >= 50) ? upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
+// Fetch data from 2D
+[at2d, at2d_prev2, bull2d, bear2d, h2d, l2d, o2d, c2d] = request.security(syminfo.tickerid, "2D", f_calc())
 
-color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
-k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
-k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
+// --- Plotting AlphaTrend (2D) ---
+color1 = at2d > at2d_prev2 ? #00E60F : at2d < at2d_prev2 ? #80000B : at2d[1] > at2d[3] ? #00E60F : #80000B
+// Note: at2d[1] here refers to the previous *chart* bar's value of the 2D data.
+// This smoothing is fine.
 
+k1 = plot(at2d, color=color.new(#0022FC, 0), linewidth=3)
+k2 = plot(at2d_prev2, color=color.new(#FC0400, 0), linewidth=3)
 fill(k1, k2, color=color1)
 
-buySignalk = ta.crossover(AlphaTrend, AlphaTrend[2])
-sellSignalk = ta.crossunder(AlphaTrend, AlphaTrend[2])
+// Signals based on 2D data
+buySignalk = ta.crossover(at2d, at2d_prev2)
+sellSignalk = ta.crossunder(at2d, at2d_prev2)
 
-
-K1 = ta.barssince(buySignalk)
-K2 = ta.barssince(sellSignalk)
-O1 = ta.barssince(buySignalk[1])
-O2 = ta.barssince(sellSignalk[1])
-
-plotshape(buySignalk and showsignalsk and O1 > K2 ? AlphaTrend[2] * 0.9999 : na, title='BUY', text='BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
-
-plotshape(sellSignalk and showsignalsk and O2 > K1 ? AlphaTrend[2] * 1.0001 : na, title='SELL', text='SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
-
-
-alertcondition(buySignalk and O1 > K2, title='Potential BUY Alarm', message='BUY SIGNAL!')
-alertcondition(sellSignalk and O2 > K1, title='Potential SELL Alarm', message='SELL SIGNAL!')
-
-alertcondition(buySignalk[1] and O1[1] > K2, title='Confirmed BUY Alarm', message='BUY SIGNAL APPROVED!')
-alertcondition(sellSignalk[1] and O2[1] > K1, title='Confirmed SELL Alarm', message='SELL SIGNAL APPROVED!')
-
-
-
-alertcondition(ta.cross(close, AlphaTrend), title='Price Cross Alert', message='Price - AlphaTrend Crossing!')
-alertcondition(ta.crossover(low, AlphaTrend), title='Candle CrossOver Alarm', message='LAST BAR is ABOVE ALPHATREND')
-alertcondition(ta.crossunder(high, AlphaTrend), title='Candle CrossUnder Alarm', message='LAST BAR is BELOW ALPHATREND!')
-
-alertcondition(ta.cross(close[1], AlphaTrend[1]), title='Price Cross Alert After Bar Close', message='Price - AlphaTrend Crossing!')
-alertcondition(ta.crossover(low[1], AlphaTrend[1]), title='Candle CrossOver Alarm After Bar Close', message='LAST BAR is ABOVE ALPHATREND!')
-alertcondition(ta.crossunder(high[1], AlphaTrend[1]), title='Candle CrossUnder Alarm After Bar Close', message='LAST BAR is BELOW ALPHATREND!')
+plotshape(buySignalk and showsignalsk, title='BUY', text='BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0), offset=0)
+plotshape(sellSignalk and showsignalsk, title='SELL', text='SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0), offset=0)
 
 // --- Outside Bar Detection on 2-Day Timeframe ---
-// Get 2D data using request.security
-// We use "2D" as the timeframe string.
-// We need High, Low, Open, Close from the 2D timeframe.
-[h2d, l2d, o2d, c2d] = request.security(syminfo.tickerid, "2D", [high, low, open, close])
+// Logic is already fetched in bull2d / bear2d
 
-// Since security returns the value for the *current* 2D bar, we need to compare it to the *previous* 2D bar.
-// request.security returns a series where the value changes only when the higher timeframe bar closes or updates.
-// To detect the "Outside Bar" pattern properly on the higher timeframe, we need to check if the *completed* 2D bar was an outside bar, 
-// OR if the *current forming* 2D bar is an outside bar relative to the previous 2D bar.
-
-// Typically, patterns are confirmed on close.
-// Let's detect if the Current 2D Bar is an Outside Bar relative to the Previous 2D Bar.
-h2d_prev = h2d[1]
-l2d_prev = l2d[1]
-
-isOutsideBar2D = h2d > h2d_prev and l2d < l2d_prev
-bullishOutside2D = isOutsideBar2D and c2d > o2d
-bearishOutside2D = isOutsideBar2D and c2d < o2d
-
-// We only want to trigger the alert/plot ONCE per 2D bar, or continuously if it's forming. 
-// However, since we are on a lower timeframe (e.g., 1H), 'isOutsideBar2D' will be true for every 1H bar that is inside that 2D bar.
-// To avoid clutter, we can check if the 2D bar has *changed* or check specifically for the transition.
-// But the user asked: "when you go to a smaller timeframe it still shows this".
-// This implies they want to see the 2D pattern overlay.
-
-// Plotting (Visualizing 2D pattern on current chart)
-// We plot only if the condition is met. 
-// Note: This will plot dots on *every* lower timeframe bar that exists within the valid 2D outside bar.
-// If we want it to appear once, we need to detect the *start* of the new 2D bar or similar. 
-// Simpler approach: Plot it, but maybe restricting it to the last bar of the session might be complex without session logic.
-// Let's stick to showing it when the condition holds true.
+// Plot Shapes for 2D Pattern
+// We use `ta.change(time("2D"))` to ensure we only plot the shape once at the beginning of the 2D bar logic
+// Since bull2d is true for the whole duration of the 2D bar, we qualify it with `ta.change(time("2D"))`
+plotshape(bull2d and ta.change(time("2D")), title="Bullish Outside Bar (2D)", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull\n(2D)", textcolor=#00FFFF, offset=1)
+plotshape(bear2d and ta.change(time("2D")), title="Bearish Outside Bar (2D)", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear\n(2D)", textcolor=#FF00FF, offset=1)
 
 // --- Fibonacci on Outside Bar (2D) ---
-// We need to draw lines based on the 2D High/Low
-if isOutsideBar2D
+if bull2d or bear2d
     barRange = h2d - l2d
-    // We draw lines at the price levels of the 2D bar
-    // Using line.new here on every lower timeframe bar will create millions of lines.
-    // We must only draw it ONCE per 2D bar instance, or delete old ones. 
-    // Better strategy: Use `line.delete` to keep only the latest set, or check if `time` matches the start of the 2D bar.
-    
-    // Check if it's a new 2D bar:
     isNew2DBar = ta.change(time("2D"))
     
     if isNew2DBar
         // Draw lines
-        // 0 (Low)
         line.new(bar_index, l2d, bar_index + 1, l2d, color=color.new(#808080, 50))
-        // 1 (High)
         line.new(bar_index, h2d, bar_index + 1, h2d, color=color.new(#808080, 50))
-        // 0.5 (Mid)
         line.new(bar_index, l2d + barRange * 0.5, bar_index + 1, l2d + barRange * 0.5, color=color.new(#FFFF00, 0))
-        // 0.618
         line.new(bar_index, l2d + barRange * 0.618, bar_index + 1, l2d + barRange * 0.618, color=color.new(#0000FF, 50))
-        // 0.382
         line.new(bar_index, l2d + barRange * 0.382, bar_index + 1, l2d + barRange * 0.382, color=color.new(#0000FF, 50))
 
-// Plot Shapes for 2D Pattern
-// We use `ta.change(time("2D"))` to ensure we only plot the shape once at the beginning of the 2D bar logic
-plotshape(bullishOutside2D and ta.change(time("2D")), title="Bullish Outside Bar (2D)", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull\n(2D)", textcolor=#00FFFF, offset=1)
-plotshape(bearishOutside2D and ta.change(time("2D")), title="Bearish Outside Bar (2D)", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear\n(2D)", textcolor=#FF00FF, offset=1)
-
-alertcondition(bullishOutside2D, title='Bullish Outside Bar (2D)', message='Bullish Outside Bar Detected on 2D Timeframe!')
-alertcondition(bearishOutside2D, title='Bearish Outside Bar (2D)', message='Bearish Outside Bar Detected on 2D Timeframe!')
+alertcondition(buySignalk, title='Potential BUY Alarm', message='BUY SIGNAL (2D)!')
+alertcondition(sellSignalk, title='Potential SELL Alarm', message='SELL SIGNAL (2D)!')
+alertcondition(bull2d, title='Bullish Outside Bar (2D)', message='Bullish Outside Bar Detected on 2D Timeframe!')
+alertcondition(bear2d, title='Bearish Outside Bar (2D)', message='Bearish Outside Bar Detected on 2D Timeframe!')
 
