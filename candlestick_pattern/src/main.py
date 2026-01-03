@@ -3,6 +3,7 @@ import mplfinance as mpf
 import pandas as pd
 import numpy as np
 from alphatrend import alphatrend
+from patterns import detect_outside_bars
 
 def main():
     print("Fetching data...")
@@ -26,6 +27,9 @@ def main():
     # Calculate AlphaTrend
     # Parameters from Pine Script default: coeff=1, AP=14
     df = alphatrend(df, coeff=1, ap=14)
+
+    print("Detecting Outside Bars...")
+    df = detect_outside_bars(df)
     
     # Prepare plots
     print("Preparing plot...")
@@ -58,6 +62,26 @@ def main():
 
     if not sell_signals.isna().all():
         apds.append(mpf.make_addplot(sell_signals, type='scatter', markersize=100, marker='v', color='red'))
+
+    # Add Bullish Outside Bar Markers
+    bull_outside = plot_df['AlphaTrend'].copy()
+    bull_outside[:] = np.nan
+    # Place marker below low
+    bull_outside[plot_df['Bullish_Outside']] = plot_df['Low'][plot_df['Bullish_Outside']] * 0.98 
+    
+    if not bull_outside.isna().all():
+        # Marker 'o' (circle) in Cyan for Bullish Outside
+        apds.append(mpf.make_addplot(bull_outside, type='scatter', markersize=50, marker='o', color='cyan', label='Bullish Outside'))
+
+    # Add Bearish Outside Bar Markers
+    bear_outside = plot_df['AlphaTrend'].copy()
+    bear_outside[:] = np.nan
+    # Place marker above high
+    bear_outside[plot_df['Bearish_Outside']] = plot_df['High'][plot_df['Bearish_Outside']] * 1.02
+    
+    if not bear_outside.isna().all():
+        # Marker 'o' (circle) in Magenta for Bearish Outside
+        apds.append(mpf.make_addplot(bear_outside, type='scatter', markersize=50, marker='o', color='magenta', label='Bearish Outside'))
 
     # Plot
     mpf.plot(
