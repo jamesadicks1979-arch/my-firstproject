@@ -2,29 +2,37 @@
 
 This project analyzes financial data to identify candlestick patterns and technical indicators.
 
-Currently, it implements the **AlphaTrend** indicator (originally by KivancOzbilgic) in Python.
+Currently, it implements the **AlphaTrend** indicator and **Outside Bar** pattern detection.
 
 ## Features
 
-- **AlphaTrend Indicator**:
+- **AlphaTrend Indicator** (originally by KivancOzbilgic):
   - Calculates AlphaTrend using RSI or MFI.
   - Generates Buy and Sell signals based on crossovers.
+  
+- **Candlestick Pattern Detection**:
+  - **Outside Bars**: Detects bars that engulf the previous bar's range.
+    - **Bullish Outside**: Outside Bar + Green Close (Cyan circle below).
+    - **Bearish Outside**: Outside Bar + Red Close (Magenta circle above).
+
 - **Visualization**:
   - Uses `mplfinance` to generate candlestick charts.
   - Overlays AlphaTrend line and signal markers.
+  - Marks detected Outside Bars.
   - Saves the output chart to `alphatrend_chart.png`.
 
 ## Project Structure
 
 - `src/main.py`: Main Python script to run the analysis and visualization.
 - `src/alphatrend.py`: Python implementation of the AlphaTrend logic.
+- `src/patterns.py`: Logic for detecting candlestick patterns (e.g., Outside Bars).
 - `src/alphatrend.pine`: **Pine Script** source code for use in TradingView.
 
 ## Which file should I use?
 
 | Platform | File to Use | Action |
 |----------|-------------|--------|
-| **TradingView** | `src/alphatrend.pine` | Copy/Paste content into Pine Editor |
+| **TradingView** | `src/alphatrend.pine` | Copy/Paste content into Pine Editor (Note: Only AlphaTrend, not Python patterns) |
 | **Local Python** | `src/main.py` | Run via terminal (see below) |
 
 ## Setup & Usage (Python)
