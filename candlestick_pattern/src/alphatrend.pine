@@ -61,8 +61,26 @@ bullishOutside = isOutsideBar and close > open
 bearishOutside = isOutsideBar and close < open
 
 // Plotting
-plotshape(bullishOutside, title="Bullish Outside Bar", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull", textcolor=#00FFFF)
-plotshape(bearishOutside, title="Bearish Outside Bar", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear", textcolor=#FF00FF)
+// Show dots on the NEXT candlestick (offset=1)
+plotshape(bullishOutside, title="Bullish Outside Bar", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull", textcolor=#00FFFF, offset=1)
+plotshape(bearishOutside, title="Bearish Outside Bar", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear", textcolor=#FF00FF, offset=1)
+
+// --- Fibonacci on Outside Bar ---
+if isOutsideBar
+    // Calculate range
+    barRange = high - low
+    
+    // Draw lines for this bar only
+    // 0 (Low)
+    line.new(bar_index, low, bar_index + 1, low, color=color.new(color.gray, 50))
+    // 1 (High)
+    line.new(bar_index, high, bar_index + 1, high, color=color.new(color.gray, 50))
+    // 0.5 (Mid)
+    line.new(bar_index, low + barRange * 0.5, bar_index + 1, low + barRange * 0.5, color=color.new(color.yellow, 0))
+    // 0.618
+    line.new(bar_index, low + barRange * 0.618, bar_index + 1, low + barRange * 0.618, color=color.new(color.blue, 50))
+    // 0.382
+    line.new(bar_index, low + barRange * 0.382, bar_index + 1, low + barRange * 0.382, color=color.new(color.blue, 50))
 
 alertcondition(bullishOutside, title='Bullish Outside Bar', message='Bullish Outside Bar Detected!')
 alertcondition(bearishOutside, title='Bearish Outside Bar', message='Bearish Outside Bar Detected!')
