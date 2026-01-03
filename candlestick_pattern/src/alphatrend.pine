@@ -5,12 +5,10 @@
 indicator('AlphaTrend', shorttitle='AT', overlay=true, format=format.price, precision=2)
 coeff = input.float(1, 'Multiplier', step=0.1)
 AP = input(14, 'Common Period')
-ATR = ta.sma(ta.tr, AP)
 src = input(close)
 showsignalsk = input(title='Show Signals?', defval=true)
 novolumedata = input(title='Change calculation (no volume data)?', defval=false)
-upT = low - ATR * coeff
-downT = high + ATR * coeff
+
 // Function to calculate AlphaTrend logic
 calcAlphaTrend(_src, _close, _low, _high, _hlc3, _coeff, _AP, _novolumedata) =>
     _atr = ta.sma(ta.tr, _AP) // Note: ta.tr might use current timeframe inside function if not careful, but usually request.security handles this if called in context
@@ -99,4 +97,3 @@ alertcondition(buySignalk, title='Potential BUY Alarm', message='BUY SIGNAL (2D)
 alertcondition(sellSignalk, title='Potential SELL Alarm', message='SELL SIGNAL (2D)!')
 alertcondition(bull2d, title='Bullish Outside Bar (2D)', message='Bullish Outside Bar Detected on 2D Timeframe!')
 alertcondition(bear2d, title='Bearish Outside Bar (2D)', message='Bearish Outside Bar Detected on 2D Timeframe!')
-
