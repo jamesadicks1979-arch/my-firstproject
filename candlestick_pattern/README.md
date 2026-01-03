@@ -14,7 +14,13 @@ Currently, it implements the **AlphaTrend** indicator (originally by KivancOzbil
   - Overlays AlphaTrend line and signal markers.
   - Saves the output chart to `alphatrend_chart.png`.
 
-## Setup
+## Project Structure
+
+- `src/main.py`: Main Python script to run the analysis and visualization.
+- `src/alphatrend.py`: Python implementation of the AlphaTrend logic.
+- `src/alphatrend.pine`: **Pine Script** source code for use in TradingView.
+
+## Setup & Usage (Python)
 
 1. **Install dependencies:**
    ```bash
@@ -22,17 +28,15 @@ Currently, it implements the **AlphaTrend** indicator (originally by KivancOzbil
    ```
 
 2. **Run the main script:**
-   
-   To run the script and generate the chart:
-   ```bash
-   PYTHONPATH=src python3 src/main.py
-   ```
-   
-   *Note: If running from the root directory `candlestick_pattern`, use:*
    ```bash
    PYTHONPATH=candlestick_pattern/src python3 candlestick_pattern/src/main.py
    ```
 
-## Output
+   This will generate `alphatrend_chart.png` in your workspace.
 
-The script will generate an image file named `alphatrend_chart.png` showing the stock price (default: AAPL) with the AlphaTrend indicator and Buy/Sell signals.
+## Usage (TradingView)
+
+If you want to use the indicator in TradingView:
+1. Open `src/alphatrend.pine`.
+2. Copy the content.
+3. Paste it into the Pine Editor in TradingView.
