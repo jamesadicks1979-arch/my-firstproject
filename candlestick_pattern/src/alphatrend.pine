@@ -12,7 +12,11 @@ novolumedata = input(title='Change calculation (no volume data)?', defval=false)
 upT = low - ATR * coeff
 downT = high + ATR * coeff
 AlphaTrend = 0.0
-AlphaTrend := (novolumedata ? ta.rsi(src, AP) >= 50 : ta.mfi(hlc3, AP) >= 50) ? upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
+
+rsiVal = ta.rsi(src, AP)
+mfiVal = ta.mfi(hlc3, AP)
+
+AlphaTrend := (novolumedata ? rsiVal >= 50 : mfiVal >= 50) ? upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
 
 color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
 k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
