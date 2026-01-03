@@ -1,18 +1,27 @@
 // This work is licensed under a Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0) https://creativecommons.org/licenses/by-nc-sa/4.0/
 // © LuxAlgo
+// AlphaTrend Author © KivancOzbilgic
 //@version=5
-strategy("DKO Pattern Strategy + SMA Filter", overlay = true, format=format.price, precision=2, max_lines_count = 500, max_labels_count = 500, max_bars_back=500)
+strategy("DKO Pattern Strategy + SMA Filter + AlphaTrend", overlay = true, format=format.price, precision=2, max_lines_count = 500, max_labels_count = 500, max_bars_back=500)
 // ==========================================
 // 1. INPUTS
 // ==========================================
-useTrendFilter = input.bool(true, "Use SMA Trend Filter?")
-fastLen        = input.int(5, "Fast SMA Length", minval=1)
-slowLen        = input.int(9, "Slow SMA Length", minval=1)
-trendLen       = input.int(21, "Trend SMA Length", minval=1)
-rangePct       = input.float(0.60, "Min Candle Range Pct (0.60 = 60%)", minval=0.0, maxval=1.0)
-minPips        = input.float(20.0, "Min Body Size (Pips)", minval=0.0, tooltip="Difference between Open and Close in Pips (1 Pip = 10 Minticks)")
-extensionPips  = input.float(20.0, "Min Extension vs Prev (Pips)", minval=0.0, tooltip="Candle must exceed prev high/low by this many pips")
-extremeLen     = input.int(20, "Extreme Lookback Length", minval=1)
+// --- DKO Inputs ---
+useTrendFilter = input.bool(true, "Use SMA Trend Filter?", group="DKO Settings")
+fastLen        = input.int(5, "Fast SMA Length", minval=1, group="DKO Settings")
+slowLen        = input.int(9, "Slow SMA Length", minval=1, group="DKO Settings")
+trendLen       = input.int(21, "Trend SMA Length", minval=1, group="DKO Settings")
+rangePct       = input.float(0.60, "Min Candle Range Pct (0.60 = 60%)", minval=0.0, maxval=1.0, group="DKO Settings")
+minPips        = input.float(20.0, "Min Body Size (Pips)", minval=0.0, tooltip="Difference between Open and Close in Pips (1 Pip = 10 Minticks)", group="DKO Settings")
+extensionPips  = input.float(20.0, "Min Extension vs Prev (Pips)", minval=0.0, tooltip="Candle must exceed prev high/low by this many pips", group="DKO Settings")
+extremeLen     = input.int(20, "Extreme Lookback Length", minval=1, group="DKO Settings")
+
+// --- AlphaTrend Inputs ---
+atCoeff        = input.float(1, 'AlphaTrend Multiplier', step=0.1, group="AlphaTrend Settings")
+atPeriod       = input.int(14, 'AlphaTrend Common Period', group="AlphaTrend Settings")
+atShowSignals  = input.bool(true, 'Show AlphaTrend Signals?', group="AlphaTrend Settings")
+atNoVolume     = input.bool(false, 'AlphaTrend No Volume Data?', group="AlphaTrend Settings")
+
 // ==========================================
 // 2. TREND FILTER (SMA 5, 9, 21)
 // ==========================================
@@ -28,14 +37,49 @@ plot(useTrendFilter ? smaTrend : na, "Trend SMA (21)", color=color.white, linewi
 // Downtrend: 5 < 9 AND 9 < 21
 isUptrend   = not useTrendFilter or (smaFast > smaSlow and smaSlow > smaTrend)
 isDowntrend = not useTrendFilter or (smaFast < smaSlow and smaSlow < smaTrend)
+
 // ==========================================
 // 3. EXTREME FILTER (20-bar Low/High)
 // ==========================================
 // Check if current candle matches the 20-bar extreme
 isLowest20  = (low <= ta.lowest(low, extremeLen))
 isHighest20 = (high >= ta.highest(high, extremeLen))
+
 // ==========================================
-// 4. PATTERN DEFINITIONS (DKO)
+// 4. ALPHATREND INDICATOR
+// ==========================================
+atATR = ta.sma(ta.tr, atPeriod)
+atSrc = close // Using close as source
+atUpT = low - atATR * atCoeff
+atDownT = high + atATR * atCoeff
+AlphaTrend = 0.0
+AlphaTrend := (atNoVolume ? ta.rsi(atSrc, atPeriod) >= 50 : ta.mfi(hlc3, atPeriod) >= 50) ? atUpT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : atUpT : atDownT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : atDownT
+
+atColor1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3, title="AlphaTrend")
+k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3, title="AlphaTrend Lag 2")
+
+fill(k1, k2, color=atColor1, title="AlphaTrend Fill")
+
+atBuySignal = ta.crossover(AlphaTrend, AlphaTrend[2])
+atSellSignal = ta.crossunder(AlphaTrend, AlphaTrend[2])
+
+// AlphaTrend Visual Signals
+atK1 = ta.barssince(atBuySignal)
+atK2 = ta.barssince(atSellSignal)
+atO1 = ta.barssince(atBuySignal[1])
+atO2 = ta.barssince(atSellSignal[1])
+
+plotshape(atBuySignal and atShowSignals and atO1 > atK2 ? AlphaTrend[2] * 0.9999 : na, title='AT BUY', text='AT BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
+
+plotshape(atSellSignal and atShowSignals and atO2 > atK1 ? AlphaTrend[2] * 1.0001 : na, title='AT SELL', text='AT SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
+
+// Alerts (Note: strategy scripts use alert() mostly, but alertcondition can stay for manual alerts setup)
+alertcondition(atBuySignal and atO1 > atK2, title='AT Potential BUY Alarm', message='BUY SIGNAL!')
+alertcondition(atSellSignal and atO2 > atK1, title='AT Potential SELL Alarm', message='SELL SIGNAL!')
+
+// ==========================================
+// 5. PATTERN DEFINITIONS (DKO)
 // ==========================================
 // Helper: Calculate where the close is relative to the High-Low range (0.0 to 1.0)
 candleRange = high - low
@@ -62,8 +106,9 @@ dkoCover = (low > low[1]) and (close < open) and (high > high[1]) and (rangePos 
 // Added: Body Size > Min Pips
 // Added: Low Extension > 20 Pips below prev Low
 dkoPer   = (high < high[1]) and (close > open) and (low < low[1]) and (rangePos > rangePct) and isBigEnough and isLowExt
+
 // ==========================================
-// 5. STRATEGY EXECUTION
+// 6. STRATEGY EXECUTION
 // ==========================================
 // Reversal ATR Target
 atr14 = ta.atr(14)
@@ -96,15 +141,17 @@ if (dkoPer and isLowest20)
 else if (dkoPer and isUptrend)
     strategy.entry("Buy Trend", strategy.long, stop=high)
     alert("Buy Trend", alert.freq_once_per_bar_close)
+
 // ==========================================
-// 6. VISUALS (Signals)
+// 7. VISUALS (Signals)
 // ==========================================
 plotshape(dkoCover and isHighest20, title="Sell Rev", location=location.abovebar, style=shape.labeldown, color=color.maroon, size=size.small, text="REV\nSELL", textcolor=color.white)
 plotshape(dkoCover and isDowntrend and not isHighest20, title="Sell Trend", location=location.abovebar, style=shape.triangledown, color=color.red, size=size.small, text="COVER")
 plotshape(dkoPer and isLowest20, title="Buy Rev", location=location.belowbar, style=shape.labelup, color=color.green, size=size.small, text="REV\nBUY", textcolor=color.white)
 plotshape(dkoPer and isUptrend and not isLowest20, title="Buy Trend", location=location.belowbar, style=shape.triangleup, color=color.lime, size=size.small, text="PER")
+
 // ==========================================
-// 7. VISUALS (Win/Loss Labels)
+// 8. VISUALS (Win/Loss Labels)
 // ==========================================
 // We check if a trade closed on the current bar
 if strategy.closedtrades > strategy.closedtrades[1]
