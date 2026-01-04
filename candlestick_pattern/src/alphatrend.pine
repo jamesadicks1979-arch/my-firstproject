@@ -78,10 +78,10 @@ fill(p4H1, p4H2, color=show4H ? color.new(fillColor4H, 80) : na, title="4H Fill"
 // --- Weekly + Daily Confluence Signal ---
 // Green = #00E60F, Red = #80000B
 // We check the color variables derived from the logic
-isBullW = colorW_fill == #00E60F
-isBullD = colorD_fill == #00E60F
-isBearW = colorW_fill == #80000B
-isBearD = colorD_fill == #80000B
+isBullW = fillColorW == #00E60F
+isBullD = fillColorD == #00E60F
+isBearW = fillColorW == #80000B
+isBearD = fillColorD == #80000B
 
 confluenceBuy = isBullW and isBullD
 confluenceSell = isBearW and isBearD
