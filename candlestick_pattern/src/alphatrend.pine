@@ -50,11 +50,19 @@ fill(pW1, pW2, color=showWeekly ? color.new(colorW_fill, 80) : na, title="Weekly
 
 // --- Calculate & Plot Daily ---
 [atD, atD_prev2] = request.security(syminfo.tickerid, "D", f_calc_at_only())
-colorD_fill = f_at_color(atD, atD_prev2, atD[1], atD[3])
+// Daily Color Logic based on Relation to Weekly (as requested)
+// If Flat -> Blue
+// If Daily > Weekly -> Green
+// If Daily < Weekly -> Red
+colorD_fill = atD == atD[1] ? #0000FF : (atD > atW ? #00E60F : #80000B)
 
 pD1 = plot(showDaily ? atD : na, color=color.new(colorD_fill, 0), linewidth=2, title="AT Daily")
 pD2 = plot(showDaily ? atD_prev2 : na, color=color.new(colorD_fill, 50), linewidth=2, title="AT Daily Lag")
 fill(pD1, pD2, color=showDaily ? color.new(colorD_fill, 80) : na, title="Daily Fill")
+
+// --- Daily vs Weekly Fill ---
+// Green when Daily > Weekly, Red when Daily < Weekly
+fill(pD1, pW1, color=showDaily and showWeekly ? (atD > atW ? color.new(color.green, 85) : color.new(color.red, 85)) : na, title="Daily-Weekly Cloud")
 
 // --- Calculate & Plot 4H ---
 [at4H, at4H_prev2] = request.security(syminfo.tickerid, "240", f_calc_at_only())
