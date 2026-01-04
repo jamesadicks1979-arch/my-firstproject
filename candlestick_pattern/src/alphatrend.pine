@@ -97,7 +97,7 @@ alertcondition(triggerConfBuy, title='Weekly+Daily Buy Confluence', message='Wee
 alertcondition(triggerConfSell, title='Weekly+Daily Sell Confluence', message='Weekly and Daily AlphaTrends are both Bearish!')
 
 // --- Calculate Everything on 2D Timeframe (With Patterns) ---
-// We define a wrapper function to call inside request.security for 2D
+// Note: We keep this function if we ever want to re-enable 2D patterns
 f_calc_2d_full() =>
     // AlphaTrend Calculation
     myATR = ta.sma(ta.tr, AP)
@@ -117,45 +117,11 @@ f_calc_2d_full() =>
     
     [myAT, myAT[2], isBull, isBear, high, low, open, close]
 
-// Fetch data from 2D
-[at2d, at2d_prev2, bull2d, bear2d, h2d, l2d, o2d, c2d] = request.security(syminfo.tickerid, "2D", f_calc_2d_full())
+// --- Calculate & Plot 2D (Optional) ---
+[at2d, at2d_prev2] = request.security(syminfo.tickerid, "2D", f_calc_at_only())
+fillColor2D = at2d > at2d_prev2 ? #00E60F : at2d < at2d_prev2 ? #80000B : at2d[1] > at2d[3] ? #00E60F : #80000B
+lineColor2D = f_at_color(at2d, at2d_prev2, at2d[1], at2d[3])
 
-// --- Plotting AlphaTrend (2D) ---
-// 2D Plotting disabled by default (show2D=false), and simplified logic here if user enables it
-color1 = f_at_color(at2d, at2d_prev2, at2d[1], at2d[3])
-
-k1 = plot(show2D ? at2d : na, color=color.new(color1, 0), linewidth=3, title="AT 2D")
-k2 = plot(show2D ? at2d_prev2 : na, color=color.new(color1, 50), linewidth=3, title="AT 2D Lag")
-fill(k1, k2, color=show2D ? color.new(color1, 80) : na, title="2D Fill")
-
-// Signals based on 2D data (only shown if 2D enabled)
-buySignalk = ta.crossover(at2d, at2d_prev2)
-sellSignalk = ta.crossunder(at2d, at2d_prev2)
-
-plotshape(show2D and buySignalk and showsignalsk, title='BUY 2D', text='BUY 2D', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0), offset=0)
-plotshape(show2D and sellSignalk and showsignalsk, title='SELL 2D', text='SELL 2D', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0), offset=0)
-
-// --- Outside Bar Detection on 2-Day Timeframe ---
-// Logic is already fetched in bull2d / bear2d
-
-// Plot Shapes for 2D Pattern (only if show2D is true)
-plotshape(show2D and bull2d and ta.change(time("2D")), title="Bullish Outside Bar (2D)", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull\n(2D)", textcolor=#00FFFF, offset=1)
-plotshape(show2D and bear2d and ta.change(time("2D")), title="Bearish Outside Bar (2D)", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear\n(2D)", textcolor=#FF00FF, offset=1)
-
-// --- Fibonacci on Outside Bar (2D) ---
-if show2D and (bull2d or bear2d)
-    barRange = h2d - l2d
-    isNew2DBar = ta.change(time("2D"))
-    
-    if isNew2DBar
-        // Draw lines
-        line.new(bar_index, l2d, bar_index + 1, l2d, color=color.new(#808080, 50))
-        line.new(bar_index, h2d, bar_index + 1, h2d, color=color.new(#808080, 50))
-        line.new(bar_index, l2d + barRange * 0.5, bar_index + 1, l2d + barRange * 0.5, color=color.new(#FFFF00, 0))
-        line.new(bar_index, l2d + barRange * 0.618, bar_index + 1, l2d + barRange * 0.618, color=color.new(#0000FF, 50))
-        line.new(bar_index, l2d + barRange * 0.382, bar_index + 1, l2d + barRange * 0.382, color=color.new(#0000FF, 50))
-
-alertcondition(buySignalk, title='Potential BUY Alarm', message='BUY SIGNAL (2D)!')
-alertcondition(sellSignalk, title='Potential SELL Alarm', message='SELL SIGNAL (2D)!')
-alertcondition(bull2d, title='Bullish Outside Bar (2D)', message='Bullish Outside Bar Detected on 2D Timeframe!')
-alertcondition(bear2d, title='Bearish Outside Bar (2D)', message='Bearish Outside Bar Detected on 2D Timeframe!')
+p2D1 = plot(show2D ? at2d : na, color=color.new(lineColor2D, 0), linewidth=2, title="AT 2D")
+p2D2 = plot(show2D ? at2d_prev2 : na, color=color.new(lineColor2D, 50), linewidth=2, title="AT 2D Lag")
+fill(p2D1, p2D2, color=show2D ? color.new(fillColor2D, 80) : na, title="2D Fill")
