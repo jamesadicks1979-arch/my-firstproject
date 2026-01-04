@@ -41,23 +41,26 @@ f_at_color(_at, _at_prev2, _at_1, _at_3) =>
 
 // --- Calculate & Plot Weekly ---
 [atW, atW_prev2] = request.security(syminfo.tickerid, "W", f_calc_at_only())
-// Trend color for fill
-colorW_fill = f_at_color(atW, atW_prev2, atW[1], atW[3])
+// Trend color for fill (Green/Red)
+fillColorW = atW > atW_prev2 ? #00E60F : atW < atW_prev2 ? #80000B : atW[1] > atW[3] ? #00E60F : #80000B
+// Line Color (Blue/Green/Red)
+lineColorW = f_at_color(atW, atW_prev2, atW[1], atW[3])
 
-pW1 = plot(showWeekly ? atW : na, color=color.new(colorW_fill, 0), linewidth=2, title="AT Weekly")
-pW2 = plot(showWeekly ? atW_prev2 : na, color=color.new(colorW_fill, 50), linewidth=2, title="AT Weekly Lag")
-fill(pW1, pW2, color=showWeekly ? color.new(colorW_fill, 80) : na, title="Weekly Fill")
+pW1 = plot(showWeekly ? atW : na, color=color.new(lineColorW, 0), linewidth=2, title="AT Weekly")
+pW2 = plot(showWeekly ? atW_prev2 : na, color=color.new(lineColorW, 50), linewidth=2, title="AT Weekly Lag")
+fill(pW1, pW2, color=showWeekly ? color.new(fillColorW, 80) : na, title="Weekly Fill")
 
 // --- Calculate & Plot Daily ---
 [atD, atD_prev2] = request.security(syminfo.tickerid, "D", f_calc_at_only())
 
 // Daily Color Override Logic (Requested: Green if Daily > Weekly, Red if Daily < Weekly, Blue if Flat)
-// Note: We check if Daily is Flat first.
-colorD_fill = atD == atD[1] ? #0000FF : (atD > atW ? #00E60F : #80000B)
+lineColorD = atD == atD[1] ? #0000FF : (atD > atW ? #00E60F : #80000B)
+// Fill Color (Green/Red based on trend only)
+fillColorD = atD > atD_prev2 ? #00E60F : atD < atD_prev2 ? #80000B : atD[1] > atD[3] ? #00E60F : #80000B
 
-pD1 = plot(showDaily ? atD : na, color=color.new(colorD_fill, 0), linewidth=2, title="AT Daily")
-pD2 = plot(showDaily ? atD_prev2 : na, color=color.new(colorD_fill, 50), linewidth=2, title="AT Daily Lag")
-fill(pD1, pD2, color=showDaily ? color.new(colorD_fill, 80) : na, title="Daily Fill")
+pD1 = plot(showDaily ? atD : na, color=color.new(lineColorD, 0), linewidth=2, title="AT Daily")
+pD2 = plot(showDaily ? atD_prev2 : na, color=color.new(lineColorD, 50), linewidth=2, title="AT Daily Lag")
+fill(pD1, pD2, color=showDaily ? color.new(fillColorD, 80) : na, title="Daily Fill")
 
 // --- Daily vs Weekly Fill (Cloud) ---
 // Green when Daily > Weekly, Red when Daily < Weekly
@@ -65,11 +68,12 @@ fill(pD1, pW1, color=showDaily and showWeekly ? (atD > atW ? color.new(color.gre
 
 // --- Calculate & Plot 4H ---
 [at4H, at4H_prev2] = request.security(syminfo.tickerid, "240", f_calc_at_only())
-color4H_fill = f_at_color(at4H, at4H_prev2, at4H[1], at4H[3])
+fillColor4H = at4H > at4H_prev2 ? #00E60F : at4H < at4H_prev2 ? #80000B : at4H[1] > at4H[3] ? #00E60F : #80000B
+lineColor4H = f_at_color(at4H, at4H_prev2, at4H[1], at4H[3])
 
-p4H1 = plot(show4H ? at4H : na, color=color.new(color4H_fill, 0), linewidth=2, title="AT 4H")
-p4H2 = plot(show4H ? at4H_prev2 : na, color=color.new(color4H_fill, 50), linewidth=2, title="AT 4H Lag")
-fill(p4H1, p4H2, color=show4H ? color.new(color4H_fill, 80) : na, title="4H Fill")
+p4H1 = plot(show4H ? at4H : na, color=color.new(lineColor4H, 0), linewidth=2, title="AT 4H")
+p4H2 = plot(show4H ? at4H_prev2 : na, color=color.new(lineColor4H, 50), linewidth=2, title="AT 4H Lag")
+fill(p4H1, p4H2, color=show4H ? color.new(fillColor4H, 80) : na, title="4H Fill")
 
 // --- Weekly + Daily Confluence Signal ---
 // Green = #00E60F, Red = #80000B
@@ -117,11 +121,12 @@ f_calc_2d_full() =>
 [at2d, at2d_prev2, bull2d, bear2d, h2d, l2d, o2d, c2d] = request.security(syminfo.tickerid, "2D", f_calc_2d_full())
 
 // --- Plotting AlphaTrend (2D) ---
-color1 = f_at_color(at2d, at2d_prev2, at2d[1], at2d[3])
+lineColor2D = f_at_color(at2d, at2d_prev2, at2d[1], at2d[3])
+fillColor2D = at2d > at2d_prev2 ? #00E60F : at2d < at2d_prev2 ? #80000B : at2d[1] > at2d[3] ? #00E60F : #80000B
 
-k1 = plot(show2D ? at2d : na, color=color.new(color1, 0), linewidth=3, title="AT 2D")
-k2 = plot(show2D ? at2d_prev2 : na, color=color.new(color1, 50), linewidth=3, title="AT 2D Lag")
-fill(k1, k2, color=show2D ? color.new(color1, 80) : na, title="2D Fill")
+k1 = plot(show2D ? at2d : na, color=color.new(lineColor2D, 0), linewidth=3, title="AT 2D")
+k2 = plot(show2D ? at2d_prev2 : na, color=color.new(lineColor2D, 50), linewidth=3, title="AT 2D Lag")
+fill(k1, k2, color=show2D ? color.new(fillColor2D, 80) : na, title="2D Fill")
 
 // Signals based on 2D data
 buySignalk = ta.crossover(at2d, at2d_prev2)
