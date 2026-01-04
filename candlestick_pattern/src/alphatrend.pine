@@ -75,35 +75,18 @@ p4H1 = plot(show4H ? at4H : na, color=color.new(lineColor4H, 0), linewidth=2, ti
 p4H2 = plot(show4H ? at4H_prev2 : na, color=color.new(lineColor4H, 50), linewidth=2, title="AT 4H Lag")
 fill(p4H1, p4H2, color=show4H ? color.new(fillColor4H, 80) : na, title="4H Fill")
 
-// --- Weekly + Daily Confluence Signal ---
-// Green = #00E60F, Red = #80000B
-// We check the color variables derived from the logic
-// Logic Request: Only buys when daily is above weekly, only sells when daily is below weekly.
-// We assume this means:
-// BUY Signal Condition: Both Weekly & Daily are Green AND Daily AlphaTrend > Weekly AlphaTrend
-// SELL Signal Condition: Both Weekly & Daily are Red AND Daily AlphaTrend < Weekly AlphaTrend
+// --- Weekly + Daily Crossover Signal ---
+// Buy when Daily AlphaTrend crosses OVER Weekly AlphaTrend
+// Sell when Daily AlphaTrend crosses UNDER Weekly AlphaTrend
 
-isBullW = fillColorW == #00E60F
-isBullD = fillColorD == #00E60F
-isBearW = fillColorW == #80000B
-isBearD = fillColorD == #80000B
+crossoverBuy = ta.crossover(atD, atW)
+crossunderSell = ta.crossunder(atD, atW)
 
-// Check relationship between Daily and Weekly values
-dailyAboveWeekly = atD > atW
-dailyBelowWeekly = atD < atW
+plotshape(crossoverBuy, title="Daily Cross Weekly Buy", text="BUY", location=location.belowbar, color=color.green, style=shape.labelup, textcolor=color.white, size=size.small)
+plotshape(crossunderSell, title="Daily Cross Weekly Sell", text="SELL", location=location.abovebar, color=color.red, style=shape.labeldown, textcolor=color.white, size=size.small)
 
-confluenceBuy = isBullW and isBullD and dailyAboveWeekly
-confluenceSell = isBearW and isBearD and dailyBelowWeekly
-
-// Trigger only on new occurrence
-triggerConfBuy = confluenceBuy and not confluenceBuy[1]
-triggerConfSell = confluenceSell and not confluenceSell[1]
-
-plotshape(triggerConfBuy, title="Weekly+Daily Buy", text="BUY", location=location.belowbar, color=color.green, style=shape.labelup, textcolor=color.white, size=size.small)
-plotshape(triggerConfSell, title="Weekly+Daily Sell", text="SELL", location=location.abovebar, color=color.red, style=shape.labeldown, textcolor=color.white, size=size.small)
-
-alertcondition(triggerConfBuy, title='Weekly+Daily Buy Confluence', message='Weekly and Daily AlphaTrends are both Bullish!')
-alertcondition(triggerConfSell, title='Weekly+Daily Sell Confluence', message='Weekly and Daily AlphaTrends are both Bearish!')
+alertcondition(crossoverBuy, title='Daily Cross Weekly Buy', message='Daily AlphaTrend has crossed ABOVE Weekly AlphaTrend!')
+alertcondition(crossunderSell, title='Daily Cross Weekly Sell', message='Daily AlphaTrend has crossed BELOW Weekly AlphaTrend!')
 
 // --- Calculate Everything on 2D Timeframe (With Patterns) ---
 // Note: We keep this function if we ever want to re-enable 2D patterns
