@@ -7,9 +7,10 @@ from patterns import detect_outside_bars
 
 def main():
     print("Fetching data...")
-    # Fetch data
+    # Fetch data (use 1H data to simulate lower timeframe, but allow resampling to 4H, Daily, Weekly)
+    # yfinance limits: 1h data is only available for 730 days.
     ticker = "AAPL"
-    df = yf.download(ticker, start="2024-01-01", end="2025-01-01")
+    df = yf.download(ticker, start="2024-01-01", end="2025-01-01", interval="1h")
     
     if df.empty:
         print("No data fetched.")
@@ -23,72 +24,136 @@ def main():
     # Ensure index is DatetimeIndex
     df.index = pd.to_datetime(df.index)
 
-    print("Calculating AlphaTrend...")
-    # Calculate AlphaTrend
-    # Parameters from Pine Script default: coeff=1, AP=14
-    df = alphatrend(df, coeff=1, ap=14)
+    print("Calculating Multi-Timeframe AlphaTrend...")
 
-    print("Detecting Outside Bars...")
-    df = detect_outside_bars(df)
+    # --- Resample Function Helper ---
+    def calculate_mtf(resample_rule, prefix):
+        # Resample logic
+        # 'agg' dictionary to define how to aggregate OHLCV
+        ohlc_dict = {
+            'Open': 'first',
+            'High': 'max',
+            'Low': 'min',
+            'Close': 'last',
+            'Volume': 'sum'
+        }
+        
+        # Resample
+        resampled_df = df.resample(resample_rule).agg(ohlc_dict).dropna()
+        
+        # Calculate AlphaTrend on resampled data
+        resampled_df = alphatrend(resampled_df, coeff=1, ap=14, prefix=prefix)
+        
+        # Reindex back to original timeframe (forward fill) using asof or merge_asof logic or simply reindex/ffill
+        # Ideally, we map the higher timeframe value to the bars that fall within it.
+        # We use reindex and ffill to propagate the higher timeframe value forward to lower timeframe bars.
+        
+        # Select only relevant columns to merge back
+        cols_to_merge = [c for c in resampled_df.columns if c.startswith(prefix)]
+        subset = resampled_df[cols_to_merge]
+        
+        # Merge back:
+        # We need to reindex to the original index. 'method=ffill' propagates the last valid observation forward.
+        aligned_df = subset.reindex(df.index, method='ffill')
+        
+        return aligned_df
+
+    # --- Calculate for different Timeframes ---
+    
+    # 1. 2D (Default, Main Plot)
+    # '2D' rule might not be standard in pandas aliases like '2D'. It's '2D'.
+    mtf_2d = calculate_mtf('2D', '2D_')
+    
+    # 2. Weekly
+    mtf_weekly = calculate_mtf('W', 'Weekly_')
+    
+    # 3. Daily
+    mtf_daily = calculate_mtf('D', 'Daily_')
+    
+    # 4. 4H (4 hours)
+    mtf_4h = calculate_mtf('4h', '4H_')
+
+    # Concatenate all results
+    df = pd.concat([df, mtf_2d, mtf_weekly, mtf_daily, mtf_4h], axis=1)
+
+    # --- Detect Outside Bars (Using 2D Data as per request for main pattern overlay) ---
+    # We need to run pattern detection on the *resampled* 2D data first, then map it back.
+    # Actually, simpler: resample 2D again specifically for patterns if not included in alphatrend function.
+    # The 'alphatrend' function doesn't detect outside bars, 'detect_outside_bars' does.
+    
+    # Create a temporary 2D dataframe for pattern detection
+    df_2d_resampled = df.resample('2D').agg({'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}).dropna()
+    df_2d_resampled = detect_outside_bars(df_2d_resampled)
+    
+    # Rename pattern columns to avoid collision if we ran it on main df
+    df_2d_resampled = df_2d_resampled.rename(columns={'Bullish_Outside': '2D_Bullish_Outside', 'Bearish_Outside': '2D_Bearish_Outside'})
+    
+    # Merge patterns back
+    patterns_subset = df_2d_resampled[['2D_Bullish_Outside', '2D_Bearish_Outside']]
+    # For patterns, we only want to show them once or propagate? 
+    # Usually patterns are valid for the duration. ffill works to show it persists until next bar.
+    patterns_aligned = patterns_subset.reindex(df.index, method='ffill')
+    
+    df = pd.concat([df, patterns_aligned], axis=1)
     
     # Prepare plots
     print("Preparing plot...")
     
     # Filter out initial NaN values for plotting if necessary, but mplfinance handles it well usually.
-    # We focus on the last 100 candles for better visibility
-    plot_df = df.iloc[-100:]
+    # We focus on the last 500 candles of 1H data to see details
+    plot_df = df.iloc[-200:]
     
     apds = []
     
-    # Add AlphaTrend line
-    apds.append(mpf.make_addplot(plot_df['AlphaTrend'], color='blue', width=1.5))
-    
-    # Add AlphaTrend Lag 2 line (optional, but part of logic)
-    # apds.append(mpf.make_addplot(plot_df['AlphaTrend_Shift2'], color='red', width=1.5))
-    
-    # Add Buy Signals
-    # Create a series with NaN everywhere except where Buy_Signal is True
-    buy_signals = plot_df['AlphaTrend'].copy()
-    buy_signals[:] = np.nan
-    buy_signals[plot_df['Buy_Signal']] = plot_df['Low'][plot_df['Buy_Signal']] * 0.99
-    
-    if not buy_signals.isna().all():
-        apds.append(mpf.make_addplot(buy_signals, type='scatter', markersize=100, marker='^', color='green'))
+    # Helper to add plots if column exists
+    def add_at_plot(col_name, color):
+        if col_name in plot_df.columns:
+            # We use forward filled data, so it will look like steps
+            apds.append(mpf.make_addplot(plot_df[col_name], color=color, width=1.5, secondary_y=False))
 
-    # Add Sell Signals
-    sell_signals = plot_df['AlphaTrend'].copy()
-    sell_signals[:] = np.nan
-    sell_signals[plot_df['Sell_Signal']] = plot_df['High'][plot_df['Sell_Signal']] * 1.01
-
-    if not sell_signals.isna().all():
-        apds.append(mpf.make_addplot(sell_signals, type='scatter', markersize=100, marker='v', color='red'))
-
-    # Add Bullish Outside Bar Markers
-    bull_outside = plot_df['AlphaTrend'].copy()
-    bull_outside[:] = np.nan
-    # Place marker below low
-    bull_outside[plot_df['Bullish_Outside']] = plot_df['Low'][plot_df['Bullish_Outside']] * 0.98 
+    # Add AlphaTrends
+    add_at_plot('2D_AlphaTrend', 'blue') # 2D is main
+    add_at_plot('Weekly_AlphaTrend', 'purple')
+    add_at_plot('Daily_AlphaTrend', 'orange')
+    add_at_plot('4H_AlphaTrend', 'gray')
     
-    if not bull_outside.isna().all():
-        # Marker 'o' (circle) in Cyan for Bullish Outside
-        apds.append(mpf.make_addplot(bull_outside, type='scatter', markersize=50, marker='o', color='cyan', label='Bullish Outside'))
-
-    # Add Bearish Outside Bar Markers
-    bear_outside = plot_df['AlphaTrend'].copy()
-    bear_outside[:] = np.nan
-    # Place marker above high
-    bear_outside[plot_df['Bearish_Outside']] = plot_df['High'][plot_df['Bearish_Outside']] * 1.02
+    # Add 2D Outside Bar Markers
+    # Since we have boolean columns '2D_Bullish_Outside', we need to map them to price levels
     
-    if not bear_outside.isna().all():
-        # Marker 'o' (circle) in Magenta for Bearish Outside
-        apds.append(mpf.make_addplot(bear_outside, type='scatter', markersize=50, marker='o', color='magenta', label='Bearish Outside'))
+    # Bullish
+    bull_mask = plot_df['2D_Bullish_Outside'].fillna(False).astype(bool)
+    # To avoid plotting a marker on every single 1H bar that constitutes the 2D bar, 
+    # we ideally want to plot it only when the 2D bar *changes* or starts.
+    # We can detect change in the '2D_AlphaTrend' or the resampled index?
+    # Simpler: Plot on every bar (continuous line of dots) or just check for change.
+    
+    # Let's verify change in the 2D boolean signal to act as a trigger, OR plot continuously as requested "locked".
+    # Plotting continuously emphasizes the "locked" state.
+    
+    bull_markers = plot_df['2D_AlphaTrend'].copy() # Dummy series
+    bull_markers[:] = np.nan
+    # Use the 1H Low for placement, or better, the *2D Low* if we had propagated it.
+    # Using 1H Low is fine for visual proximity.
+    bull_markers[bull_mask] = plot_df['Low'][bull_mask] * 0.98
+    
+    if not bull_markers.isna().all():
+        apds.append(mpf.make_addplot(bull_markers, type='scatter', markersize=20, marker='o', color='cyan', label='2D Bull Outside'))
+        
+    # Bearish
+    bear_mask = plot_df['2D_Bearish_Outside'].fillna(False).astype(bool)
+    bear_markers = plot_df['2D_AlphaTrend'].copy()
+    bear_markers[:] = np.nan
+    bear_markers[bear_mask] = plot_df['High'][bear_mask] * 1.02
+    
+    if not bear_markers.isna().all():
+        apds.append(mpf.make_addplot(bear_markers, type='scatter', markersize=20, marker='o', color='magenta', label='2D Bear Outside'))
 
     # Plot
     mpf.plot(
         plot_df,
         type='candle',
         style='yahoo',
-        title=f'{ticker} AlphaTrend',
+        title=f'{ticker} Multi-Timeframe AlphaTrend (Base: 1H)',
         ylabel='Price',
         addplot=apds,
         volume=True,

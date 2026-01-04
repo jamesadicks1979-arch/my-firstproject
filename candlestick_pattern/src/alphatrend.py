@@ -49,7 +49,7 @@ def calculate_atr(high, low, close, period=14):
     atr = tr.rolling(window=period).mean()
     return atr
 
-def alphatrend(df, coeff=1, ap=14, use_volume=True):
+def alphatrend(df, coeff=1, ap=14, use_volume=True, prefix=''):
     """
     Calculates the AlphaTrend indicator.
     
@@ -58,12 +58,16 @@ def alphatrend(df, coeff=1, ap=14, use_volume=True):
         coeff: Multiplier
         ap: Common Period
         use_volume: If True, uses MFI. If False, uses RSI.
+        prefix: Optional prefix for output columns (e.g., 'Weekly_', 'Daily_')
     """
     # Ensure column names are correct
     high = df['High']
     low = df['Low']
     close = df['Close']
-    volume = df['Volume']
+    if 'Volume' in df.columns:
+        volume = df['Volume']
+    else:
+        volume = pd.Series(0, index=df.index)
     
     # Calculate ATR
     atr = calculate_atr(high, low, close, ap)
@@ -90,7 +94,8 @@ def alphatrend(df, coeff=1, ap=14, use_volume=True):
     downT_vals = downT.values
     
     # Initialize first value (can be NaN or close)
-    alpha_trend[0] = close.iloc[0] # or 0
+    if len(close) > 0:
+        alpha_trend[0] = close.iloc[0] # or 0
     
     for i in range(1, len(df)):
         prev_at = alpha_trend[i-1]
@@ -116,27 +121,32 @@ def alphatrend(df, coeff=1, ap=14, use_volume=True):
             else:
                 alpha_trend[i] = downT_vals[i]
                 
-    df['AlphaTrend'] = alpha_trend
+    at_col = f'{prefix}AlphaTrend'
+    at_shift_col = f'{prefix}AlphaTrend_Shift2'
+    buy_col = f'{prefix}Buy_Signal'
+    sell_col = f'{prefix}Sell_Signal'
+
+    df[at_col] = alpha_trend
     
     # Signal generation
     # buySignalk = ta.crossover(AlphaTrend, AlphaTrend[2])
     # sellSignalk = ta.crossunder(AlphaTrend, AlphaTrend[2])
     
-    df['AlphaTrend_Shift2'] = df['AlphaTrend'].shift(2)
+    df[at_shift_col] = df[at_col].shift(2)
     
     # Buy Signal: AlphaTrend crosses OVER AlphaTrend[2]
     # This means: prev_AT <= prev_AT_Shift2 AND curr_AT > curr_AT_Shift2
     # Pine Script `ta.crossover(source1, source2)`: source1 crosses over source2
     # Logic: source1[1] <= source2[1] and source1 > source2
     
-    df['Buy_Signal'] = (
-        (df['AlphaTrend'].shift(1) <= df['AlphaTrend_Shift2'].shift(1)) & 
-        (df['AlphaTrend'] > df['AlphaTrend_Shift2'])
+    df[buy_col] = (
+        (df[at_col].shift(1) <= df[at_shift_col].shift(1)) & 
+        (df[at_col] > df[at_shift_col])
     )
     
-    df['Sell_Signal'] = (
-        (df['AlphaTrend'].shift(1) >= df['AlphaTrend_Shift2'].shift(1)) & 
-        (df['AlphaTrend'] < df['AlphaTrend_Shift2'])
+    df[sell_col] = (
+        (df[at_col].shift(1) >= df[at_shift_col].shift(1)) & 
+        (df[at_col] < df[at_shift_col])
     )
     
     return df
