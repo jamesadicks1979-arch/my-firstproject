@@ -78,13 +78,22 @@ fill(p4H1, p4H2, color=show4H ? color.new(fillColor4H, 80) : na, title="4H Fill"
 // --- Weekly + Daily Confluence Signal ---
 // Green = #00E60F, Red = #80000B
 // We check the color variables derived from the logic
+// Logic Request: Only buys when daily is above weekly, only sells when daily is below weekly.
+// We assume this means:
+// BUY Signal Condition: Both Weekly & Daily are Green AND Daily AlphaTrend > Weekly AlphaTrend
+// SELL Signal Condition: Both Weekly & Daily are Red AND Daily AlphaTrend < Weekly AlphaTrend
+
 isBullW = fillColorW == #00E60F
 isBullD = fillColorD == #00E60F
 isBearW = fillColorW == #80000B
 isBearD = fillColorD == #80000B
 
-confluenceBuy = isBullW and isBullD
-confluenceSell = isBearW and isBearD
+// Check relationship between Daily and Weekly values
+dailyAboveWeekly = atD > atW
+dailyBelowWeekly = atD < atW
+
+confluenceBuy = isBullW and isBullD and dailyAboveWeekly
+confluenceSell = isBearW and isBearD and dailyBelowWeekly
 
 // Trigger only on new occurrence
 triggerConfBuy = confluenceBuy and not confluenceBuy[1]
