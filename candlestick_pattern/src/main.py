@@ -106,16 +106,46 @@ def main():
     apds = []
     
     # Helper to add plots if column exists
-    def add_at_plot(col_name, color):
-        if col_name in plot_df.columns:
-            # We use forward filled data, so it will look like steps
-            apds.append(mpf.make_addplot(plot_df[col_name], color=color, width=1.5, secondary_y=False))
+    def add_at_plot_with_fill(prefix, line_color, lag_color):
+        at_col = f'{prefix}AlphaTrend'
+        lag_col = f'{prefix}AlphaTrend_Shift2'
+        
+        if at_col in plot_df.columns and lag_col in plot_df.columns:
+            # Main Line + Bull Fill (Green)
+            # fill_between: y1 is the plot values (AT), y2 needs to be specified (Lag)
+            apds.append(mpf.make_addplot(
+                plot_df[at_col], 
+                color=line_color, 
+                width=1.5,
+                fill_between=dict(
+                    y1=plot_df[at_col].values, 
+                    y2=plot_df[lag_col].values, 
+                    where=plot_df[at_col].values > plot_df[lag_col].values, 
+                    color='green', 
+                    alpha=0.2
+                )
+            ))
+            
+            # Lag Line + Bear Fill (Red)
+            # We plot the lag line separately
+            apds.append(mpf.make_addplot(
+                plot_df[lag_col], 
+                color=lag_color, 
+                width=1.0,
+                fill_between=dict(
+                    y1=plot_df[at_col].values, 
+                    y2=plot_df[lag_col].values, 
+                    where=plot_df[at_col].values < plot_df[lag_col].values, 
+                    color='red', 
+                    alpha=0.2
+                )
+            ))
 
-    # Add AlphaTrends
-    add_at_plot('2D_AlphaTrend', 'blue') # 2D is main
-    add_at_plot('Weekly_AlphaTrend', 'purple')
-    add_at_plot('Daily_AlphaTrend', 'orange')
-    add_at_plot('4H_AlphaTrend', 'gray')
+    # Add AlphaTrends with Fills and Distinct Colors
+    add_at_plot_with_fill('2D_', 'blue', 'darkblue')     # 2D: Blue
+    add_at_plot_with_fill('Weekly_', 'purple', 'indigo') # Weekly: Purple
+    add_at_plot_with_fill('Daily_', 'orange', '#CC5500') # Daily: Orange (Burnt Orange for lag)
+    add_at_plot_with_fill('4H_', 'gray', 'black')        # 4H: Gray
     
     # Add 2D Outside Bar Markers
     # Since we have boolean columns '2D_Bullish_Outside', we need to map them to price levels
