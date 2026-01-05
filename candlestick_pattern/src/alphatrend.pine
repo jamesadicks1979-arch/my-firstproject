@@ -60,9 +60,11 @@ fill(k1, k2, color=color1)
 // --- Signals based on Outside Bar Pattern ---
 isNew2DBar = ta.change(time("2D"))
 
-// Check previous bar values [1] because we are at the start of the new bar
-bullCond = isNew2DBar and bull2d[1]
-bearCond = isNew2DBar and bear2d[1]
+// Directly check bull2d/bear2d. 
+// isNew2DBar ensures we only signal once per 2D bar (important for lower timeframe viewing).
+// On 2D timeframe, isNew2DBar is always true, so it triggers on the Outside Bar close.
+bullCond = bull2d and isNew2DBar
+bearCond = bear2d and isNew2DBar
 
 plotshape(bullCond and showsignalsk, title='BUY', text='BUY', location=location.belowbar, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0), offset=0)
 plotshape(bearCond and showsignalsk, title='SELL', text='SELL', location=location.abovebar, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0), offset=0)
@@ -70,9 +72,8 @@ plotshape(bearCond and showsignalsk, title='SELL', text='SELL', location=locatio
 // --- Strategy Execution ---
 // Condition: Buy Signal (Bullish Outside Bar)
 if bullCond
-    // Trigger Candle is the PREVIOUS 2D candle (the one that just finished)
-    // We use [1] to access its values
-    triggerRange = h2d[1] - l2d[1]
+    // Trigger Candle is the CURRENT 2D candle (the one that is Outside)
+    triggerRange = h2d - l2d
     
     // Stop Loss Distance: 82% of Trigger Candle Range
     slDist = triggerRange * sl_mult
@@ -81,37 +82,37 @@ if bullCond
     tpDist = slDist * tp_mult
     
     // Stop and Limit levels relative to the Close of the trigger candle
-    longStop = c2d[1] - slDist
-    longTP = c2d[1] + tpDist
+    longStop = c2d - slDist
+    longTP = c2d + tpDist
     
     strategy.entry("Long", strategy.long)
     strategy.exit("Exit Long", "Long", stop=longStop, limit=longTP)
 
 // Condition: Sell Signal (Bearish Outside Bar)
 if bearCond
-    triggerRange = h2d[1] - l2d[1]
+    triggerRange = h2d - l2d
     slDist = triggerRange * sl_mult
     tpDist = slDist * tp_mult
     
-    shortStop = c2d[1] + slDist
-    shortTP = c2d[1] - tpDist
+    shortStop = c2d + slDist
+    shortTP = c2d - tpDist
     
     strategy.entry("Short", strategy.short)
     strategy.exit("Exit Short", "Short", stop=shortStop, limit=shortTP)
 
 // --- Outside Bar Detection on 2-Day Timeframe (Visuals) ---
-// Using bullCond/bearCond (which check [1]) to align with signals
+// Using bullCond/bearCond (aligned with signals)
 plotshape(bullCond, title="Bullish Outside Bar (2D)", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull\n(2D)", textcolor=#00FFFF, offset=0)
 plotshape(bearCond, title="Bearish Outside Bar (2D)", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear\n(2D)", textcolor=#FF00FF, offset=0)
 
 // --- Fibonacci on Outside Bar (2D) ---
 if bullCond or bearCond
-    // Using [1] for the previous (completed) bar values
-    barRange = h2d[1] - l2d[1]
+    // Draw on the current bar (Outside Bar)
+    barRange = h2d - l2d
     
     // Draw lines
-    line.new(bar_index, l2d[1], bar_index + 1, l2d[1], color=color.new(#808080, 50))
-    line.new(bar_index, h2d[1], bar_index + 1, h2d[1], color=color.new(#808080, 50))
-    line.new(bar_index, l2d[1] + barRange * 0.5, bar_index + 1, l2d[1] + barRange * 0.5, color=color.new(#FFFF00, 0))
-    line.new(bar_index, l2d[1] + barRange * 0.618, bar_index + 1, l2d[1] + barRange * 0.618, color=color.new(#0000FF, 50))
-    line.new(bar_index, l2d[1] + barRange * 0.382, bar_index + 1, l2d[1] + barRange * 0.382, color=color.new(#0000FF, 50))
+    line.new(bar_index, l2d, bar_index + 1, l2d, color=color.new(#808080, 50))
+    line.new(bar_index, h2d, bar_index + 1, h2d, color=color.new(#808080, 50))
+    line.new(bar_index, l2d + barRange * 0.5, bar_index + 1, l2d + barRange * 0.5, color=color.new(#FFFF00, 0))
+    line.new(bar_index, l2d + barRange * 0.618, bar_index + 1, l2d + barRange * 0.618, color=color.new(#0000FF, 50))
+    line.new(bar_index, l2d + barRange * 0.382, bar_index + 1, l2d + barRange * 0.382, color=color.new(#0000FF, 50))
