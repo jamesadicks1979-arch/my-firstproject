@@ -1,0 +1,198 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// author © KivancOzbilgic
+// developer © KivancOzbilgic
+//@version=5
+indicator('AlphaTrend', shorttitle='AT', overlay=true, format=format.price, precision=2, max_lines_count=500, max_labels_count=500)
+coeff = input.float(1, 'Multiplier', step=0.1)
+AP = input(14, 'Common Period')
+src = input(close)
+showsignalsk = input(title='Show Signals?', defval=true)
+novolumedata = input(title='Change calculation (no volume data)?', defval=false)
+// Inputs
+showWeekly = input.bool(false, "Show Weekly AlphaTrend")
+showDaily = input.bool(false, "Show Daily AlphaTrend")
+show2D = input.bool(true, "Show 2D AlphaTrend")
+show4H = input.bool(false, "Show 4H AlphaTrend")
+
+// --- Helper Functions ---
+f_calc_at_only() =>
+    myATR = ta.sma(ta.tr, AP)
+    myUpT = low - myATR * coeff
+    myDownT = high + myATR * coeff
+    
+    myRsi = ta.rsi(src, AP)
+    myMfi = ta.mfi(hlc3, AP)
+    
+    myAT = 0.0
+    myAT := (novolumedata ? myRsi >= 50 : myMfi >= 50) ? (myUpT < nz(myAT[1]) ? nz(myAT[1]) : myUpT) : (myDownT > nz(myAT[1]) ? nz(myAT[1]) : myDownT)
+    
+    [myAT, myAT[2]]
+
+// --- Calculate & Plot Weekly ---
+[atW, atW_prev2] = request.security(syminfo.tickerid, "W", f_calc_at_only())
+colorW_fill = atW > atW_prev2 ? #00E60F : atW < atW_prev2 ? #80000B : atW[1] > atW[3] ? #00E60F : #80000B
+pW1 = plot(showWeekly ? atW : na, color=color.new(colorW_fill, 0), linewidth=2, title="AT Weekly")
+pW2 = plot(showWeekly ? atW_prev2 : na, color=color.new(colorW_fill, 50), linewidth=2, title="AT Weekly Lag")
+fill(pW1, pW2, color=showWeekly ? color.new(colorW_fill, 80) : na, title="Weekly Fill")
+
+// --- Calculate & Plot Daily ---
+[atD, atD_prev2] = request.security(syminfo.tickerid, "D", f_calc_at_only())
+colorD_fill = atD > atD_prev2 ? #00E60F : atD < atD_prev2 ? #80000B : atD[1] > atD[3] ? #00E60F : #80000B
+pD1 = plot(showDaily ? atD : na, color=color.new(colorD_fill, 0), linewidth=2, title="AT Daily")
+pD2 = plot(showDaily ? atD_prev2 : na, color=color.new(colorD_fill, 50), linewidth=2, title="AT Daily Lag")
+fill(pD1, pD2, color=showDaily ? color.new(colorD_fill, 80) : na, title="Daily Fill")
+
+// --- Calculate & Plot 4H ---
+[at4H, at4H_prev2] = request.security(syminfo.tickerid, "240", f_calc_at_only())
+color4H_fill = at4H > at4H_prev2 ? #00E60F : at4H < at4H_prev2 ? #80000B : at4H[1] > at4H[3] ? #00E60F : #80000B
+p4H1 = plot(show4H ? at4H : na, color=color.new(color4H_fill, 0), linewidth=2, title="AT 4H")
+p4H2 = plot(show4H ? at4H_prev2 : na, color=color.new(color4H_fill, 50), linewidth=2, title="AT 4H Lag")
+fill(p4H1, p4H2, color=show4H ? color.new(color4H_fill, 80) : na, title="4H Fill")
+
+// --- Calculate Everything on 2D Timeframe (With Patterns) ---
+f_calc_2d_full() =>
+    myATR = ta.sma(ta.tr, AP)
+    myUpT = low - myATR * coeff
+    myDownT = high + myATR * coeff
+    
+    myRsi = ta.rsi(src, AP)
+    myMfi = ta.mfi(hlc3, AP)
+    
+    myAT = 0.0
+    myAT := (novolumedata ? myRsi >= 50 : myMfi >= 50) ? (myUpT < nz(myAT[1]) ? nz(myAT[1]) : myUpT) : (myDownT > nz(myAT[1]) ? nz(myAT[1]) : myDownT)
+    
+    // Outside Bar Logic (Kept for variable assignment in tuple, but not used for plotting)
+    isOut = high > high[1] and low < low[1]
+    isBull = isOut and close > open
+    isBear = isOut and close < open
+    
+    [myAT, myAT[2], isBull, isBear, high, low, open, close]
+
+[at2d, at2d_prev2, bull2d, bear2d, h2d, l2d, o2d, c2d] = request.security(syminfo.tickerid, "2D", f_calc_2d_full())
+
+// --- Plotting AlphaTrend (2D) ---
+color1 = at2d > at2d_prev2 ? #00E60F : at2d < at2d_prev2 ? #80000B : at2d[1] > at2d[3] ? #00E60F : #80000B
+k1 = plot(show2D ? at2d : na, color=color.new(color1, 0), linewidth=3, title="AT 2D")
+k2 = plot(show2D ? at2d_prev2 : na, color=color.new(color1, 50), linewidth=3, title="AT 2D Lag")
+fill(k1, k2, color=show2D ? color.new(color1, 80) : na, title="2D Fill")
+
+// Signals based on 2D data
+buySignalk = ta.crossover(at2d, at2d_prev2)
+sellSignalk = ta.crossunder(at2d, at2d_prev2)
+plotshape(show2D and buySignalk and showsignalsk, title='BUY 2D', text='BUY 2D', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0), offset=0)
+plotshape(show2D and sellSignalk and showsignalsk, title='SELL 2D', text='SELL 2D', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0), offset=0)
+
+// -------------------------------------------------------------------------
+// NOTE: 2D Pattern Detection and Fibs removed as requested.
+// -------------------------------------------------------------------------
+
+// --- Daily vs Weekly Crossover Signals ---
+dailyCrossOverWeekly = ta.crossover(atD, atW)
+dailyCrossUnderWeekly = ta.crossunder(atD, atW)
+
+plotshape(showDaily and showWeekly and dailyCrossOverWeekly, title='Bull Cross', text='Bull\nCross', location=location.belowbar, style=shape.labelup, size=size.small, color=color.new(#00E60F, 0), textcolor=color.white)
+plotshape(showDaily and showWeekly and dailyCrossUnderWeekly, title='Bear Cross', text='Bear\nCross', location=location.abovebar, style=shape.labeldown, size=size.small, color=color.new(#80000B, 0), textcolor=color.white)
+
+// --- Dynamic Fibs Logic (Based on Daily/Weekly Cross) ---
+var float trackLow = na
+var int trackLowIdx = na
+var float trackHigh = na
+var int trackHighIdx = na
+var float anchorPrice = na
+var float extremePrice = na
+var int crossIndex = na
+var line fibLine50 = na
+var line fibLine618 = na
+var bool fibHit = false
+
+// Track High/Low BEFORE the cross happens
+if atD < atW
+    // We are in Bearish Mode -> Waiting for Bull Cross
+    // Track Lowest Low of this phase
+    if na(trackLow) or low < trackLow
+        trackLow := low
+        trackLowIdx := bar_index
+    // Reset Bull Tracker
+    trackHigh := na
+    trackHighIdx := na
+else if atD > atW
+    // We are in Bullish Mode -> Waiting for Bear Cross
+    // Track Highest High of this phase
+    if na(trackHigh) or high > trackHigh
+        trackHigh := high
+        trackHighIdx := bar_index
+    // Reset Bear Tracker
+    trackLow := na
+    trackLowIdx := na
+
+// Detect Crosses
+if dailyCrossOverWeekly
+    // Bull Cross Happened
+    // Anchor is the Low of the previous Bear phase
+    anchorPrice := trackLow
+    extremePrice := high // Start with current bar high
+    crossIndex := bar_index
+    fibHit := false
+    
+    // Mark the Anchor Low with a Cross
+    if not na(trackLowIdx)
+        label.new(trackLowIdx, trackLow, text="X", color=color.green, style=label.style_none, textcolor=color.green, size=size.normal)
+    
+    // Start lines
+    fibLine50 := line.new(bar_index, close, bar_index, close, color=color.new(#00E60F, 0), style=line.style_solid, width=2)
+    fibLine618 := line.new(bar_index, close, bar_index, close, color=color.new(#00E60F, 0), style=line.style_dashed, width=2)
+
+if dailyCrossUnderWeekly
+    // Bear Cross Happened
+    // Anchor is the High of the previous Bull phase
+    anchorPrice := trackHigh
+    extremePrice := low // Start with current bar low
+    crossIndex := bar_index
+    fibHit := false
+    
+    // Mark the Anchor High with a Cross
+    if not na(trackHighIdx)
+        label.new(trackHighIdx, trackHigh, text="X", color=color.red, style=label.style_none, textcolor=color.red, size=size.normal)
+    
+    // Start lines
+    fibLine50 := line.new(bar_index, close, bar_index, close, color=color.new(#FF0000, 0), style=line.style_solid, width=2)
+    fibLine618 := line.new(bar_index, close, bar_index, close, color=color.new(#FF0000, 0), style=line.style_dashed, width=2)
+
+// Update Lines
+if not na(anchorPrice) and not na(fibLine50)
+    // Bull Trend (Daily > Weekly)
+    if atD > atW
+        extremePrice := math.max(extremePrice, high)
+        range_val = extremePrice - anchorPrice
+        lev50 = anchorPrice + range_val * 0.5
+        lev618 = anchorPrice + range_val * 0.618
+        
+        // Check Hit (Retracement Down to 50%)
+        if low <= lev50
+            fibHit := true
+        
+        if not fibHit
+            line.set_xy1(fibLine50, crossIndex, lev50)
+            line.set_xy2(fibLine50, bar_index + 5, lev50)
+            line.set_xy1(fibLine618, crossIndex, lev618)
+            line.set_xy2(fibLine618, bar_index + 5, lev618)
+            
+    // Bear Trend (Daily < Weekly)
+    else if atD < atW
+        extremePrice := math.min(extremePrice, low)
+        range_val = anchorPrice - extremePrice
+        lev50 = anchorPrice - range_val * 0.5
+        lev618 = anchorPrice - range_val * 0.618
+        
+        // Check Hit (Retracement Up to 50%)
+        if high >= lev50
+            fibHit := true
+            
+        if not fibHit
+            line.set_xy1(fibLine50, crossIndex, lev50)
+            line.set_xy2(fibLine50, bar_index + 5, lev50)
+            line.set_xy1(fibLine618, crossIndex, lev618)
+            line.set_xy2(fibLine618, bar_index + 5, lev618)
+
+alertcondition(buySignalk, title='Potential BUY Alarm', message='BUY SIGNAL (2D)!')
+alertcondition(sellSignalk, title='Potential SELL Alarm', message='SELL SIGNAL (2D)!')
