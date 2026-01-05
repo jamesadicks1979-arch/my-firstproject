@@ -7,7 +7,7 @@ strategy('AlphaTrend 2D Strategy', overlay=true, format=format.price, precision=
 // Inputs
 coeff = input.float(1, 'Multiplier', step=0.1)
 AP = input(14, 'Common Period')
-sl_mult = input.float(0.8, 'Stop Loss Multiplier (x Candle Range)', step=0.1)
+sl_mult = input.float(0.82, 'Stop Loss Multiplier (x Candle Range)', step=0.01)
 tp_mult = input.float(3.0, 'Take Profit Multiplier (x Stop Distance)', step=0.1)
 
 src = input(close)
@@ -57,60 +57,61 @@ k1 = plot(at2d, color=color.new(#0022FC, 0), linewidth=3)
 k2 = plot(at2d_prev2, color=color.new(#FC0400, 0), linewidth=3)
 fill(k1, k2, color=color1)
 
-// Signals based on 2D data
-buySignalk = ta.crossover(at2d, at2d_prev2)
-sellSignalk = ta.crossunder(at2d, at2d_prev2)
+// --- Signals based on Outside Bar Pattern ---
+isNew2DBar = ta.change(time("2D"))
 
-plotshape(buySignalk and showsignalsk, title='BUY', text='BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0), offset=0)
-plotshape(sellSignalk and showsignalsk, title='SELL', text='SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0), offset=0)
+// Check previous bar values [1] because we are at the start of the new bar
+bullCond = isNew2DBar and bull2d[1]
+bearCond = isNew2DBar and bear2d[1]
+
+plotshape(bullCond and showsignalsk, title='BUY', text='BUY', location=location.belowbar, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0), offset=0)
+plotshape(bearCond and showsignalsk, title='SELL', text='SELL', location=location.abovebar, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0), offset=0)
 
 // --- Strategy Execution ---
-// Condition: Buy Signal
-if buySignalk
-    // Trigger Candle is the 2D candle
-    // Range of Trigger Candle
-    triggerRange = h2d - l2d
+// Condition: Buy Signal (Bullish Outside Bar)
+if bullCond
+    // Trigger Candle is the PREVIOUS 2D candle (the one that just finished)
+    // We use [1] to access its values
+    triggerRange = h2d[1] - l2d[1]
     
-    // Stop Loss Distance: 80% of Trigger Candle Range
+    // Stop Loss Distance: 82% of Trigger Candle Range
     slDist = triggerRange * sl_mult
     
     // Take Profit Distance: 3 times the Stop Distance
     tpDist = slDist * tp_mult
     
-    // Entry price will be the Open of the next bar (handled by strategy.entry)
-    // We base SL/TP from the Close of the trigger bar (or estimated Entry)
-    // Using Close of 2D bar as reference point for SL/TP placement
-    longStop = c2d - slDist
-    longTP = c2d + tpDist
+    // Stop and Limit levels relative to the Close of the trigger candle
+    longStop = c2d[1] - slDist
+    longTP = c2d[1] + tpDist
     
     strategy.entry("Long", strategy.long)
     strategy.exit("Exit Long", "Long", stop=longStop, limit=longTP)
 
-// Condition: Sell Signal
-if sellSignalk
-    triggerRange = h2d - l2d
+// Condition: Sell Signal (Bearish Outside Bar)
+if bearCond
+    triggerRange = h2d[1] - l2d[1]
     slDist = triggerRange * sl_mult
     tpDist = slDist * tp_mult
     
-    shortStop = c2d + slDist
-    shortTP = c2d - tpDist
+    shortStop = c2d[1] + slDist
+    shortTP = c2d[1] - tpDist
     
     strategy.entry("Short", strategy.short)
     strategy.exit("Exit Short", "Short", stop=shortStop, limit=shortTP)
 
 // --- Outside Bar Detection on 2-Day Timeframe (Visuals) ---
-plotshape(bull2d and ta.change(time("2D")), title="Bullish Outside Bar (2D)", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull\n(2D)", textcolor=#00FFFF, offset=1)
-plotshape(bear2d and ta.change(time("2D")), title="Bearish Outside Bar (2D)", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear\n(2D)", textcolor=#FF00FF, offset=1)
+// Using bullCond/bearCond (which check [1]) to align with signals
+plotshape(bullCond, title="Bullish Outside Bar (2D)", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull\n(2D)", textcolor=#00FFFF, offset=0)
+plotshape(bearCond, title="Bearish Outside Bar (2D)", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear\n(2D)", textcolor=#FF00FF, offset=0)
 
 // --- Fibonacci on Outside Bar (2D) ---
-if bull2d or bear2d
-    barRange = h2d - l2d
-    isNew2DBar = ta.change(time("2D"))
+if bullCond or bearCond
+    // Using [1] for the previous (completed) bar values
+    barRange = h2d[1] - l2d[1]
     
-    if isNew2DBar
-        // Draw lines
-        line.new(bar_index, l2d, bar_index + 1, l2d, color=color.new(#808080, 50))
-        line.new(bar_index, h2d, bar_index + 1, h2d, color=color.new(#808080, 50))
-        line.new(bar_index, l2d + barRange * 0.5, bar_index + 1, l2d + barRange * 0.5, color=color.new(#FFFF00, 0))
-        line.new(bar_index, l2d + barRange * 0.618, bar_index + 1, l2d + barRange * 0.618, color=color.new(#0000FF, 50))
-        line.new(bar_index, l2d + barRange * 0.382, bar_index + 1, l2d + barRange * 0.382, color=color.new(#0000FF, 50))
+    // Draw lines
+    line.new(bar_index, l2d[1], bar_index + 1, l2d[1], color=color.new(#808080, 50))
+    line.new(bar_index, h2d[1], bar_index + 1, h2d[1], color=color.new(#808080, 50))
+    line.new(bar_index, l2d[1] + barRange * 0.5, bar_index + 1, l2d[1] + barRange * 0.5, color=color.new(#FFFF00, 0))
+    line.new(bar_index, l2d[1] + barRange * 0.618, bar_index + 1, l2d[1] + barRange * 0.618, color=color.new(#0000FF, 50))
+    line.new(bar_index, l2d[1] + barRange * 0.382, bar_index + 1, l2d[1] + barRange * 0.382, color=color.new(#0000FF, 50))
