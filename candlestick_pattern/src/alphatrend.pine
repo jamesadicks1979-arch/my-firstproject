@@ -8,105 +8,30 @@ AP = input(14, 'Common Period')
 src = input(close)
 showsignalsk = input(title='Show Signals?', defval=true)
 novolumedata = input(title='Change calculation (no volume data)?', defval=false)
-
-// Inputs
-showWeekly = input.bool(true, "Show Weekly AlphaTrend")
-showDaily = input.bool(true, "Show Daily AlphaTrend")
-show2D = input.bool(false, "Show 2D AlphaTrend")
-show4H = input.bool(false, "Show 4H AlphaTrend")
-
-// --- Helper Functions ---
-// Generic AlphaTrend calculation function to be used in security
-// Only returns AlphaTrend and Signals, not pattern details (except for 2D special case)
-f_calc_at_only() =>
-    myATR = ta.sma(ta.tr, AP)
-    myUpT = low - myATR * coeff
-    myDownT = high + myATR * coeff
+// Function to calculate AlphaTrend logic
+calcAlphaTrend(_src, _close, _low, _high, _hlc3, _coeff, _AP, _novolumedata) =>
+    _atr = ta.sma(ta.tr, _AP) // Note: ta.tr might use current timeframe inside function if not careful, but usually request.security handles this if called in context
+    // Actually, ta.tr needs high, low, close.
+    // The simple way is to pass ta.tr calculated in the higher timeframe, or rely on implicit context.
+    // "request.security" executes the entire expression in the requested timeframe.
+    // So if we put all logic here, it works.
     
-    myRsi = ta.rsi(src, AP)
-    myMfi = ta.mfi(hlc3, AP)
+    _upT = _low - _atr * _coeff
+    _downT = _high + _atr * _coeff
     
-    myAT = 0.0
-    myAT := (novolumedata ? myRsi >= 50 : myMfi >= 50) ? (myUpT < nz(myAT[1]) ? nz(myAT[1]) : myUpT) : (myDownT > nz(myAT[1]) ? nz(myAT[1]) : myDownT)
+    _rsi = ta.rsi(_src, _AP)
+    _mfi = ta.mfi(_hlc3, _AP)
     
-    [myAT, myAT[2]]
-
-// --- Helper Functions ---
-// Determine AlphaTrend Color
-// Blue (#0000FF) if Flat (at == at[1])
-// Green (#00E60F) if Bullish
-// Red (#80000B) if Bearish
-f_at_color(_at, _at_prev2, _at_1, _at_3) =>
-    _at == _at_1 ? #0000FF : (_at > _at_prev2 ? #00E60F : _at < _at_prev2 ? #80000B : _at_1 > _at_3 ? #00E60F : #80000B)
-
-// --- Calculate & Plot Weekly ---
-[atW, atW_prev2] = request.security(syminfo.tickerid, "W", f_calc_at_only())
-// Trend color for fill (Green/Red)
-fillColorW = atW > atW_prev2 ? #00E60F : atW < atW_prev2 ? #80000B : atW[1] > atW[3] ? #00E60F : #80000B
-// Line Color (Blue/Green/Red)
-lineColorW = f_at_color(atW, atW_prev2, atW[1], atW[3])
-
-pW1 = plot(showWeekly ? atW : na, color=color.new(lineColorW, 0), linewidth=2, title="AT Weekly")
-pW2 = plot(showWeekly ? atW_prev2 : na, color=color.new(lineColorW, 50), linewidth=2, title="AT Weekly Lag")
-fill(pW1, pW2, color=showWeekly ? color.new(fillColorW, 80) : na, title="Weekly Fill")
-
-// --- Calculate & Plot Daily ---
-[atD, atD_prev2] = request.security(syminfo.tickerid, "D", f_calc_at_only())
-
-// Daily Color Override Logic (Requested: Green if Daily > Weekly, Red if Daily < Weekly, Blue if Flat)
-lineColorD = atD == atD[1] ? #0000FF : (atD > atW ? #00E60F : #80000B)
-// Fill Color (Green/Red based on trend only)
-fillColorD = atD > atD_prev2 ? #00E60F : atD < atD_prev2 ? #80000B : atD[1] > atD[3] ? #00E60F : #80000B
-
-pD1 = plot(showDaily ? atD : na, color=color.new(lineColorD, 0), linewidth=2, title="AT Daily")
-pD2 = plot(showDaily ? atD_prev2 : na, color=color.new(lineColorD, 50), linewidth=2, title="AT Daily Lag")
-fill(pD1, pD2, color=showDaily ? color.new(fillColorD, 80) : na, title="Daily Fill")
-
-// --- Daily vs Weekly Fill (Cloud) ---
-// Green when Daily > Weekly, Red when Daily < Weekly
-fill(pD1, pW1, color=showDaily and showWeekly ? (atD > atW ? color.new(color.green, 85) : color.new(color.red, 85)) : na, title="Daily-Weekly Cloud")
-
-// --- Calculate & Plot 4H ---
-[at4H, at4H_prev2] = request.security(syminfo.tickerid, "240", f_calc_at_only())
-fillColor4H = at4H > at4H_prev2 ? #00E60F : at4H < at4H_prev2 ? #80000B : at4H[1] > at4H[3] ? #00E60F : #80000B
-lineColor4H = f_at_color(at4H, at4H_prev2, at4H[1], at4H[3])
-
-p4H1 = plot(show4H ? at4H : na, color=color.new(lineColor4H, 0), linewidth=2, title="AT 4H")
-p4H2 = plot(show4H ? at4H_prev2 : na, color=color.new(lineColor4H, 50), linewidth=2, title="AT 4H Lag")
-fill(p4H1, p4H2, color=show4H ? color.new(fillColor4H, 80) : na, title="4H Fill")
-
-// --- Weekly + Daily Confluence Signal ---
-// Green = #00E60F, Red = #80000B
-// We check the color variables derived from the logic
-// Logic:
-// BUY Signal: Both Weekly & Daily are Green AND Daily AlphaTrend > Weekly AlphaTrend
-// SELL Signal: Both Weekly & Daily are Red AND Daily AlphaTrend < Weekly AlphaTrend
-
-isBullW = fillColorW == #00E60F
-isBullD = fillColorD == #00E60F
-isBearW = fillColorW == #80000B
-isBearD = fillColorD == #80000B
-
-// Check relationship between Daily and Weekly values
-dailyAboveWeekly = atD > atW
-dailyBelowWeekly = atD < atW
-
-confluenceBuy = isBullW and isBullD and dailyAboveWeekly
-confluenceSell = isBearW and isBearD and dailyBelowWeekly
-
-// Trigger only on new occurrence
-triggerConfBuy = confluenceBuy and not confluenceBuy[1]
-triggerConfSell = confluenceSell and not confluenceSell[1]
-
-plotshape(triggerConfBuy, title="Weekly+Daily Buy", text="BUY", location=location.belowbar, color=color.green, style=shape.labelup, textcolor=color.white, size=size.small)
-plotshape(triggerConfSell, title="Weekly+Daily Sell", text="SELL", location=location.abovebar, color=color.red, style=shape.labeldown, textcolor=color.white, size=size.small)
-
-alertcondition(triggerConfBuy, title='Weekly+Daily Buy Confluence', message='Weekly and Daily AlphaTrends are both Bullish and Daily > Weekly!')
-alertcondition(triggerConfSell, title='Weekly+Daily Sell Confluence', message='Weekly and Daily AlphaTrends are both Bearish and Daily < Weekly!')
-
-// --- Calculate Everything on 2D Timeframe (With Patterns) ---
-// Note: We keep this function if we ever want to re-enable 2D patterns
-f_calc_2d_full() =>
+    _alphaTrend = 0.0
+    _alphaTrend := (_novolumedata ? _rsi >= 50 : _mfi >= 50) ? (_upT < nz(_alphaTrend[1]) ? nz(_alphaTrend[1]) : _upT) : (_downT > nz(_alphaTrend[1]) ? nz(_alphaTrend[1]) : _downT)
+    
+    // Return values needed for plotting
+    [_alphaTrend, _alphaTrend[2]]
+// --- Calculate Everything on 2D Timeframe ---
+// We create a tuple of results from the 2D timeframe
+// Note: We need to pass the arguments that don't change (inputs)
+// We define a wrapper function to call inside request.security
+f_calc() =>
     // AlphaTrend Calculation
     myATR = ta.sma(ta.tr, AP)
     myUpT = low - myATR * coeff
@@ -124,12 +49,40 @@ f_calc_2d_full() =>
     isBear = isOut and close < open
     
     [myAT, myAT[2], isBull, isBear, high, low, open, close]
-
-// --- Calculate & Plot 2D (Optional) ---
-[at2d, at2d_prev2] = request.security(syminfo.tickerid, "2D", f_calc_at_only())
-fillColor2D = at2d > at2d_prev2 ? #00E60F : at2d < at2d_prev2 ? #80000B : at2d[1] > at2d[3] ? #00E60F : #80000B
-lineColor2D = f_at_color(at2d, at2d_prev2, at2d[1], at2d[3])
-
-p2D1 = plot(show2D ? at2d : na, color=color.new(lineColor2D, 0), linewidth=2, title="AT 2D")
-p2D2 = plot(show2D ? at2d_prev2 : na, color=color.new(lineColor2D, 50), linewidth=2, title="AT 2D Lag")
-fill(p2D1, p2D2, color=show2D ? color.new(fillColor2D, 80) : na, title="2D Fill")
+// Fetch data from 2D
+[at2d, at2d_prev2, bull2d, bear2d, h2d, l2d, o2d, c2d] = request.security(syminfo.tickerid, "2D", f_calc())
+// --- Plotting AlphaTrend (2D) ---
+color1 = at2d > at2d_prev2 ? #00E60F : at2d < at2d_prev2 ? #80000B : at2d[1] > at2d[3] ? #00E60F : #80000B
+// Note: at2d[1] here refers to the previous *chart* bar's value of the 2D data.
+// This smoothing is fine.
+k1 = plot(at2d, color=color.new(#0022FC, 0), linewidth=3)
+k2 = plot(at2d_prev2, color=color.new(#FC0400, 0), linewidth=3)
+fill(k1, k2, color=color1)
+// Signals based on 2D data
+buySignalk = ta.crossover(at2d, at2d_prev2)
+sellSignalk = ta.crossunder(at2d, at2d_prev2)
+plotshape(buySignalk and showsignalsk, title='BUY', text='BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0), offset=0)
+plotshape(sellSignalk and showsignalsk, title='SELL', text='SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0), offset=0)
+// --- Outside Bar Detection on 2-Day Timeframe ---
+// Logic is already fetched in bull2d / bear2d
+// Plot Shapes for 2D Pattern
+// We use `ta.change(time("2D"))` to ensure we only plot the shape once at the beginning of the 2D bar logic
+// Since bull2d is true for the whole duration of the 2D bar, we qualify it with `ta.change(time("2D"))`
+plotshape(bull2d and ta.change(time("2D")), title="Bullish Outside Bar (2D)", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull\n(2D)", textcolor=#00FFFF, offset=1)
+plotshape(bear2d and ta.change(time("2D")), title="Bearish Outside Bar (2D)", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear\n(2D)", textcolor=#FF00FF, offset=1)
+// --- Fibonacci on Outside Bar (2D) ---
+if bull2d or bear2d
+    barRange = h2d - l2d
+    isNew2DBar = ta.change(time("2D"))
+    
+    if isNew2DBar
+        // Draw lines
+        line.new(bar_index, l2d, bar_index + 1, l2d, color=color.new(#808080, 50))
+        line.new(bar_index, h2d, bar_index + 1, h2d, color=color.new(#808080, 50))
+        line.new(bar_index, l2d + barRange * 0.5, bar_index + 1, l2d + barRange * 0.5, color=color.new(#FFFF00, 0))
+        line.new(bar_index, l2d + barRange * 0.618, bar_index + 1, l2d + barRange * 0.618, color=color.new(#0000FF, 50))
+        line.new(bar_index, l2d + barRange * 0.382, bar_index + 1, l2d + barRange * 0.382, color=color.new(#0000FF, 50))
+alertcondition(buySignalk, title='Potential BUY Alarm', message='BUY SIGNAL (2D)!')
+alertcondition(sellSignalk, title='Potential SELL Alarm', message='SELL SIGNAL (2D)!')
+alertcondition(bull2d, title='Bullish Outside Bar (2D)', message='Bullish Outside Bar Detected on 2D Timeframe!')
+alertcondition(bear2d, title='Bearish Outside Bar (2D)', message='Bearish Outside Bar Detected on 2D Timeframe!')
