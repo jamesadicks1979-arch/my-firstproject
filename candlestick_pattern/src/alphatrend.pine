@@ -2,20 +2,21 @@
 // author © KivancOzbilgic
 // developer © KivancOzbilgic
 //@version=5
-indicator('AlphaTrend', shorttitle='AT', overlay=true, format=format.price, precision=2)
+strategy('AlphaTrend 2D Strategy', overlay=true, format=format.price, precision=2)
+
+// Inputs
 coeff = input.float(1, 'Multiplier', step=0.1)
 AP = input(14, 'Common Period')
+sl_mult = input.float(0.8, 'Stop Loss Multiplier (x Candle Range)', step=0.1)
+tp_mult = input.float(3.0, 'Take Profit Multiplier (x Stop Distance)', step=0.1)
+
 src = input(close)
 showsignalsk = input(title='Show Signals?', defval=true)
 novolumedata = input(title='Change calculation (no volume data)?', defval=false)
+
 // Function to calculate AlphaTrend logic
 calcAlphaTrend(_src, _close, _low, _high, _hlc3, _coeff, _AP, _novolumedata) =>
-    _atr = ta.sma(ta.tr, _AP) // Note: ta.tr might use current timeframe inside function if not careful, but usually request.security handles this if called in context
-    // Actually, ta.tr needs high, low, close.
-    // The simple way is to pass ta.tr calculated in the higher timeframe, or rely on implicit context.
-    // "request.security" executes the entire expression in the requested timeframe.
-    // So if we put all logic here, it works.
-    
+    _atr = ta.sma(ta.tr, _AP)
     _upT = _low - _atr * _coeff
     _downT = _high + _atr * _coeff
     
@@ -25,12 +26,9 @@ calcAlphaTrend(_src, _close, _low, _high, _hlc3, _coeff, _AP, _novolumedata) =>
     _alphaTrend = 0.0
     _alphaTrend := (_novolumedata ? _rsi >= 50 : _mfi >= 50) ? (_upT < nz(_alphaTrend[1]) ? nz(_alphaTrend[1]) : _upT) : (_downT > nz(_alphaTrend[1]) ? nz(_alphaTrend[1]) : _downT)
     
-    // Return values needed for plotting
     [_alphaTrend, _alphaTrend[2]]
+
 // --- Calculate Everything on 2D Timeframe ---
-// We create a tuple of results from the 2D timeframe
-// Note: We need to pass the arguments that don't change (inputs)
-// We define a wrapper function to call inside request.security
 f_calc() =>
     // AlphaTrend Calculation
     myATR = ta.sma(ta.tr, AP)
@@ -49,27 +47,61 @@ f_calc() =>
     isBear = isOut and close < open
     
     [myAT, myAT[2], isBull, isBear, high, low, open, close]
+
 // Fetch data from 2D
 [at2d, at2d_prev2, bull2d, bear2d, h2d, l2d, o2d, c2d] = request.security(syminfo.tickerid, "2D", f_calc())
+
 // --- Plotting AlphaTrend (2D) ---
 color1 = at2d > at2d_prev2 ? #00E60F : at2d < at2d_prev2 ? #80000B : at2d[1] > at2d[3] ? #00E60F : #80000B
-// Note: at2d[1] here refers to the previous *chart* bar's value of the 2D data.
-// This smoothing is fine.
 k1 = plot(at2d, color=color.new(#0022FC, 0), linewidth=3)
 k2 = plot(at2d_prev2, color=color.new(#FC0400, 0), linewidth=3)
 fill(k1, k2, color=color1)
+
 // Signals based on 2D data
 buySignalk = ta.crossover(at2d, at2d_prev2)
 sellSignalk = ta.crossunder(at2d, at2d_prev2)
+
 plotshape(buySignalk and showsignalsk, title='BUY', text='BUY', location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0), offset=0)
 plotshape(sellSignalk and showsignalsk, title='SELL', text='SELL', location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0), offset=0)
-// --- Outside Bar Detection on 2-Day Timeframe ---
-// Logic is already fetched in bull2d / bear2d
-// Plot Shapes for 2D Pattern
-// We use `ta.change(time("2D"))` to ensure we only plot the shape once at the beginning of the 2D bar logic
-// Since bull2d is true for the whole duration of the 2D bar, we qualify it with `ta.change(time("2D"))`
+
+// --- Strategy Execution ---
+// Condition: Buy Signal
+if buySignalk
+    // Trigger Candle is the 2D candle
+    // Range of Trigger Candle
+    triggerRange = h2d - l2d
+    
+    // Stop Loss Distance: 80% of Trigger Candle Range
+    slDist = triggerRange * sl_mult
+    
+    // Take Profit Distance: 3 times the Stop Distance
+    tpDist = slDist * tp_mult
+    
+    // Entry price will be the Open of the next bar (handled by strategy.entry)
+    // We base SL/TP from the Close of the trigger bar (or estimated Entry)
+    // Using Close of 2D bar as reference point for SL/TP placement
+    longStop = c2d - slDist
+    longTP = c2d + tpDist
+    
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", stop=longStop, limit=longTP)
+
+// Condition: Sell Signal
+if sellSignalk
+    triggerRange = h2d - l2d
+    slDist = triggerRange * sl_mult
+    tpDist = slDist * tp_mult
+    
+    shortStop = c2d + slDist
+    shortTP = c2d - tpDist
+    
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", stop=shortStop, limit=shortTP)
+
+// --- Outside Bar Detection on 2-Day Timeframe (Visuals) ---
 plotshape(bull2d and ta.change(time("2D")), title="Bullish Outside Bar (2D)", location=location.belowbar, color=#00FFFF, style=shape.circle, size=size.small, text="Out\nBull\n(2D)", textcolor=#00FFFF, offset=1)
 plotshape(bear2d and ta.change(time("2D")), title="Bearish Outside Bar (2D)", location=location.abovebar, color=#FF00FF, style=shape.circle, size=size.small, text="Out\nBear\n(2D)", textcolor=#FF00FF, offset=1)
+
 // --- Fibonacci on Outside Bar (2D) ---
 if bull2d or bear2d
     barRange = h2d - l2d
@@ -82,7 +114,3 @@ if bull2d or bear2d
         line.new(bar_index, l2d + barRange * 0.5, bar_index + 1, l2d + barRange * 0.5, color=color.new(#FFFF00, 0))
         line.new(bar_index, l2d + barRange * 0.618, bar_index + 1, l2d + barRange * 0.618, color=color.new(#0000FF, 50))
         line.new(bar_index, l2d + barRange * 0.382, bar_index + 1, l2d + barRange * 0.382, color=color.new(#0000FF, 50))
-alertcondition(buySignalk, title='Potential BUY Alarm', message='BUY SIGNAL (2D)!')
-alertcondition(sellSignalk, title='Potential SELL Alarm', message='SELL SIGNAL (2D)!')
-alertcondition(bull2d, title='Bullish Outside Bar (2D)', message='Bullish Outside Bar Detected on 2D Timeframe!')
-alertcondition(bear2d, title='Bearish Outside Bar (2D)', message='Bearish Outside Bar Detected on 2D Timeframe!')
