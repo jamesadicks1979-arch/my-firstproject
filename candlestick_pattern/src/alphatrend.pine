@@ -9,8 +9,8 @@ src = input(close)
 showsignalsk = input(title='Show Signals?', defval=true)
 novolumedata = input(title='Change calculation (no volume data)?', defval=false)
 // Inputs
-showWeekly = input.bool(true, "Show Weekly AlphaTrend")
-showDaily = input.bool(true, "Show Daily AlphaTrend")
+showWeekly = input.bool(false, "Show Weekly AlphaTrend")
+showDaily = input.bool(false, "Show Daily AlphaTrend")
 show2D = input.bool(true, "Show 2D AlphaTrend")
 show4H = input.bool(false, "Show 4H AlphaTrend")
 
@@ -96,6 +96,7 @@ if show2D and (bull2d or bear2d)
 dailyCrossOverWeekly = ta.crossover(atD, atW)
 dailyCrossUnderWeekly = ta.crossunder(atD, atW)
 
+// Only show text signals if enabled
 plotshape(showDaily and showWeekly and dailyCrossOverWeekly, title='Bull Cross', text='Bull\nCross', location=location.belowbar, style=shape.labelup, size=size.small, color=color.new(#00E60F, 0), textcolor=color.white)
 plotshape(showDaily and showWeekly and dailyCrossUnderWeekly, title='Bear Cross', text='Bear\nCross', location=location.abovebar, style=shape.labeldown, size=size.small, color=color.new(#80000B, 0), textcolor=color.white)
 
@@ -142,9 +143,9 @@ if dailyCrossOverWeekly
     if not na(trackLowIdx)
         label.new(trackLowIdx, trackLow, text="X", color=color.green, style=label.style_none, textcolor=color.green, size=size.normal)
     
-    if showDaily and showWeekly
-        fibLine50 := line.new(bar_index, close, bar_index, close, color=color.new(#00E60F, 0), style=line.style_solid, width=2)
-        fibLine618 := line.new(bar_index, close, bar_index, close, color=color.new(#00E60F, 0), style=line.style_dashed, width=2)
+    // Create lines regardless of 'Show Daily' toggle (since this is a separate feature user asked for)
+    fibLine50 := line.new(bar_index, close, bar_index, close, color=color.new(#00E60F, 0), style=line.style_solid, width=2)
+    fibLine618 := line.new(bar_index, close, bar_index, close, color=color.new(#00E60F, 0), style=line.style_dashed, width=2)
 
 if dailyCrossUnderWeekly
     // Bear Cross (Start Bear Leg)
@@ -158,12 +159,11 @@ if dailyCrossUnderWeekly
     if not na(trackHighIdx)
         label.new(trackHighIdx, trackHigh, text="X", color=color.red, style=label.style_none, textcolor=color.red, size=size.normal)
     
-    if showDaily and showWeekly
-        fibLine50 := line.new(bar_index, close, bar_index, close, color=color.new(#FF0000, 0), style=line.style_solid, width=2)
-        fibLine618 := line.new(bar_index, close, bar_index, close, color=color.new(#FF0000, 0), style=line.style_dashed, width=2)
+    fibLine50 := line.new(bar_index, close, bar_index, close, color=color.new(#FF0000, 0), style=line.style_solid, width=2)
+    fibLine618 := line.new(bar_index, close, bar_index, close, color=color.new(#FF0000, 0), style=line.style_dashed, width=2)
 
 // Update Lines
-if showDaily and showWeekly and not na(anchorPrice) and not na(fibLine50)
+if not na(anchorPrice) and not na(fibLine50)
     // Bull Trend (Active)
     if atD > atW
         extremePrice := math.max(extremePrice, high)
