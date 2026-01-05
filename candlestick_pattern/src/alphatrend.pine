@@ -9,8 +9,8 @@ src = input(close)
 showsignalsk = input(title='Show Signals?', defval=true)
 novolumedata = input(title='Change calculation (no volume data)?', defval=false)
 // Inputs
-showWeekly = input.bool(false, "Show Weekly AlphaTrend")
-showDaily = input.bool(false, "Show Daily AlphaTrend")
+showWeekly = input.bool(true, "Show Weekly AlphaTrend")
+showDaily = input.bool(true, "Show Daily AlphaTrend")
 show2D = input.bool(true, "Show 2D AlphaTrend")
 show4H = input.bool(false, "Show 4H AlphaTrend")
 
@@ -106,14 +106,14 @@ if show2D and (bull2d or bear2d)
         line.new(bar_index, l2d + barRange * 0.618, bar_index + 1, l2d + barRange * 0.618, color=color.new(#0000FF, 50))
         line.new(bar_index, l2d + barRange * 0.382, bar_index + 1, l2d + barRange * 0.382, color=color.new(#0000FF, 50))
 
-// --- Daily vs Weekly Crossover Signals & Fibs ---
+// --- Daily vs Weekly Crossover Logic & Fibs ---
 dailyCrossOverWeekly = ta.crossover(atD, atW)
 dailyCrossUnderWeekly = ta.crossunder(atD, atW)
 
 plotshape(showDaily and showWeekly and dailyCrossOverWeekly, title='Bull Cross', text='Bull\nCross', location=location.belowbar, style=shape.labelup, size=size.small, color=color.new(#00E60F, 0), textcolor=color.white)
 plotshape(showDaily and showWeekly and dailyCrossUnderWeekly, title='Bear Cross', text='Bear\nCross', location=location.abovebar, style=shape.labeldown, size=size.small, color=color.new(#80000B, 0), textcolor=color.white)
 
-// Logic for dynamic Fibs based on Cross
+// Tracking extremes for Fibs
 var float trackLow = na
 var float trackHigh = na
 var float anchorPrice = na
@@ -122,69 +122,78 @@ var int crossIndex = na
 var line fibLine50 = na
 var line fibLine618 = na
 
-// Update Tracking for "Before Cross"
+// Update tracking for the *current* state before the cross happens
 if atD < atW
-    // Bearish Phase: Track Lowest Low
+    // We are in Bearish Mode (before potential bull cross)
+    // Track the lowest low of this bearish phase
     trackLow := na(trackLow) ? low : math.min(trackLow, low)
-    trackHigh := na // Reset Bull High tracker
+    trackHigh := na // Reset high tracker
 else if atD > atW
-    // Bullish Phase: Track Highest High
+    // We are in Bullish Mode (before potential bear cross)
+    // Track the highest high of this bullish phase
     trackHigh := na(trackHigh) ? high : math.max(trackHigh, high)
-    trackLow := na // Reset Bear Low tracker
+    trackLow := na // Reset low tracker
 
-// Detect Crosses and Draw Initial Lines
+// Handling Bull Cross (Bear -> Bull)
 if dailyCrossOverWeekly
-    // Start Bull Leg
-    // Anchor is the Low of the previous Bear phase
+    // Use the lowest low from the just-finished bear phase
     anchorPrice := trackLow
-    extremePrice := high // Start with current bar high
+    // Start tracking high from current bar
+    extremePrice := high 
     crossIndex := bar_index
     
-    // Create new lines (Show only if Daily/Weekly enabled to avoid clutter, or always? User logic implies visual requirement)
+    // Draw initial lines
     if showDaily and showWeekly
         line.delete(fibLine50)
         line.delete(fibLine618)
-        fibLine50 := line.new(bar_index, close, bar_index, close, color=color.green, style=line.style_solid, width=1)
-        fibLine618 := line.new(bar_index, close, bar_index, close, color=color.green, style=line.style_dashed, width=1)
+        fibLine50 := line.new(bar_index, close, bar_index, close, color=color.new(#00E60F, 0), style=line.style_solid, width=2)
+        fibLine618 := line.new(bar_index, close, bar_index, close, color=color.new(#00E60F, 0), style=line.style_dashed, width=2)
 
+// Handling Bear Cross (Bull -> Bear)
 if dailyCrossUnderWeekly
-    // Start Bear Leg
-    // Anchor is the High of the previous Bull phase
+    // Use the highest high from the just-finished bull phase
     anchorPrice := trackHigh
-    extremePrice := low // Start with current bar low
+    // Start tracking low from current bar
+    extremePrice := low
     crossIndex := bar_index
     
     if showDaily and showWeekly
         line.delete(fibLine50)
         line.delete(fibLine618)
-        fibLine50 := line.new(bar_index, close, bar_index, close, color=color.red, style=line.style_solid, width=1)
-        fibLine618 := line.new(bar_index, close, bar_index, close, color=color.red, style=line.style_dashed, width=1)
+        fibLine50 := line.new(bar_index, close, bar_index, close, color=color.new(#FF0000, 0), style=line.style_solid, width=2)
+        fibLine618 := line.new(bar_index, close, bar_index, close, color=color.new(#FF0000, 0), style=line.style_dashed, width=2)
 
-// Update Lines if inside a trend
+// Update Lines if a trend is active (and lines exist)
 if showDaily and showWeekly and not na(anchorPrice) and not na(fibLine50)
+    // Bullish Trend (Daily > Weekly)
     if atD > atW
-        // Bull Trend: Update Extreme High
+        // Update the highest high of the *current* move
         extremePrice := math.max(extremePrice, high)
         range_val = extremePrice - anchorPrice
+        
+        // Fib levels: 50% and 61.8% of the range, projected from the anchor
         lev50 = anchorPrice + range_val * 0.5
         lev618 = anchorPrice + range_val * 0.618
         
         line.set_xy1(fibLine50, crossIndex, lev50)
-        line.set_xy2(fibLine50, bar_index, lev50)
+        line.set_xy2(fibLine50, bar_index + 5, lev50) // Extend slightly
         line.set_xy1(fibLine618, crossIndex, lev618)
-        line.set_xy2(fibLine618, bar_index, lev618)
+        line.set_xy2(fibLine618, bar_index + 5, lev618)
         
+    // Bearish Trend (Daily < Weekly)
     else if atD < atW
-        // Bear Trend: Update Extreme Low
+        // Update the lowest low of the *current* move
         extremePrice := math.min(extremePrice, low)
-        range_val = anchorPrice - extremePrice
+        range_val = anchorPrice - extremePrice // Positive range
+        
+        // Fib levels: 50% and 61.8% of the range, projected downwards from the anchor
         lev50 = anchorPrice - range_val * 0.5
         lev618 = anchorPrice - range_val * 0.618
         
         line.set_xy1(fibLine50, crossIndex, lev50)
-        line.set_xy2(fibLine50, bar_index, lev50)
+        line.set_xy2(fibLine50, bar_index + 5, lev50)
+        line.set_xy2(fibLine618, bar_index + 5, lev618)
         line.set_xy1(fibLine618, crossIndex, lev618)
-        line.set_xy2(fibLine618, bar_index, lev618)
 
 alertcondition(buySignalk, title='Potential BUY Alarm', message='BUY SIGNAL (2D)!')
 alertcondition(sellSignalk, title='Potential SELL Alarm', message='SELL SIGNAL (2D)!')
