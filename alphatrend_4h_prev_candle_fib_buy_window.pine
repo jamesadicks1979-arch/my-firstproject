@@ -146,3 +146,81 @@ plotshape(showPostBuyFibLabel and postBuyHit50,
 
 alertcondition(postBuyHit50, title="Post-Buy Fib50 Touch", message="After AlphaTrend BUY: price touched 4H prev candle 50% within next 6 bars")
 
+//-------------------- Dynamic 50% retracement line per BUY (sell-low -> post-buy high) --------------------
+showSwingFibLine = input.bool(true, "Show BUY-state 50% retracement line (from sell-low to post-buy high)")
+showSwingFibBuyLabel = input.bool(true, "Show BUY FIB label when line is hit")
+
+// Define "sell state" / "buy state" from AlphaTrend signals.
+var bool inSellState = false
+if barstate.isfirst
+    inSellState := AlphaTrend < AlphaTrend[2]
+if alphaSell
+    inSellState := true
+if alphaBuy
+    inSellState := false
+
+// Track the lowest low while we're in sell state.
+var float sellStateLow = na
+if inSellState
+    sellStateLow := na(sellStateLow) ? low : math.min(sellStateLow, low)
+if alphaSell
+    sellStateLow := low  // reset at the start of each sell state
+
+// One active fib line at a time; completed lines stay on chart.
+var line swingFibLine = na
+var bool swingFibActive = false
+var bool swingFibHit = false
+var float swingAnchorLow = na
+var float swingHighSinceBuy = na
+var float swingFib50 = na
+var int swingStartBar = na
+bool swingFibHitNow = false
+
+// Start a new fib line on every AlphaTrend BUY.
+if alphaBuy and showSwingFibLine
+    swingFibActive := true
+    swingFibHit := false
+    swingFibHitNow := false
+    swingStartBar := bar_index
+    swingAnchorLow := na(sellStateLow) ? low : sellStateLow
+    swingHighSinceBuy := high
+    swingFib50 := swingAnchorLow + (swingHighSinceBuy - swingAnchorLow) * 0.50
+    swingFibLine := line.new(
+         x1=swingStartBar,
+         y1=swingFib50,
+         x2=bar_index,
+         y2=swingFib50,
+         xloc=xloc.bar_index,
+         extend=extend.none,
+         color=color.new(color.lime, 0),
+         width=2)
+
+// Update the active fib line while in BUY state, until hit or sell state returns.
+if swingFibActive and not swingFibHit
+    // Stop tracking if market turns back to sell state.
+    if inSellState
+        swingFibActive := false
+        if not na(swingFibLine)
+            line.set_xy2(swingFibLine, bar_index, swingFib50)
+            line.set_color(swingFibLine, color.new(color.gray, 0))
+    else
+        swingHighSinceBuy := math.max(swingHighSinceBuy, high)
+        swingFib50 := swingAnchorLow + (swingHighSinceBuy - swingAnchorLow) * 0.50
+        if not na(swingFibLine)
+            line.set_xy1(swingFibLine, swingStartBar, swingFib50)
+            line.set_xy2(swingFibLine, bar_index, swingFib50)
+
+        // "Hit" when price touches the line (intrabar).
+        swingHitNow = low <= swingFib50 and high >= swingFib50
+        if swingHitNow
+            swingFibHit := true
+            swingFibHitNow := true
+            swingFibActive := false
+            if not na(swingFibLine)
+                line.set_xy2(swingFibLine, bar_index, swingFib50)
+                line.set_color(swingFibLine, color.new(color.green, 0))
+            if showSwingFibBuyLabel
+                label.new(bar_index, low, "BUY FIB", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
+
+alertcondition(showSwingFibLine and swingFibHitNow, title="BUY FIB (50% retracement hit)", message="After AlphaTrend BUY: price hit dynamic 50% retracement (sell-low -> post-buy high)")
+
