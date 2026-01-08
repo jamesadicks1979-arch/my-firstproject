@@ -2,81 +2,85 @@
 // author © KivancOzbilgic
 // developer © KivancOzbilgic
 //@version=5
-indicator("AlphaTrend + 4H Prev Candle Fib (50/61.8) + Post-Buy Fib Touch", shorttitle="AT+4HFib", overlay=true, format=format.price, precision=2, timeframe="")
+indicator("AlphaTrend (4H+1D locked) + 4H Fib + Fib Buys", shorttitle="AT4H+ATD+Fib", overlay=true, format=format.price, precision=2, max_lines_count=500, max_labels_count=500)
 
-//-------------------- AlphaTrend (original logic) --------------------
+//==================== INPUTS ====================
 coeff = input.float(1, "Multiplier", step=0.1)
 AP = input.int(14, "Common Period")
-ATR = ta.sma(ta.tr, AP)
 src = input.source(close, "Source")
-showsignalsk = input.bool(true, title="Show Signals?")
 novolumedata = input.bool(false, title="Change calculation (no volume data)?")
 
-upT = low - ATR * coeff
-downT = high + ATR * coeff
+showAT4H = input.bool(true, "Show AlphaTrend (4H locked)")
+showATD = input.bool(true, "Show AlphaTrend (Daily locked)")
+showsignals4H = input.bool(true, "Show 4H Signals?")
+showsignalsD = input.bool(false, "Show Daily Signals?")
 
-AlphaTrend = 0.0
-AlphaTrend := (novolumedata ? ta.rsi(src, AP) >= 50 : ta.mfi(hlc3, AP) >= 50) ?
-     (upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT) :
-     (downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT)
+// Always use these fixed timeframes so the indicator "holds" when you switch chart TF.
+tf4H = "240"
+tfD = "D"
 
-color1 = AlphaTrend > AlphaTrend[2] ? #00E60F :
-     AlphaTrend < AlphaTrend[2] ? #80000B :
-     AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+//==================== AlphaTrend bundle function (runs inside request.security) ====================
+f_atBundle(_src) =>
+    ATR = ta.sma(ta.tr, AP)
+    upT = low - ATR * coeff
+    dnT = high + ATR * coeff
 
-k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3)
-k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3)
-fill(k1, k2, color=color1)
+    // Call both every bar (avoids Pine consistency warnings)
+    rsiVal = ta.rsi(_src, AP)
+    mfiVal = ta.mfi(hlc3, AP)
+    bullOK = novolumedata ? (rsiVal >= 50) : (mfiVal >= 50)
 
-buySignalk = ta.crossover(AlphaTrend, AlphaTrend[2])
-sellSignalk = ta.crossunder(AlphaTrend, AlphaTrend[2])
+    float at = na
+    at := bullOK ?
+         (upT < nz(at[1]) ? nz(at[1]) : upT) :
+         (dnT > nz(at[1]) ? nz(at[1]) : dnT)
 
-K1 = ta.barssince(buySignalk)
-K2 = ta.barssince(sellSignalk)
-O1 = ta.barssince(buySignalk[1])
-O2 = ta.barssince(sellSignalk[1])
+    buySig = ta.crossover(at, at[2])
+    sellSig = ta.crossunder(at, at[2])
 
-alphaBuy = buySignalk and O1 > K2
-alphaSell = sellSignalk and O2 > K1
+    K1 = ta.barssince(buySig)
+    K2 = ta.barssince(sellSig)
+    O1 = ta.barssince(buySig[1])
+    O2 = ta.barssince(sellSig[1])
 
-plotshape(buySignalk and showsignalsk and O1 > K2 ? AlphaTrend[2] * 0.9999 : na,
-     title="BUY",
-     text="BUY",
-     location=location.absolute,
-     style=shape.labelup,
-     size=size.tiny,
-     color=color.new(#0022FC, 0),
-     textcolor=color.new(color.white, 0))
+    aBuy = buySig and O1 > K2
+    aSell = sellSig and O2 > K1
 
-plotshape(sellSignalk and showsignalsk and O2 > K1 ? AlphaTrend[2] * 1.0001 : na,
-     title="SELL",
-     text="SELL",
-     location=location.absolute,
-     style=shape.labeldown,
-     size=size.tiny,
-     color=color.new(color.maroon, 0),
-     textcolor=color.new(color.white, 0))
+    [at, at[1], at[2], at[3], aBuy, aSell]
 
-alertcondition(alphaBuy, title="Potential BUY Alarm", message="BUY SIGNAL!")
-alertcondition(alphaSell, title="Potential SELL Alarm", message="SELL SIGNAL!")
+//==================== 4H AlphaTrend (locked) ====================
+[AT4H, AT4H_1, AT4H_2, AT4H_3, buy4H, sell4H] = request.security(syminfo.tickerid, tf4H, f_atBundle(src), barmerge.gaps_off, barmerge.lookahead_off)
+at4HColorFill = AT4H > AT4H_2 ? #00E60F : AT4H < AT4H_2 ? #80000B : AT4H_1 > AT4H_3 ? #00E60F : #80000B
 
-alertcondition(buySignalk[1] and O1[1] > K2, title="Confirmed BUY Alarm", message="BUY SIGNAL APPROVED!")
-alertcondition(sellSignalk[1] and O2[1] > K1, title="Confirmed SELL Alarm", message="SELL SIGNAL APPROVED!")
+pAT4H = plot(showAT4H ? AT4H : na, title="AlphaTrend (4H)", color=color.new(#0022FC, 0), linewidth=3)
+pAT4H2 = plot(showAT4H ? AT4H_2 : na, title="AlphaTrend[2] (4H)", color=color.new(#FC0400, 0), linewidth=3)
+fill(pAT4H, pAT4H2, color=showAT4H ? at4HColorFill : na)
 
-alertcondition(ta.cross(close, AlphaTrend), title="Price Cross Alert", message="Price - AlphaTrend Crossing!")
-alertcondition(ta.crossover(low, AlphaTrend), title="Candle CrossOver Alarm", message="LAST BAR is ABOVE ALPHATREND")
-alertcondition(ta.crossunder(high, AlphaTrend), title="Candle CrossUnder Alarm", message="LAST BAR is BELOW ALPHATREND!")
+plotshape(showAT4H and showsignals4H and buy4H ? (AT4H_2 * 0.9999) : na, title="BUY (4H)", text="BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
+plotshape(showAT4H and showsignals4H and sell4H ? (AT4H_2 * 1.0001) : na, title="SELL (4H)", text="SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
 
-alertcondition(ta.cross(close[1], AlphaTrend[1]), title="Price Cross Alert After Bar Close", message="Price - AlphaTrend Crossing!")
-alertcondition(ta.crossover(low[1], AlphaTrend[1]), title="Candle CrossOver Alarm After Bar Close", message="LAST BAR is ABOVE ALPHATREND!")
-alertcondition(ta.crossunder(high[1], AlphaTrend[1]), title="Candle CrossUnder Alarm After Bar Close", message="LAST BAR is BELOW ALPHATREND!")
+alertcondition(buy4H, title="AlphaTrend BUY (4H)", message="AlphaTrend 4H BUY")
+alertcondition(sell4H, title="AlphaTrend SELL (4H)", message="AlphaTrend 4H SELL")
 
-//-------------------- 4H previous candle fib dots (fixed timeframe = 4H) --------------------
+//==================== Daily AlphaTrend (locked) ====================
+[ATD, ATD_1, ATD_2, ATD_3, buyD, sellD] = request.security(syminfo.tickerid, tfD, f_atBundle(src), barmerge.gaps_off, barmerge.lookahead_off)
+atDColorFill = ATD > ATD_2 ? color.new(#00E60F, 65) : ATD < ATD_2 ? color.new(#80000B, 65) : ATD_1 > ATD_3 ? color.new(#00E60F, 65) : color.new(#80000B, 65)
+
+pATD = plot(showATD ? ATD : na, title="AlphaTrend (Daily)", color=color.new(color.aqua, 0), linewidth=2)
+pATD2 = plot(showATD ? ATD_2 : na, title="AlphaTrend[2] (Daily)", color=color.new(color.orange, 0), linewidth=2)
+fill(pATD, pATD2, color=showATD ? atDColorFill : na)
+
+plotshape(showATD and showsignalsD and buyD ? (ATD_2 * 0.9999) : na, title="BUY (Daily)", text="D BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.aqua, 0), textcolor=color.new(color.black, 0))
+plotshape(showATD and showsignalsD and sellD ? (ATD_2 * 1.0001) : na, title="SELL (Daily)", text="D SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.orange, 0), textcolor=color.new(color.black, 0))
+
+alertcondition(buyD, title="AlphaTrend BUY (Daily)", message="AlphaTrend Daily BUY")
+alertcondition(sellD, title="AlphaTrend SELL (Daily)", message="AlphaTrend Daily SELL")
+
+//==================== 4H previous candle fib dots (fixed 4H) ====================
 showFibDots = input.bool(true, "Show 4H Fib Dots (Prev Candle 50%/61.8%)")
-htf = "240" // 4H
 
-htfHighPrev = request.security(syminfo.tickerid, htf, high[1], barmerge.gaps_off, barmerge.lookahead_off)
-htfLowPrev = request.security(syminfo.tickerid, htf, low[1], barmerge.gaps_off, barmerge.lookahead_off)
+htfHighPrev = request.security(syminfo.tickerid, tf4H, high[1], barmerge.gaps_off, barmerge.lookahead_off)
+htfLowPrev = request.security(syminfo.tickerid, tf4H, low[1], barmerge.gaps_off, barmerge.lookahead_off)
 
 fib50 = htfLowPrev + (htfHighPrev - htfLowPrev) * 0.50
 fib618 = htfLowPrev + (htfHighPrev - htfLowPrev) * 0.618
@@ -84,143 +88,104 @@ fib618 = htfLowPrev + (htfHighPrev - htfLowPrev) * 0.618
 var float lastFib50 = na
 var float lastFib618 = na
 
-htfTime = request.security(syminfo.tickerid, htf, time, barmerge.gaps_off, barmerge.lookahead_off)
-newHTF = ta.change(htfTime)
+htfTime = request.security(syminfo.tickerid, tf4H, time, barmerge.gaps_off, barmerge.lookahead_off)
+newHTF = ta.change(htfTime) != 0
 
 if newHTF
     lastFib50 := fib50
     lastFib618 := fib618
 
-plot(showFibDots and not na(lastFib50) ? lastFib50 : na,
-     title="4H Prev Candle 50% (Dot)",
-     style=plot.style_circles,
-     color=color.blue,
-     linewidth=3)
+plot(showFibDots and not na(lastFib50) ? lastFib50 : na, title="4H Prev Candle 50% (Dot)", style=plot.style_circles, color=color.blue, linewidth=3)
+plot(showFibDots and not na(lastFib618) ? lastFib618 : na, title="4H Prev Candle 61.8% (Dot)", style=plot.style_circles, color=color.red, linewidth=3)
 
-plot(showFibDots and not na(lastFib618) ? lastFib618 : na,
-     title="4H Prev Candle 61.8% (Dot)",
-     style=plot.style_circles,
-     color=color.red,
-     linewidth=3)
+hitPrev50 = not na(lastFib50) and (low <= lastFib50 and high >= lastFib50)
+hitPrev618 = not na(lastFib618) and (low <= lastFib618 and high >= lastFib618)
+alertcondition(hitPrev50, title="Hit 4H Prev 50%", message="Price touched 4H previous candle 50% retracement")
+alertcondition(hitPrev618, title="Hit 4H Prev 61.8%", message="Price touched 4H previous candle 61.8% retracement")
 
-hit50 = not na(lastFib50) and (low <= lastFib50 and high >= lastFib50)
-hit618 = not na(lastFib618) and (low <= lastFib618 and high >= lastFib618)
+//==================== (Optional) After 4H BUY: next N bars touch 4H prev fib50 ====================
+postBuyBars = input.int(6, "Bars to watch after 4H BUY (4H prev fib50)", minval=1)
+showPostBuyFibLabel = input.bool(true, "Show Post-Buy 4H Prev Fib50 Label")
 
-alertcondition(hit50, title="Hit 4H 50% Fib", message="Price touched 4H previous candle 50% retracement")
-alertcondition(hit618, title="Hit 4H 61.8% Fib", message="Price touched 4H previous candle 61.8% retracement")
+var int postBuyCount = na
+var bool postBuyFired = false
 
-//-------------------- After AlphaTrend BUY: watch next 6 candles for 50% touch --------------------
-postBuyBars = input.int(6, "Bars to watch after AlphaTrend BUY", minval=1)
-showPostBuyFibLabel = input.bool(true, "Show Post-Buy Fib50 Touch Label")
-
-var bool postBuyActive = false
-var int postBuyCount = 0
-var bool postBuyHitFired = false
-var float fib50AtBuy = na
-
-if alphaBuy
-    postBuyActive := true
+if buy4H
     postBuyCount := 0
-    postBuyHitFired := false
-    fib50AtBuy := lastFib50
-
-postBuyHit50 = false
-if postBuyActive
-    // Only start checking from the candle AFTER the AlphaTrend buy candle.
-    inWindow = postBuyCount >= 1 and postBuyCount <= postBuyBars
-    postBuyHit50 := inWindow and not postBuyHitFired and not na(fib50AtBuy) and (low <= fib50AtBuy and high >= fib50AtBuy)
-    if postBuyHit50
-        postBuyHitFired := true
+    postBuyFired := false
+else if not na(postBuyCount)
     postBuyCount += 1
     if postBuyCount > postBuyBars
-        postBuyActive := false
+        postBuyCount := na
 
-plotshape(showPostBuyFibLabel and postBuyHit50,
-     title="Post-Buy Fib50 Touch BUY",
-     text="FIB BUY",
-     style=shape.labelup,
-     location=location.belowbar,
-     size=size.tiny,
-     color=color.new(color.lime, 0),
-     textcolor=color.new(color.black, 0))
+postBuyHit50 = false
+if not na(postBuyCount)
+    inWindow = postBuyCount >= 1 and postBuyCount <= postBuyBars
+    postBuyHit50 := inWindow and not postBuyFired and not na(lastFib50) and (low <= lastFib50 and high >= lastFib50)
+    if postBuyHit50
+        postBuyFired := true
+        postBuyCount := na
 
-alertcondition(postBuyHit50, title="Post-Buy Fib50 Touch", message="After AlphaTrend BUY: price touched 4H prev candle 50% within next 6 bars")
+plotshape(showPostBuyFibLabel and postBuyHit50, title="Post-Buy 4H Prev Fib50 Touch", text="FIB BUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
+alertcondition(postBuyHit50, title="Post-Buy 4H Prev Fib50 Touch", message="After AlphaTrend 4H BUY: price touched 4H previous candle 50% within next N bars")
 
-//-------------------- Dynamic 50% retracement line per BUY (sell-low -> post-buy high) --------------------
-showSwingFibLine = input.bool(true, "Show BUY-state 50% retracement line (from sell-low to post-buy high)")
-showSwingFibBuyLabel = input.bool(true, "Show BUY FIB label when line is hit")
+//==================== Dynamic 50% retracement line after EVERY 4H BUY ====================
+showSwingFibLine = input.bool(true, "Show 50% line after every 4H BUY (sell-low -> post-buy high)")
+showSwingFibBuyLabel = input.bool(true, "Show BUY FIB label when 50% line is hit")
 
-// Define "sell state" / "buy state" from AlphaTrend signals.
-var bool inSellState = false
+// Trend state driven by 4H signals, tracked on current chart timeframe
+var int trendState4H = 0 // -1 sell, +1 buy
 if barstate.isfirst
-    inSellState := AlphaTrend < AlphaTrend[2]
-if alphaSell
-    inSellState := true
-if alphaBuy
-    inSellState := false
+    trendState4H := AT4H >= AT4H_2 ? 1 : -1
+if sell4H
+    trendState4H := -1
+if buy4H
+    trendState4H := 1
 
-// Track the lowest low while we're in sell state.
+// Lowest low while in 4H sell state (tracked on the chart TF)
 var float sellStateLow = na
-if inSellState
+if sell4H
+    sellStateLow := low
+else if trendState4H == -1
     sellStateLow := na(sellStateLow) ? low : math.min(sellStateLow, low)
-if alphaSell
-    sellStateLow := low  // reset at the start of each sell state
 
-// One active fib line at a time; completed lines stay on chart.
-var line swingFibLine = na
-var bool swingFibActive = false
-var bool swingFibHit = false
-var float swingAnchorLow = na
-var float swingHighSinceBuy = na
-var float swingFib50 = na
-var int swingStartBar = na
-bool swingFibHitNow = false
+var line swingLine = na
+var bool swingActive = false
+var float swingLow = na
+var float swingHigh = na
+var float swing50 = na
+var int swingStart = na
+bool swingHitNow = false
 
-// Start a new fib line on every AlphaTrend BUY.
-if alphaBuy and showSwingFibLine
-    swingFibActive := true
-    swingFibHit := false
-    swingFibHitNow := false
-    swingStartBar := bar_index
-    swingAnchorLow := na(sellStateLow) ? low : sellStateLow
-    swingHighSinceBuy := high
-    swingFib50 := swingAnchorLow + (swingHighSinceBuy - swingAnchorLow) * 0.50
-    swingFibLine := line.new(
-         x1=swingStartBar,
-         y1=swingFib50,
-         x2=bar_index,
-         y2=swingFib50,
-         xloc=xloc.bar_index,
-         extend=extend.none,
-         color=color.new(color.lime, 0),
-         width=2)
+if buy4H and showSwingFibLine
+    swingLow := na(sellStateLow) ? low : sellStateLow
+    swingHigh := high
+    swing50 := swingLow + (swingHigh - swingLow) * 0.50
+    swingStart := bar_index
+    swingActive := true
+    swingLine := line.new(swingStart, swing50, bar_index, swing50, xloc=xloc.bar_index, extend=extend.none, color=color.new(color.lime, 0), width=2)
 
-// Update the active fib line while in BUY state, until hit or sell state returns.
-if swingFibActive and not swingFibHit
-    // Stop tracking if market turns back to sell state.
-    if inSellState
-        swingFibActive := false
-        if not na(swingFibLine)
-            line.set_xy2(swingFibLine, bar_index, swingFib50)
-            line.set_color(swingFibLine, color.new(color.gray, 0))
+if swingActive and showSwingFibLine
+    if trendState4H == -1
+        swingActive := false
+        if not na(swingLine)
+            line.set_xy2(swingLine, bar_index, swing50)
+            line.set_color(swingLine, color.new(color.gray, 0))
     else
-        swingHighSinceBuy := math.max(swingHighSinceBuy, high)
-        swingFib50 := swingAnchorLow + (swingHighSinceBuy - swingAnchorLow) * 0.50
-        if not na(swingFibLine)
-            line.set_xy1(swingFibLine, swingStartBar, swingFib50)
-            line.set_xy2(swingFibLine, bar_index, swingFib50)
+        swingHigh := math.max(swingHigh, high)
+        swing50 := swingLow + (swingHigh - swingLow) * 0.50
+        if not na(swingLine)
+            line.set_xy1(swingLine, swingStart, swing50)
+            line.set_xy2(swingLine, bar_index, swing50)
 
-        // "Hit" when price touches the line (intrabar).
-        swingHitNow = low <= swingFib50 and high >= swingFib50
+        swingHitNow := (low <= swing50 and high >= swing50)
         if swingHitNow
-            swingFibHit := true
-            swingFibHitNow := true
-            swingFibActive := false
-            if not na(swingFibLine)
-                line.set_xy2(swingFibLine, bar_index, swingFib50)
-                line.set_color(swingFibLine, color.new(color.green, 0))
+            swingActive := false
+            if not na(swingLine)
+                line.set_xy2(swingLine, bar_index, swing50)
+                line.set_color(swingLine, color.new(color.green, 0))
             if showSwingFibBuyLabel
                 label.new(bar_index, low, "BUY FIB", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
 
-alertcondition(showSwingFibLine and swingFibHitNow, title="BUY FIB (50% retracement hit)", message="After AlphaTrend BUY: price hit dynamic 50% retracement (sell-low -> post-buy high)")
+alertcondition(showSwingFibLine and swingHitNow, title="BUY FIB (dynamic 50% hit)", message="After AlphaTrend 4H BUY: price hit dynamic 50% retracement (sell-low -> post-buy high)")
 
