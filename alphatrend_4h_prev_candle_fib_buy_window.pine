@@ -12,12 +12,15 @@ novolumedata = input.bool(false, title="Change calculation (no volume data)?")
 
 showAT4H = input.bool(true, "Show AlphaTrend (4H locked)")
 showATD = input.bool(true, "Show AlphaTrend (Daily locked)")
+showATW = input.bool(true, "Show AlphaTrend (Weekly locked)")
 showsignals4H = input.bool(true, "Show 4H Signals?")
 showsignalsD = input.bool(false, "Show Daily Signals?")
+showsignalsW = input.bool(false, "Show Weekly Signals?")
 
 // Always use these fixed timeframes so the indicator "holds" when you switch chart TF.
 tf4H = "240"
 tfD = "D"
+tfW = "W"
 
 //==================== AlphaTrend bundle function (runs inside request.security) ====================
 f_atBundle(_src) =>
@@ -75,6 +78,20 @@ plotshape(showATD and showsignalsD and sellD ? (ATD_2 * 1.0001) : na, title="SEL
 
 alertcondition(buyD, title="AlphaTrend BUY (Daily)", message="AlphaTrend Daily BUY")
 alertcondition(sellD, title="AlphaTrend SELL (Daily)", message="AlphaTrend Daily SELL")
+
+//==================== Weekly AlphaTrend (locked) ====================
+[ATW, ATW_1, ATW_2, ATW_3, buyW, sellW] = request.security(syminfo.tickerid, tfW, f_atBundle(src), barmerge.gaps_off, barmerge.lookahead_off)
+atWColorFill = ATW > ATW_2 ? color.new(#00E60F, 80) : ATW < ATW_2 ? color.new(#80000B, 80) : ATW_1 > ATW_3 ? color.new(#00E60F, 80) : color.new(#80000B, 80)
+
+pATW = plot(showATW ? ATW : na, title="AlphaTrend (Weekly)", color=color.new(color.fuchsia, 0), linewidth=2)
+pATW2 = plot(showATW ? ATW_2 : na, title="AlphaTrend[2] (Weekly)", color=color.new(color.yellow, 0), linewidth=2)
+fill(pATW, pATW2, color=showATW ? atWColorFill : na)
+
+plotshape(showATW and showsignalsW and buyW ? (ATW_2 * 0.9999) : na, title="BUY (Weekly)", text="W BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.fuchsia, 0), textcolor=color.new(color.black, 0))
+plotshape(showATW and showsignalsW and sellW ? (ATW_2 * 1.0001) : na, title="SELL (Weekly)", text="W SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.yellow, 0), textcolor=color.new(color.black, 0))
+
+alertcondition(buyW, title="AlphaTrend BUY (Weekly)", message="AlphaTrend Weekly BUY")
+alertcondition(sellW, title="AlphaTrend SELL (Weekly)", message="AlphaTrend Weekly SELL")
 
 //==================== 4H previous candle fib dots (fixed 4H) ====================
 showFibDots = input.bool(true, "Show 4H Fib Dots (Prev Candle 50%/61.8%)")
