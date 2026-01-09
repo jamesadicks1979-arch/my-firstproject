@@ -194,84 +194,79 @@ if swingActive and showSwingFibLine
 
 alertcondition(showSwingFibLine and swingHitNow, title="BUY FIB (dynamic 50% hit)", message="After AlphaTrend 4H BUY: price hit dynamic 50% retracement (sell-low -> post-buy high)")
 
-//==================== D>W and 4H>D&W; 5m below 4H -> wait 5m BUY -> 50% fib -> "4H ALPHABUY" ====================
-enable4HAlphaBuyFib = input.bool(true, "Enable 4H ALPHABUY fib (D>W & 4H>D&W; 5m<4H then 5m BUY -> 50% retrace)")
-show4HAlphaBuyFibLine = input.bool(true, "Show 4H ALPHABUY fib 50% line")
-max4HAlphaBuyFibLines = input.int(20, "Max 4H ALPHABUY fib lines to keep on chart", minval=1)
+//==================== D>W and 4H>D&W; 5m below 4H -> wait 5m BUY -> 50% fib -> "DAILYFIBBUY" ====================
+enableDailyFibBuy = input.bool(true, "Enable DAILYFIBBUY (D>W & 4H>D&W; 5m<4H then 5m BUY -> 50% retrace)")
+showDailyFibBuyLine = input.bool(true, "Show DAILYFIBBUY 50% line")
+maxDailyFibBuyLines = input.int(20, "Max DAILYFIBBUY lines to keep", minval=1)
 
 alignedDW4H = (ATD > ATW) and (AT4H > ATD) and (AT4H > ATW)
 fiveBelow4H = AT5 < AT4H
-fiveCrossBelow4H = ta.crossunder(AT5, AT4H)
 
-var bool abWaiting = false
-var bool abActive = false
-var float abLow = na
-var float abHigh = na
-var float abFib50 = na
-var int abStartTime = na
-var line abLine = na
-var line[] abLineHistory = array.new_line()
+// State machine:
+// - pullback tracking starts while aligned and 5m is below 4H
+// - once a 5m BUY happens, we start fib tracking from pullback low to highest high since buy
+var bool dfPullback = false
+var bool dfActive = false
+var float dfLow = na
+var float dfHigh = na
+var float df50 = na
+var int dfStartTime = na
+var line dfLine = na
+var line[] dfHistory = array.new_line()
 
-abHitNow = false
+dfHitNow = false
 
-// Start a setup when 5m drops below 4H (or is already below on load) while aligned.
-if enable4HAlphaBuyFib and alignedDW4H and not abActive
-    startNow = (not abWaiting and fiveBelow4H) or fiveCrossBelow4H
-    if startNow
-        abWaiting := true
-        abLow := low
+// Reset everything if alignment breaks
+if enableDailyFibBuy and not alignedDW4H
+    dfPullback := false
+    dfActive := false
+    dfLow := na
+    dfHigh := na
+    df50 := na
 
-// While waiting, keep tracking the pullback low ONLY while 5m remains below 4H.
-if enable4HAlphaBuyFib and abWaiting
-    if not alignedDW4H
-        abWaiting := false
-        abLow := na
-    else
-        if fiveBelow4H
-            abLow := na(abLow) ? low : math.min(abLow, low)
+// Start/continue pullback low tracking (while aligned and below 4H, and not already in fib-active mode)
+if enableDailyFibBuy and alignedDW4H and not dfActive
+    if fiveBelow4H
+        dfPullback := true
+        dfLow := na(dfLow) ? low : math.min(dfLow, low)
 
-// When 5m BUY happens after being below 4H (and still aligned), start the fib from that pullback low.
-if enable4HAlphaBuyFib and abWaiting and alignedDW4H and buy5
-    abWaiting := false
-    abActive := true
-    abStartTime := time
-    abLow := na(abLow) ? low : abLow
-    abHigh := high
-    abFib50 := abLow + (abHigh - abLow) * 0.50
-    if show4HAlphaBuyFibLine
-        abLine := line.new(abStartTime, abFib50, time, abFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
-        array.push(abLineHistory, abLine)
-        if array.size(abLineHistory) > max4HAlphaBuyFibLines
-            oldAbLine = array.shift(abLineHistory)
-            line.delete(oldAbLine)
+// If we leave the "below 4H" area before buy triggers, keep dfPullback but stop updating the low.
+// (This avoids losing the pullback low if the BUY happens after crossing back above 4H.)
 
-// Update active fib until hit OR alignment breaks.
-if abActive
-    if not alignedDW4H
-        abActive := false
-        abLow := na
-        if not na(abLine)
-            line.set_extend(abLine, extend.none)
-            line.set_color(abLine, color.new(color.gray, 0))
-    else
-        abHigh := math.max(abHigh, high)
-        abFib50 := abLow + (abHigh - abLow) * 0.50
-        if show4HAlphaBuyFibLine and not na(abLine)
-            line.set_extend(abLine, extend.right)
-            line.set_xy1(abLine, abStartTime, abFib50)
-            line.set_xy2(abLine, time, abFib50)
+// On 5m BUY: start fib tracking using the stored pullback low (fallback to current low if needed)
+if enableDailyFibBuy and alignedDW4H and dfPullback and not dfActive and buy5
+    dfActive := true
+    dfPullback := false
+    dfStartTime := time
+    dfLow := na(dfLow) ? low : dfLow
+    dfHigh := high
+    df50 := dfLow + (dfHigh - dfLow) * 0.50
+    if showDailyFibBuyLine
+        dfLine := line.new(dfStartTime, df50, time, df50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
+        array.push(dfHistory, dfLine)
+        if array.size(dfHistory) > maxDailyFibBuyLines
+            oldDf = array.shift(dfHistory)
+            line.delete(oldDf)
 
-        abHitNow := (low <= abFib50 and high >= abFib50)
-        if abHitNow
-            abActive := false
-            abLow := na
-            if show4HAlphaBuyFibLine and not na(abLine)
-                line.set_xy2(abLine, time, abFib50)
-                line.set_extend(abLine, extend.right)
-                line.set_color(abLine, color.new(color.green, 0))
-            label.new(bar_index, low, "4H ALPHABUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
+// Update fib until hit (or until alignment breaks, which resets above)
+if enableDailyFibBuy and dfActive and alignedDW4H
+    dfHigh := math.max(dfHigh, high)
+    df50 := dfLow + (dfHigh - dfLow) * 0.50
+    if showDailyFibBuyLine and not na(dfLine)
+        line.set_extend(dfLine, extend.right)
+        line.set_xy1(dfLine, dfStartTime, df50)
+        line.set_xy2(dfLine, time, df50)
 
-alertcondition(enable4HAlphaBuyFib and abHitNow, title="4H ALPHABUY (50% hit)", message="4H ALPHABUY: D>W and 4H>D&W; 5m was below 4H, then 5m BUY, then hit 50% retracement")
+    dfHitNow := (low <= df50 and high >= df50)
+    if dfHitNow
+        dfActive := false
+        if showDailyFibBuyLine and not na(dfLine)
+            line.set_xy2(dfLine, time, df50)
+            line.set_extend(dfLine, extend.right)
+            line.set_color(dfLine, color.new(color.green, 0))
+        label.new(bar_index, low, "DAILYFIBBUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
+
+alertcondition(enableDailyFibBuy and dfHitNow, title="DAILYFIBBUY (50% hit)", message="DAILYFIBBUY: D>W and 4H>D&W; 5m went below 4H, then 5m BUY, then hit 50% retracement")
 
 //==================== 5m below Daily (while HTF bullish) -> wait 5m BUY -> 50% fib -> "BUY DAILY AT" ====================
 enableDailyPullbackBuy = input.bool(true, "Enable BUY DAILY AT (5m<Daily, 4H>Daily, Daily>Weekly, then 5m BUY -> 50% fib)")
