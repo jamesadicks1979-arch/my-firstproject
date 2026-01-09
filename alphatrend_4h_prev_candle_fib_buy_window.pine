@@ -253,10 +253,10 @@ if nweFibDotsActive
             nweHighDots := na
             nweFib50Dots := na
 
-plot(showNWEFibDots and nweFibDotsActive ? nweFib50Dots : na, title="NWE Fib 50% (dots)", style=plot.style_circles, color=color.new(color.teal, 0), linewidth=3)
+plot(showNWEFibDots and nweFibDotsActive ? nweFib50Dots : na, title="NWE Fib 50% (dots)", style=plot.style_circles, color=color.new(color.lime, 0), linewidth=3)
 
 nweFibDotsHitNow = nweFibDotsActive and (time > nweFibStartTimeDots) and (low <= nweFib50Dots and high >= nweFib50Dots)
-plotshape(nweFibDotsHitNow ? low : na, title="NWE Fib Buy", text="NWE FIB BUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.teal, 0), textcolor=color.new(color.white, 0))
+plotshape(nweFibDotsHitNow ? low : na, title="NWE Fib Buy", text="NWE FIB BUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
 
 if nweFibDotsHitNow
     nweFibDotsActive := false
