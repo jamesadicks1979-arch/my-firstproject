@@ -2,7 +2,7 @@
 // author © KivancOzbilgic
 // developer © KivancOzbilgic
 //@version=5
-indicator("AlphaTrend (locked MTF) + Fib Buys", shorttitle="AT MTF", overlay=true, format=format.price, precision=2, max_lines_count=500, max_labels_count=500)
+indicator("AlphaTrend (locked MTF) + Fib Buys", shorttitle="AT MTF", overlay=true, format=format.price, precision=2, max_lines_count=500, max_labels_count=500, max_bars_back=5000)
 
 //==================== INPUTS ====================
 coeff = input.float(1, "Multiplier", step=0.1)
@@ -310,4 +310,149 @@ if wpLineHit and not na(wpLine) and not na(wpHitLevel) and not na(wpHitTime)
         wpLineHit := false
         wpHitLevel := na
         wpHitTime := na
+
+//==================== Nadaraya lower-band dip -> reclaim -> 50% fib (max 2 days) ====================
+enableNadarayaFib = input.bool(true, "Enable Nadaraya Fib (D>W & 4H>D; dip below band then reclaim)")
+showNadarayaBands = input.bool(false, "Show Nadaraya bands")
+nwLookbackBars = input.int(500, "Nadaraya lookback bars (run further back)", minval=50, maxval=5000)
+nwLen = input.int(200, "Nadaraya length", minval=20, maxval=500)
+nwBandwidth = input.float(30.0, "Nadaraya bandwidth", step=1.0, minval=1.0)
+nwMult = input.float(2.0, "Band multiplier", step=0.1, minval=0.1)
+nwMaxDays = input.int(2, "Max run time (days)", minval=1, maxval=30)
+
+inNwLookback = bar_index >= (last_bar_index - nwLookbackBars)
+nwContextOk = (ATD > ATW) and (AT4H > ATD)
+
+// Precompute gaussian weights when inputs change.
+var int _nwLenLast = na
+var float _nwBwLast = na
+var float _nwDen = na
+var float[] _nwW = array.new_float()
+
+if barstate.isfirst or _nwLenLast != nwLen or _nwBwLast != nwBandwidth
+    array.clear(_nwW)
+    _nwDen := 0.0
+    for i = 0 to nwLen - 1
+        w = math.exp(-0.5 * math.pow(i / nwBandwidth, 2))
+        array.push(_nwW, w)
+        _nwDen += w
+    _nwLenLast := nwLen
+    _nwBwLast := nwBandwidth
+
+nwEst = na
+if enableNadarayaFib and inNwLookback and bar_index >= nwLen
+    num = 0.0
+    for i = 0 to nwLen - 1
+        num += array.get(_nwW, i) * close[i]
+    nwEst := num / _nwDen
+
+nwDev = (enableNadarayaFib and inNwLookback) ? ta.stdev(close - nwEst, nwLen) : na
+nwUpper = nwEst + nwMult * nwDev
+nwLower = nwEst - nwMult * nwDev
+
+plot(showNadarayaBands ? nwUpper : na, title="Nadaraya Upper", color=color.new(color.gray, 60), linewidth=1)
+plot(showNadarayaBands ? nwLower : na, title="Nadaraya Lower", color=color.new(color.gray, 60), linewidth=1)
+
+belowBand = enableNadarayaFib and inNwLookback and nwContextOk and not na(nwLower) and close < nwLower
+reclaimBand = enableNadarayaFib and inNwLookback and nwContextOk and not na(nwLower) and ta.crossover(close, nwLower)
+
+var bool nwInDip = false
+var float nwDipLow = na
+
+var bool nwFibActive = false
+var float nwHigh = na
+var float nwFib50 = na
+var int nwStartTime = na
+var line nwLine = na
+var bool nwLineHit = false
+var float nwHitLevel = na
+var int nwHitTime = na
+
+twoDaysMs = nwMaxDays * 24 * 60 * 60 * 1000
+
+// Track dip-low while below the band.
+if enableNadarayaFib and inNwLookback and nwContextOk
+    if belowBand
+        nwInDip := true
+        nwDipLow := na(nwDipLow) ? low : math.min(nwDipLow, low)
+    if reclaimBand and nwInDip and not nwFibActive
+        // Start fib tracking on reclaim.
+        nwFibActive := true
+        nwInDip := false
+        nwStartTime := time
+        nwHigh := high
+        nwFib50 := nwDipLow + (nwHigh - nwDipLow) * 0.50
+        nwLineHit := false
+        nwHitLevel := na
+        nwHitTime := na
+        if not na(nwLine)
+            line.delete(nwLine)
+        nwLine := line.new(nwStartTime, nwFib50, time, nwFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.teal, 0), width=2)
+        // reset dip low for next dip sequence
+        nwDipLow := na
+
+// Cancel if context breaks
+if nwFibActive and (not nwContextOk)
+    nwFibActive := false
+    if not na(nwLine)
+        line.delete(nwLine)
+        nwLine := na
+
+// Update fib while active, up to max days.
+if nwFibActive
+    // Expire after max days.
+    if time - nwStartTime > twoDaysMs
+        nwFibActive := false
+        if not na(nwLine)
+            line.delete(nwLine)
+            nwLine := na
+    else
+        nwHigh := math.max(nwHigh, high)
+        nwFib50 := nz(nwDipLow, nwFib50)  // safety; dip low already set at start
+        // recompute from stored start low (we stored it in nwFib50 seed only); store low separately:
+        // We can reconstruct start-low as: low0 = nwFib50 * 2 - nwHigh? Not stable, so store it:
+
+// Store low anchor separately to compute fib correctly.
+var float nwLowAnchor = na
+if reclaimBand and not na(nwLine)
+    // This assignment is redundant on future bars; set once on start.
+    nwLowAnchor := nz(nwLowAnchor, nwFib50)  // placeholder; overwritten below in start block
+
+// Patch in correct low-anchor on start (kept outside loops for Pine limitations).
+// If line exists and we just started, set anchor to current fib50 seed's low component:
+if enableNadarayaFib and nwFibActive and na(nwLowAnchor)
+    // Fallback: use current low as anchor if not set (shouldn't happen).
+    nwLowAnchor := low
+
+if nwFibActive and not na(nwLowAnchor)
+    nwFib50 := nwLowAnchor + (nwHigh - nwLowAnchor) * 0.50
+    if not na(nwLine)
+        line.set_extend(nwLine, extend.right)
+        line.set_xy1(nwLine, nwStartTime, nwFib50)
+        line.set_xy2(nwLine, time, nwFib50)
+
+    // Hit check (not on start bar).
+    hitNow = (time > nwStartTime) and (low <= nwFib50 and high >= nwFib50)
+    if hitNow
+        nwFibActive := false
+        nwLineHit := true
+        nwHitLevel := nwFib50
+        nwHitTime := time
+        if not na(nwLine)
+            line.set_xy2(nwLine, time, nwFib50)
+            line.set_extend(nwLine, extend.none)
+            line.set_color(nwLine, color.new(color.teal, 0))
+        label.new(bar_index, low, "NAD FIB BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.teal, 0), textcolor=color.new(color.white, 0))
+
+// After hit: delete line once price closes below the 50% level.
+if nwLineHit and not na(nwLine) and not na(nwHitLevel) and not na(nwHitTime)
+    if time > nwHitTime and close < nwHitLevel
+        line.delete(nwLine)
+        nwLine := na
+        nwLineHit := false
+        nwHitLevel := na
+        nwHitTime := na
+        nwLowAnchor := na
+
+alertcondition(enableNadarayaFib and nwLineHit, title="Nadaraya Fib Buy (50% hit)", message="Nadaraya fib 50% hit after lower-band dip/reclaim under D>W and 4H>D context.")
 
