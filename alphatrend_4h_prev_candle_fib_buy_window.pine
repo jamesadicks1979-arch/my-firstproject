@@ -325,7 +325,8 @@ if dpActive
     if not (ATD > ATW)
         dpActive := false
         if not na(dpLine)
-            line.set_extend(dpLine, extend.none)
+            // Keep the line visible to the right even if context breaks.
+            line.set_extend(dpLine, extend.right)
             line.set_color(dpLine, color.new(color.gray, 0))
     else
         // If 4H falls below Daily, stop updating (but keep the line).
