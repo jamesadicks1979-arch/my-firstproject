@@ -1,0 +1,114 @@
+//@version=5
+strategy(
+     "Starter Strategy (v5) - Template",
+     overlay=true,
+     initial_capital=10000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.05,
+     slippage=1,
+     pyramiding=0,
+     process_orders_on_close=true
+)
+
+// -----------------------------
+// Inputs
+// -----------------------------
+grpSignals = "Signals"
+fastLen   = input.int(20, "Fast EMA Length", minval=1, group=grpSignals)
+slowLen   = input.int(50, "Slow EMA Length", minval=1, group=grpSignals)
+
+grpFilters = "Filters"
+useDateFilter = input.bool(false, "Limit to date range", group=grpFilters)
+startDate     = input.time(timestamp("2024-01-01T00:00:00"), "Start", group=grpFilters, inline="date")
+endDate       = input.time(timestamp("2030-01-01T00:00:00"), "End", group=grpFilters, inline="date")
+useRsi        = input.bool(true, "Use RSI filter", group=grpFilters)
+rsiLen        = input.int(14, "RSI Length", minval=1, group=grpFilters, inline="rsi")
+rsiMinLong    = input.int(50, "Min (long)", minval=1, maxval=100, group=grpFilters, inline="rsi")
+
+grpRisk  = "Risk / Exits"
+qtyType  = input.string("percent_equity", "Position sizing", options=["percent_equity", "fixed_contracts"], group=grpRisk)
+qtyValue = input.float(10, "Qty (10% or contracts)", minval=0.0, step=0.25, group=grpRisk)
+useStops = input.bool(true, "Use stop loss / take profit", group=grpRisk)
+atrLen   = input.int(14, "ATR Length", minval=1, group=grpRisk, inline="atr")
+slAtr    = input.float(2.0, "SL (x ATR)", minval=0.1, step=0.1, group=grpRisk, inline="atr")
+tpAtr    = input.float(3.0, "TP (x ATR)", minval=0.1, step=0.1, group=grpRisk, inline="atr")
+useTrail = input.bool(false, "Use trailing stop", group=grpRisk)
+trailAtr = input.float(2.0, "Trail (x ATR)", minval=0.1, step=0.1, group=grpRisk)
+
+grpDisplay = "Display"
+plotMAs    = input.bool(true, "Plot EMAs", group=grpDisplay)
+plotSignals= input.bool(true, "Plot signals", group=grpDisplay)
+
+// -----------------------------
+// Core calculations (replace with your logic)
+// -----------------------------
+fast = ta.ema(close, fastLen)
+slow = ta.ema(close, slowLen)
+rsi  = ta.rsi(close, rsiLen)
+atr  = ta.atr(atrLen)
+
+inDate = not useDateFilter or (time >= startDate and time <= endDate)
+longOk  = inDate and (not useRsi or rsi >= rsiMinLong)
+shortOk = inDate and (not useRsi or rsi <= (100 - rsiMinLong))
+
+longSignal  = ta.crossover(fast, slow) and longOk
+shortSignal = ta.crossunder(fast, slow) and shortOk
+
+// -----------------------------
+// Position sizing helper
+// -----------------------------
+float orderQty =
+     qtyType == "fixed_contracts" ? qtyValue :
+     // strategy.percent_of_equity expects a percent value (0-100)
+     na
+
+// -----------------------------
+// Entries
+// -----------------------------
+if longSignal
+    if qtyType == "fixed_contracts"
+        strategy.entry("L", strategy.long, qty=orderQty)
+    else
+        strategy.entry("L", strategy.long, qty_percent=qtyValue)
+
+if shortSignal
+    if qtyType == "fixed_contracts"
+        strategy.entry("S", strategy.short, qty=orderQty)
+    else
+        strategy.entry("S", strategy.short, qty_percent=qtyValue)
+
+// -----------------------------
+// Exits (example ATR-based risk management)
+// -----------------------------
+longStop  = close - slAtr * atr
+longLimit = close + tpAtr * atr
+shortStop  = close + slAtr * atr
+shortLimit = close - tpAtr * atr
+
+if useStops and not useTrail
+    strategy.exit("L.exit", from_entry="L", stop=longStop, limit=longLimit)
+    strategy.exit("S.exit", from_entry="S", stop=shortStop, limit=shortLimit)
+
+if useTrail
+    // Trailing stop uses "trail_points" in ticks/price units. Using ATR as a price value.
+    // For many markets, this is acceptable; if you trade tick-based instruments, consider converting to ticks.
+    trail = trailAtr * atr
+    strategy.exit("L.trail", from_entry="L", trail_points=trail)
+    strategy.exit("S.trail", from_entry="S", trail_points=trail)
+
+// -----------------------------
+// Plots
+// -----------------------------
+if plotMAs
+    plot(fast, "Fast EMA", color=color.new(color.teal, 0), linewidth=2)
+    plot(slow, "Slow EMA", color=color.new(color.orange, 0), linewidth=2)
+
+if plotSignals
+    plotshape(longSignal,  title="Long signal",  style=shape.triangleup,   location=location.belowbar, color=color.new(color.green, 0), size=size.tiny, text="L")
+    plotshape(shortSignal, title="Short signal", style=shape.triangledown, location=location.abovebar, color=color.new(color.red, 0),   size=size.tiny, text="S")
+
+// -----------------------------
+// Alerts (optional)
+// -----------------------------
+alertcondition(longSignal,  title="Long Signal",  message="Starter Strategy: Long signal on {{ticker}} @ {{close}}")
+alertcondition(shortSignal, title="Short Signal", message="Starter Strategy: Short signal on {{ticker}} @ {{close}}")

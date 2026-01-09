@@ -1,0 +1,64 @@
+//@version=5
+indicator("Starter Indicator (v5) - Template", overlay=true, max_labels_count=500, max_lines_count=500)
+
+// -----------------------------
+// Inputs
+// -----------------------------
+grpSignals = "Signals"
+fastLen   = input.int(20, "Fast MA Length", minval=1, group=grpSignals)
+slowLen   = input.int(50, "Slow MA Length", minval=1, group=grpSignals)
+useRsi    = input.bool(true, "Use RSI filter", group=grpSignals)
+rsiLen    = input.int(14, "RSI Length", minval=1, group=grpSignals, inline="rsi")
+rsiMin    = input.int(50, "RSI min for longs", minval=1, maxval=100, group=grpSignals, inline="rsi")
+
+grpDisplay = "Display"
+showBg     = input.bool(false, "Highlight trend background", group=grpDisplay)
+showLabels = input.bool(true, "Show signal labels", group=grpDisplay)
+
+// -----------------------------
+// Core calculations (replace with your logic)
+// -----------------------------
+fast = ta.ema(close, fastLen)
+slow = ta.ema(close, slowLen)
+rsi  = ta.rsi(close, rsiLen)
+
+trendUp   = fast > slow
+trendDown = fast < slow
+
+longSignalRaw  = ta.crossover(fast, slow)
+shortSignalRaw = ta.crossunder(fast, slow)
+
+longOk  = not useRsi or rsi >= rsiMin
+shortOk = not useRsi or rsi <= (100 - rsiMin)
+
+longSignal  = longSignalRaw and longOk
+shortSignal = shortSignalRaw and shortOk
+
+// -----------------------------
+// Plots
+// -----------------------------
+plot(fast, "Fast EMA", color=color.new(color.teal, 0), linewidth=2)
+plot(slow, "Slow EMA", color=color.new(color.orange, 0), linewidth=2)
+
+bgcolor(showBg ? (trendUp ? color.new(color.green, 90) : trendDown ? color.new(color.red, 90) : na) : na, title="Trend background")
+
+// -----------------------------
+// Signal visuals
+// -----------------------------
+plotshape(longSignal,  title="Long signal",  style=shape.triangleup,   location=location.belowbar, color=color.new(color.green, 0), size=size.tiny, text="L")
+plotshape(shortSignal, title="Short signal", style=shape.triangledown, location=location.abovebar, color=color.new(color.red, 0),   size=size.tiny, text="S")
+
+if showLabels and longSignal
+    label.new(bar_index, low, "Long", style=label.style_label_up, textcolor=color.white, color=color.new(color.green, 0))
+if showLabels and shortSignal
+    label.new(bar_index, high, "Short", style=label.style_label_down, textcolor=color.white, color=color.new(color.red, 0))
+
+// -----------------------------
+// Alerts
+// -----------------------------
+alertcondition(longSignal,  title="Long Signal",  message="Starter Indicator: Long signal on {{ticker}} @ {{close}}")
+alertcondition(shortSignal, title="Short Signal", message="Starter Indicator: Short signal on {{ticker}} @ {{close}}")
+
+// Optional: expose a simple “state” for dashboards/other scripts
+trendState = trendUp ? 1 : trendDown ? -1 : 0
+plotchar(trendState, title="Trend State (1/-1/0)", char=".", location=location.top, color=trendState == 1 ? color.new(color.green, 0) : trendState == -1 ? color.new(color.red, 0) : color.new(color.gray, 0), display=display.none)
