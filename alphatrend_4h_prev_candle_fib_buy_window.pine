@@ -337,23 +337,23 @@ if dpActive
                 line.set_extend(dpLine, extend.right)
                 line.set_color(dpLine, color.new(color.gray, 0))
         else
-        dpHigh := math.max(dpHigh, high)
-        dpFib50 := dpLow + (dpHigh - dpLow) * 0.50
-        if showDailyPullbackFibLine and not na(dpLine)
-            line.set_extend(dpLine, extend.right)
-            line.set_xy1(dpLine, dpStartTime, dpFib50)
-            line.set_xy2(dpLine, time, dpFib50)
-
-        // Don't allow an "instant hit" on the same candle the line is created.
-        dpHitNow := (time > dpStartTime) and (low <= dpFib50 and high >= dpFib50)
-        if dpHitNow
-            dpActive := false
-            // Once hit: keep the 50% line on-chart.
-            if not na(dpLine)
-                line.set_xy2(dpLine, time, dpFib50)
+            dpHigh := math.max(dpHigh, high)
+            dpFib50 := dpLow + (dpHigh - dpLow) * 0.50
+            if showDailyPullbackFibLine and not na(dpLine)
                 line.set_extend(dpLine, extend.right)
-                line.set_color(dpLine, color.new(color.green, 0))
-            label.new(bar_index, low, "FIBDAILY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
+                line.set_xy1(dpLine, dpStartTime, dpFib50)
+                line.set_xy2(dpLine, time, dpFib50)
+
+            // Don't allow an "instant hit" on the same candle the line is created.
+            dpHitNow := (time > dpStartTime) and (low <= dpFib50 and high >= dpFib50)
+            if dpHitNow
+                dpActive := false
+                // Once hit: keep the 50% line on-chart.
+                if not na(dpLine)
+                    line.set_xy2(dpLine, time, dpFib50)
+                    line.set_extend(dpLine, extend.right)
+                    line.set_color(dpLine, color.new(color.green, 0))
+                label.new(bar_index, low, "FIBDAILY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
 alertcondition(enableDailyPullbackBuy and dpHitNow, title="FIBDAILY BUY (50% hit)", message="FIBDAILY BUY: Daily>Weekly; 5m was below Daily, waited for 5m BUY, then hit 50% retracement")
 
