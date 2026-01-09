@@ -178,6 +178,7 @@ if swingActive and showSwingFibLine
         swingHigh := math.max(swingHigh, high)
         swing50 := swingLow + (swingHigh - swingLow) * 0.50
         if not na(swingLine)
+            line.set_extend(swingLine, extend.right)
             line.set_xy1(swingLine, swingStart, swing50)
             line.set_xy2(swingLine, bar_index, swing50)
 
@@ -267,6 +268,7 @@ if trend5mActive
             if trend5mRallied
                 trend5mFib50 := trend5mLow + (trend5mHigh - trend5mLow) * 0.50
                 if show5mTrendFibLine and not na(trend5mLine)
+                    line.set_extend(trend5mLine, extend.right)
                     line.set_xy1(trend5mLine, trend5mStartBar, trend5mFib50)
                     line.set_xy2(trend5mLine, bar_index, trend5mFib50)
 
@@ -342,6 +344,7 @@ if dpActive
         dpHigh := math.max(dpHigh, high)
         dpFib50 := dpLow + (dpHigh - dpLow) * 0.50
         if showDailyPullbackFibLine and not na(dpLine)
+            line.set_extend(dpLine, extend.right)
             line.set_xy1(dpLine, dpStartBar, dpFib50)
             line.set_xy2(dpLine, bar_index, dpFib50)
 
