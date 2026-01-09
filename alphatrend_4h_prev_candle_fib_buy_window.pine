@@ -196,7 +196,7 @@ alertcondition(showSwingFibLine and swingHitNow, title="BUY FIB (dynamic 50% hit
 
 //==================== 5m cross-below-4H -> (wait for 5m BUY) -> rally -> 50% fib -> "5mTrendBUY" ====================
 enable5mTrendBuy = input.bool(true, "Enable 5mTrendBUY (HTF aligned + 5m<4H cross + 5m BUY + 20 pip rally + 50% retrace)")
-pipSize = input.float(0.01, "Pip size (GBPJPY pip=0.01)", step=0.01, minval=syminfo.mintick)
+pipSize = input.float(0.01, "Pip size (GBPJPY pip=0.01)", step=0.01, minval=0.0)
 minRallyPips = input.int(20, "Minimum rally (pips) after cross", minval=1)
 show5mTrendFibLine = input.bool(true, "Show 5mTrend fib 50% line")
 max5mTrendLines = input.int(20, "Max 5mTrend fib lines to keep on chart", minval=1)
