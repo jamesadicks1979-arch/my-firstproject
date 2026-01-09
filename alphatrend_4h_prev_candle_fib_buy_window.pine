@@ -311,137 +311,161 @@ if wpLineHit and not na(wpLine) and not na(wpHitLevel) and not na(wpHitTime)
         wpHitLevel := na
         wpHitTime := na
 
-//==================== Nadaraya lower-band dip -> reclaim -> 50% fib (max 2 days) ====================
-enableNadarayaFib = input.bool(true, "Enable Nadaraya Fib (D>W & 4H>D; dip below band then reclaim)")
-showNadarayaBands = input.bool(true, "Show Nadaraya bands")
-nwLookbackBars = input.int(500, "Nadaraya lookback bars (last N candles)", minval=50, maxval=5000)
-nwLen = input.int(200, "Nadaraya length", minval=20, maxval=500)
-nwBandwidth = input.float(30.0, "Nadaraya bandwidth", step=1.0, minval=1.0)
-nwMult = input.float(2.0, "Band multiplier", step=0.1, minval=0.1)
-nwMaxDays = input.int(2, "Max run time (days)", minval=1, maxval=30)
-nwSrc = input.source(close, "Nadaraya source")
+//==================== Nadaraya-Watson Envelope [LuxAlgo] (matched) ====================
+// NOTE: This block matches the user's provided LuxAlgo NWE calculations (499/500 constants).
+enableNWE = input.bool(true, "Enable Nadaraya-Watson Envelope [LuxAlgo]")
+h = input.float(8.0, "Bandwidth", minval=0)
+mult = input.float(3.0, "Multiplier", minval=0)
+nweSrc = input.source(close, "NWE Source")
+repaint = input.bool(true, "Repainting Smoothing", tooltip="Disabling repainting outputs endpoint calculations")
+upCss = input.color(color.teal, "NWE Up Color")
+dnCss = input.color(color.red, "NWE Down Color")
 
-inNwLookback = bar_index >= (last_bar_index - nwLookbackBars)
-nwContextOk = (ATD > ATW) and (AT4H > ATD)
+// Gaussian window
+gauss(x, _h) => math.exp(-(math.pow(x, 2) / (_h * _h * 2)))
 
-// Precompute gaussian weights when inputs change.
-var int _nwLenLast = na
-var float _nwBwLast = na
-var float _nwDen = na
-var float[] _nwW = array.new_float()
+n = bar_index
 
-if barstate.isfirst or _nwLenLast != nwLen or _nwBwLast != nwBandwidth
-    array.clear(_nwW)
-    _nwDen := 0.0
-    for i = 0 to nwLen - 1
-        w = math.exp(-0.5 * math.pow(i / nwBandwidth, 2))
-        array.push(_nwW, w)
-        _nwDen += w
-    _nwLenLast := nwLen
-    _nwBwLast := nwBandwidth
+// Precreate line pool for repaint mode (500 lines max)
+var line[] ln = array.new_line(0)
+if barstate.isfirst and repaint
+    for _i = 0 to 499
+        array.push(ln, line.new(na, na, na, na))
 
-float nwEst = na
-if enableNadarayaFib and inNwLookback and bar_index >= nwLen
-    num = 0.0
-    for i = 0 to nwLen - 1
-        num += array.get(_nwW, i) * nwSrc[i]
-    nwEst := num / _nwDen
+// Endpoint method (non-repaint): coefs/den precomputed once
+var float[] coefs = array.new_float(0)
+var float den = na
+if barstate.isfirst and not repaint
+    for i = 0 to 499
+        w = gauss(i, h)
+        array.push(coefs, w)
+    den := array.sum(coefs)
 
-// Many popular Nadaraya-Watson envelopes use MAE (not stdev) for band width.
-float nwMae = (enableNadarayaFib and inNwLookback) ? ta.sma(math.abs(nwSrc - nwEst), nwLen) : na
-float nwUpper = nwEst + nwMult * nwMae
-float nwLower = nwEst - nwMult * nwMae
+float out = na
+float mae = na
+float upper = na
+float lower = na
 
-plot(showNadarayaBands ? nwUpper : na, title="Nadaraya Upper", color=color.new(color.gray, 60), linewidth=1)
-plot(showNadarayaBands ? nwLower : na, title="Nadaraya Lower", color=color.new(color.gray, 60), linewidth=1)
+if enableNWE and not repaint and bar_index >= 499
+    sumOut = 0.0
+    for i = 0 to 499
+        sumOut += nweSrc[i] * array.get(coefs, i)
+    out := sumOut / den
+    mae := ta.sma(math.abs(nweSrc - out), 499) * mult
+    upper := out + mae
+    lower := out - mae
 
-belowBand = enableNadarayaFib and inNwLookback and nwContextOk and not na(nwLower) and low < nwLower
-reclaimBand = enableNadarayaFib and inNwLookback and nwContextOk and not na(nwLower) and ta.crossover(close, nwLower)
+plot(enableNWE and not repaint ? upper : na, "Upper", upCss)
+plot(enableNWE and not repaint ? lower : na, "Lower", dnCss)
 
-var bool nwInDip = false
-var float nwDipLow = na
+// Repainting mode: compute and draw envelope on last bar
+if enableNWE and repaint and barstate.islast
+    float y2 = na
+    float y1 = na
+    float sae = 0.0
+    float[] nwe = array.new_float(0)
 
-var bool nwFibActive = false
-var float nwHigh = na
-var float nwFib50 = na
-var int nwStartTime = na
-var line nwLine = na
-var bool nwLineHit = false
-var float nwHitLevel = na
-var int nwHitTime = na
-var float nwLowAnchor = na
+    for i = 0 to math.min(499, n - 1)
+        sum = 0.0
+        sumw = 0.0
+        for j = 0 to math.min(499, n - 1)
+            w = gauss(i - j, h)
+            sum += nweSrc[j] * w
+            sumw += w
+        y2 := sum / sumw
+        sae += math.abs(nweSrc[i] - y2)
+        array.push(nwe, y2)
 
-twoDaysMs = nwMaxDays * 24 * 60 * 60 * 1000
+    sae := sae / math.min(499, n - 1) * mult
 
-// Track dip-low while below the band.
-if enableNadarayaFib and inNwLookback and nwContextOk
-    if belowBand
-        nwInDip := true
-        nwDipLow := na(nwDipLow) ? low : math.min(nwDipLow, low)
-    if reclaimBand and nwInDip and not nwFibActive
-        // Start fib tracking on reclaim.
-        nwFibActive := true
-        nwInDip := false
-        nwStartTime := time
-        nwLowAnchor := nwDipLow
-        nwHigh := high
-        nwFib50 := nwLowAnchor + (nwHigh - nwLowAnchor) * 0.50
-        nwLineHit := false
-        nwHitLevel := na
-        nwHitTime := na
-        if not na(nwLine)
-            line.delete(nwLine)
-        nwLine := line.new(nwStartTime, nwFib50, time, nwFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.teal, 0), width=2)
-        // reset dip low for next dip sequence
-        nwDipLow := na
+    // Update precreated lines (use only odd i => ~500 segments total)
+    seg = 0
+    for i = 0 to math.min(499, n - 1)
+        if i % 2 == 1
+            upperLine = array.get(ln, seg)
+            lowerLine = array.get(ln, seg + 1)
+            line.set_xy1(upperLine, n - i + 1, y1 + sae)
+            line.set_xy2(upperLine, n - i, array.get(nwe, i) + sae)
+            line.set_color(upperLine, upCss)
+            line.set_xy1(lowerLine, n - i + 1, y1 - sae)
+            line.set_xy2(lowerLine, n - i, array.get(nwe, i) - sae)
+            line.set_color(lowerLine, dnCss)
+            seg += 2
+        y1 := array.get(nwe, i)
 
-// Cancel if context breaks
-if nwFibActive and (not nwContextOk)
-    nwFibActive := false
-    if not na(nwLine)
-        line.delete(nwLine)
-        nwLine := na
-    nwLowAnchor := na
+//==================== NWE dip -> reclaim -> 50% fib (max 2 days) ====================
+enableNWEFib = input.bool(true, "Enable NWE Fib (4H>Daily & Daily>Weekly; dip below lower then reclaim)")
+nweFibMaxDays = input.int(2, "NWE fib max duration (days)", minval=1, maxval=30)
 
-// Update fib while active, up to max days.
-if nwFibActive
-    // Expire after max days.
-    if time - nwStartTime > twoDaysMs
-        nwFibActive := false
-        if not na(nwLine)
-            line.delete(nwLine)
-            nwLine := na
-        nwLowAnchor := na
+ctxNWEFib = (AT4H > ATD) and (ATD > ATW)
+twoDaysMs = nweFibMaxDays * 24 * 60 * 60 * 1000
+
+// Use non-repaint lower/upper series for signals (stable historically).
+float lowerSig = lower
+
+var bool nweInDip = false
+var float nweDipLow = na
+var bool nweFibActive = false
+var float nweHigh = na
+var float nweFib50 = na
+var int nweFibStartTime = na
+var line nweFibLine = na
+
+belowLower = enableNWE and enableNWEFib and not repaint and ctxNWEFib and not na(lowerSig) and low < lowerSig
+reclaimLower = enableNWE and enableNWEFib and not repaint and ctxNWEFib and not na(lowerSig) and ta.crossover(close, lowerSig)
+
+if belowLower
+    nweInDip := true
+    nweDipLow := na(nweDipLow) ? low : math.min(nweDipLow, low)
+
+if reclaimLower and nweInDip and not nweFibActive
+    nweInDip := false
+    nweFibActive := true
+    nweFibStartTime := time
+    nweHigh := high
+    nweFib50 := nweDipLow + (nweHigh - nweDipLow) * 0.50
+    if not na(nweFibLine)
+        line.delete(nweFibLine)
+    nweFibLine := line.new(nweFibStartTime, nweFib50, time, nweFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.teal, 0), width=2)
+
+// Update until hit or expiry; delete if price closes below the 50% after hit.
+var bool nweFibHit = false
+var float nweHitLevel = na
+var int nweHitTime = na
+
+if nweFibActive
+    if time - nweFibStartTime > twoDaysMs or not ctxNWEFib
+        nweFibActive := false
+        if not na(nweFibLine)
+            line.delete(nweFibLine)
+            nweFibLine := na
+        nweInDip := false
+        nweDipLow := na
     else
-        nwHigh := math.max(nwHigh, high)
-        nwFib50 := nwLowAnchor + (nwHigh - nwLowAnchor) * 0.50
-        if not na(nwLine)
-            line.set_extend(nwLine, extend.right)
-            line.set_xy1(nwLine, nwStartTime, nwFib50)
-            line.set_xy2(nwLine, time, nwFib50)
+        nweHigh := math.max(nweHigh, high)
+        nweFib50 := nweDipLow + (nweHigh - nweDipLow) * 0.50
+        if not na(nweFibLine)
+            line.set_xy1(nweFibLine, nweFibStartTime, nweFib50)
+            line.set_xy2(nweFibLine, time, nweFib50)
 
-    // Hit check (not on start bar).
-    hitNow = (time > nwStartTime) and (low <= nwFib50 and high >= nwFib50)
-    if hitNow
-        nwFibActive := false
-        nwLineHit := true
-        nwHitLevel := nwFib50
-        nwHitTime := time
-        if not na(nwLine)
-            line.set_xy2(nwLine, time, nwFib50)
-            line.set_extend(nwLine, extend.none)
-            line.set_color(nwLine, color.new(color.teal, 0))
-        label.new(bar_index, low, "NAD FIB BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.teal, 0), textcolor=color.new(color.white, 0))
+        hitNow = (time > nweFibStartTime) and (low <= nweFib50 and high >= nweFib50)
+        if hitNow
+            nweFibActive := false
+            nweFibHit := true
+            nweHitLevel := nweFib50
+            nweHitTime := time
+            if not na(nweFibLine)
+                line.set_xy2(nweFibLine, time, nweFib50)
+                line.set_extend(nweFibLine, extend.none)
+            label.new(bar_index, low, "NWE FIB BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.teal, 0), textcolor=color.new(color.white, 0))
 
-// After hit: delete line once price closes below the 50% level.
-if nwLineHit and not na(nwLine) and not na(nwHitLevel) and not na(nwHitTime)
-    if time > nwHitTime and close < nwHitLevel
-        line.delete(nwLine)
-        nwLine := na
-        nwLineHit := false
-        nwHitLevel := na
-        nwHitTime := na
-        nwLowAnchor := na
+if nweFibHit and not na(nweFibLine) and not na(nweHitLevel) and not na(nweHitTime)
+    if time > nweHitTime and close < nweHitLevel
+        line.delete(nweFibLine)
+        nweFibLine := na
+        nweFibHit := false
+        nweHitLevel := na
+        nweHitTime := na
 
-alertcondition(enableNadarayaFib and nwLineHit, title="Nadaraya Fib Buy (50% hit)", message="Nadaraya fib 50% hit after lower-band dip/reclaim under D>W and 4H>D context.")
+alertcondition(enableNWEFib and nweFibHit, title="NWE Fib Buy (50% hit)", message="NWE fib 50% hit after lower-band dip/reclaim under 4H>Daily and Daily>Weekly.")
 
