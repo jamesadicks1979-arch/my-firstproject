@@ -339,16 +339,16 @@ if barstate.isfirst or _nwLenLast != nwLen or _nwBwLast != nwBandwidth
     _nwLenLast := nwLen
     _nwBwLast := nwBandwidth
 
-nwEst = na
+float nwEst = na
 if enableNadarayaFib and inNwLookback and bar_index >= nwLen
     num = 0.0
     for i = 0 to nwLen - 1
         num += array.get(_nwW, i) * close[i]
     nwEst := num / _nwDen
 
-nwDev = (enableNadarayaFib and inNwLookback) ? ta.stdev(close - nwEst, nwLen) : na
-nwUpper = nwEst + nwMult * nwDev
-nwLower = nwEst - nwMult * nwDev
+float nwDev = (enableNadarayaFib and inNwLookback) ? ta.stdev(close - nwEst, nwLen) : na
+float nwUpper = nwEst + nwMult * nwDev
+float nwLower = nwEst - nwMult * nwDev
 
 plot(showNadarayaBands ? nwUpper : na, title="Nadaraya Upper", color=color.new(color.gray, 60), linewidth=1)
 plot(showNadarayaBands ? nwLower : na, title="Nadaraya Lower", color=color.new(color.gray, 60), linewidth=1)
@@ -367,6 +367,7 @@ var line nwLine = na
 var bool nwLineHit = false
 var float nwHitLevel = na
 var int nwHitTime = na
+var float nwLowAnchor = na
 
 twoDaysMs = nwMaxDays * 24 * 60 * 60 * 1000
 
@@ -380,8 +381,9 @@ if enableNadarayaFib and inNwLookback and nwContextOk
         nwFibActive := true
         nwInDip := false
         nwStartTime := time
+        nwLowAnchor := nwDipLow
         nwHigh := high
-        nwFib50 := nwDipLow + (nwHigh - nwDipLow) * 0.50
+        nwFib50 := nwLowAnchor + (nwHigh - nwLowAnchor) * 0.50
         nwLineHit := false
         nwHitLevel := na
         nwHitTime := na
@@ -397,6 +399,7 @@ if nwFibActive and (not nwContextOk)
     if not na(nwLine)
         line.delete(nwLine)
         nwLine := na
+    nwLowAnchor := na
 
 // Update fib while active, up to max days.
 if nwFibActive
@@ -406,30 +409,14 @@ if nwFibActive
         if not na(nwLine)
             line.delete(nwLine)
             nwLine := na
+        nwLowAnchor := na
     else
         nwHigh := math.max(nwHigh, high)
-        nwFib50 := nz(nwDipLow, nwFib50)  // safety; dip low already set at start
-        // recompute from stored start low (we stored it in nwFib50 seed only); store low separately:
-        // We can reconstruct start-low as: low0 = nwFib50 * 2 - nwHigh? Not stable, so store it:
-
-// Store low anchor separately to compute fib correctly.
-var float nwLowAnchor = na
-if reclaimBand and not na(nwLine)
-    // This assignment is redundant on future bars; set once on start.
-    nwLowAnchor := nz(nwLowAnchor, nwFib50)  // placeholder; overwritten below in start block
-
-// Patch in correct low-anchor on start (kept outside loops for Pine limitations).
-// If line exists and we just started, set anchor to current fib50 seed's low component:
-if enableNadarayaFib and nwFibActive and na(nwLowAnchor)
-    // Fallback: use current low as anchor if not set (shouldn't happen).
-    nwLowAnchor := low
-
-if nwFibActive and not na(nwLowAnchor)
-    nwFib50 := nwLowAnchor + (nwHigh - nwLowAnchor) * 0.50
-    if not na(nwLine)
-        line.set_extend(nwLine, extend.right)
-        line.set_xy1(nwLine, nwStartTime, nwFib50)
-        line.set_xy2(nwLine, time, nwFib50)
+        nwFib50 := nwLowAnchor + (nwHigh - nwLowAnchor) * 0.50
+        if not na(nwLine)
+            line.set_extend(nwLine, extend.right)
+            line.set_xy1(nwLine, nwStartTime, nwFib50)
+            line.set_xy2(nwLine, time, nwFib50)
 
     // Hit check (not on start bar).
     hitNow = (time > nwStartTime) and (low <= nwFib50 and high >= nwFib50)
