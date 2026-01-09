@@ -152,16 +152,16 @@ var bool swingActive = false
 var float swingLow = na
 var float swingHigh = na
 var float swing50 = na
-var int swingStart = na
+var int swingStartTime = na
 bool swingHitNow = false
 
 if buy4H and showSwingFibLine
     swingLow := na(sellStateLow) ? low : sellStateLow
     swingHigh := high
     swing50 := swingLow + (swingHigh - swingLow) * 0.50
-    swingStart := bar_index
+    swingStartTime := time
     swingActive := true
-    swingLine := line.new(swingStart, swing50, bar_index, swing50, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.lime, 0), width=2)
+    swingLine := line.new(swingStartTime, swing50, time, swing50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.lime, 0), width=2)
     array.push(swingLineHistory, swingLine)
     if array.size(swingLineHistory) > maxSwingFibLines
         oldLine = array.shift(swingLineHistory)
@@ -171,7 +171,7 @@ if swingActive and showSwingFibLine
     if trendState4H == -1
         swingActive := false
         if not na(swingLine)
-            line.set_xy2(swingLine, bar_index, swing50)
+            line.set_xy2(swingLine, time, swing50)
             line.set_extend(swingLine, extend.none)
             line.set_color(swingLine, color.new(color.gray, 0))
     else
@@ -179,14 +179,14 @@ if swingActive and showSwingFibLine
         swing50 := swingLow + (swingHigh - swingLow) * 0.50
         if not na(swingLine)
             line.set_extend(swingLine, extend.right)
-            line.set_xy1(swingLine, swingStart, swing50)
-            line.set_xy2(swingLine, bar_index, swing50)
+            line.set_xy1(swingLine, swingStartTime, swing50)
+            line.set_xy2(swingLine, time, swing50)
 
         swingHitNow := (low <= swing50 and high >= swing50)
         if swingHitNow
             swingActive := false
             if not na(swingLine)
-                line.set_xy2(swingLine, bar_index, swing50)
+                line.set_xy2(swingLine, time, swing50)
                 line.set_extend(swingLine, extend.none)
                 line.set_color(swingLine, color.new(color.green, 0))
             if showSwingFibBuyLabel
@@ -216,7 +216,7 @@ var bool trend5mRallied = false
 var float trend5mLow = na
 var float trend5mHigh = na
 var float trend5mFib50 = na
-var int trend5mStartBar = na
+var int trend5mStartTime = na
 var line trend5mLine = na
 var line[] trend5mLineHistory = array.new_line()
 
@@ -232,7 +232,7 @@ if enable5mTrendBuy and htfAligned and cross5mBelow4H
     trend5mLow := low
     trend5mHigh := na
     trend5mFib50 := na
-    trend5mStartBar := bar_index
+    trend5mStartTime := time
     // Do NOT draw the line yet; we draw it on the 5m BUY candle so levels are correct.
 
 // Update tracking state
@@ -251,14 +251,14 @@ if trend5mActive
         if not trend5mBullish and buy5
             trend5mBullish := true
             // Start fib tracking from the 5m BUY candle so the fib isn't "off".
-            trend5mStartBar := bar_index
+            trend5mStartTime := time
             trend5mLow := low
             trend5mHigh := high
             trend5mRallied := false
             trend5mFib50 := na
             // Create (or recreate) the line now that we have a proper anchor.
             if show5mTrendFibLine
-                trend5mLine := line.new(trend5mStartBar, trend5mLow, bar_index, trend5mLow, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.lime, 0), width=2)
+                trend5mLine := line.new(trend5mStartTime, trend5mLow, time, trend5mLow, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.lime, 0), width=2)
                 array.push(trend5mLineHistory, trend5mLine)
                 if array.size(trend5mLineHistory) > max5mTrendLines
                     oldTrendLine = array.shift(trend5mLineHistory)
@@ -276,15 +276,15 @@ if trend5mActive
                 trend5mFib50 := trend5mLow + (trend5mHigh - trend5mLow) * 0.50
                 if show5mTrendFibLine and not na(trend5mLine)
                     line.set_extend(trend5mLine, extend.right)
-                    line.set_xy1(trend5mLine, trend5mStartBar, trend5mFib50)
-                    line.set_xy2(trend5mLine, bar_index, trend5mFib50)
+                    line.set_xy1(trend5mLine, trend5mStartTime, trend5mFib50)
+                    line.set_xy2(trend5mLine, time, trend5mFib50)
 
                 // When price touches the 50% level, mark buy and stop this setup.
                 trend5mHitNow := (low <= trend5mFib50 and high >= trend5mFib50)
                 if trend5mHitNow
                     trend5mActive := false
                     if show5mTrendFibLine and not na(trend5mLine)
-                        line.set_xy2(trend5mLine, bar_index, trend5mFib50)
+                        line.set_xy2(trend5mLine, time, trend5mFib50)
                         line.set_extend(trend5mLine, extend.none)
                         line.set_color(trend5mLine, color.new(color.green, 0))
                     label.new(bar_index, low, "5mTrendBUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
@@ -307,7 +307,7 @@ var bool dpActive = false
 var float dpLow = na
 var float dpHigh = na
 var float dpFib50 = na
-var int dpStartBar = na
+var int dpStartTime = na
 var line dpLine = na
 var line[] dpLineHistory = array.new_line()
 
@@ -330,11 +330,11 @@ if enableDailyPullbackBuy
 if enableDailyPullbackBuy and dpWaitingForBuy and buy5
     dpWaitingForBuy := false
     dpActive := true
-    dpStartBar := bar_index
+    dpStartTime := time
     dpHigh := high
     dpFib50 := dpLow + (dpHigh - dpLow) * 0.50
     if showDailyPullbackFibLine
-        dpLine := line.new(dpStartBar, dpFib50, bar_index, dpFib50, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.green, 0), width=2)
+        dpLine := line.new(dpStartTime, dpFib50, time, dpFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
         array.push(dpLineHistory, dpLine)
         if array.size(dpLineHistory) > maxDailyPullbackLines
             oldDpLine = array.shift(dpLineHistory)
@@ -352,14 +352,14 @@ if dpActive
         dpFib50 := dpLow + (dpHigh - dpLow) * 0.50
         if showDailyPullbackFibLine and not na(dpLine)
             line.set_extend(dpLine, extend.right)
-            line.set_xy1(dpLine, dpStartBar, dpFib50)
-            line.set_xy2(dpLine, bar_index, dpFib50)
+            line.set_xy1(dpLine, dpStartTime, dpFib50)
+            line.set_xy2(dpLine, time, dpFib50)
 
         dpHitNow := (low <= dpFib50 and high >= dpFib50)
         if dpHitNow
             dpActive := false
             if showDailyPullbackFibLine and not na(dpLine)
-                line.set_xy2(dpLine, bar_index, dpFib50)
+                line.set_xy2(dpLine, time, dpFib50)
                 line.set_extend(dpLine, extend.none)
                 line.set_color(dpLine, color.new(color.green, 0))
             label.new(bar_index, low, "BUY DAILY AT", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
