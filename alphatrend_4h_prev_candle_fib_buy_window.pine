@@ -266,3 +266,47 @@ if nweFibDotsHitNow
 
 alertcondition(enableNWEFibDots and nweFibDotsHitNow, title="NWE Fib Buy (dots)", message="NWE fib 50% hit after lower-band dip/reclaim under aligned AlphaTrends.")
 
+//==================== 4BAND (Pivot Bands) - converted from Pine v4 ====================
+show4Band = input.bool(true, "Show 4BAND Pivot Bands")
+lengthMA = input.int(3, "4BAND EMA Length", minval=1)
+lengthMA1 = input.int(1, "4BAND EMA Length 1", minval=1)
+lengthMA11 = input.int(1, "4BAND EMA Length 11", minval=1)
+showDailyPivotBands = input.bool(true, "4BAND: Show Daily Pivot Bands")
+show4HPivotBands = input.bool(true, "4BAND: Show 4H Pivot Bands")
+
+PP = (high + low + close) / 3.0
+PPEMA = ta.ema(PP, lengthMA)
+PPEMA1 = ta.ema(PP, lengthMA1)
+PPEMA11 = ta.ema(PP, lengthMA11)
+
+HP1 = (PP + (PP - low))
+LP1 = (PP - (high - PP))
+HP2 = (PP + 2 * (PP - low))
+LP2 = (PP - 2 * (high - PP))
+
+// PPD71 = Difference from HP1 and LP1 for the last 7 days
+PPD71 = (((HP1 - LP1) + (HP1[1] - LP1[1]) + (HP1[2] - LP1[2]) + (HP1[3] - LP1[3]) + (HP1[4] - LP1[4]) + (HP1[5] - LP1[5]) + (HP1[6] - LP1[6])) / 7.0)
+// PPD72 = Difference from HP2 and LP2 for the last 7 days
+PPD72 = (((HP2 - LP2) + (HP2[1] - LP2[1]) + (HP2[2] - LP2[2]) + (HP2[3] - LP2[3]) + (HP2[4] - LP2[4]) + (HP2[5] - LP2[5]) + (HP2[6] - LP2[6])) / 7.0)
+
+r1 = PPEMA + PPD71
+s1 = PPEMA - PPD71
+r2 = PPEMA1 + PPD71
+s2 = PPEMA1 - PPD71
+
+// Daily Pivot Bands
+ddd_r1 = request.security(syminfo.tickerid, "D", r1, barmerge.gaps_off, barmerge.lookahead_off)
+ddd_s1 = request.security(syminfo.tickerid, "D", s1, barmerge.gaps_off, barmerge.lookahead_off)
+
+plot(show4Band and showDailyPivotBands ? ddd_r1 : na, title="4BAND Daily R1", style=plot.style_line, linewidth=2, color=color.blue)
+plot(show4Band and showDailyPivotBands ? ddd_s1 : na, title="4BAND Daily S1", style=plot.style_line, linewidth=2, color=color.blue)
+
+// 240 Pivot Bands (4H)
+d_r1 = request.security(syminfo.tickerid, "240", r1, barmerge.gaps_off, barmerge.lookahead_off)
+d_s1 = request.security(syminfo.tickerid, "240", s1, barmerge.gaps_off, barmerge.lookahead_off)
+d_r2 = request.security(syminfo.tickerid, "240", r2, barmerge.gaps_off, barmerge.lookahead_off)
+d_s2 = request.security(syminfo.tickerid, "240", s2, barmerge.gaps_off, barmerge.lookahead_off)
+
+plot(show4Band and show4HPivotBands ? d_r1 : na, title="4BAND 4H R1", style=plot.style_line, linewidth=5, color=color.black)
+plot(show4Band and show4HPivotBands ? d_s1 : na, title="4BAND 4H S1", style=plot.style_line, linewidth=5, color=color.black)
+
