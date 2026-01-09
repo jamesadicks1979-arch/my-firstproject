@@ -289,9 +289,9 @@ maxDailyPullbackLines = input.int(20, "Max BUY DAILY AT fib lines to keep on cha
 
 // Gate:
 // - 5m AlphaTrend below Daily AlphaTrend (pullback)
-// - 4H AlphaTrend above Daily AlphaTrend
 // - Daily AlphaTrend above Weekly AlphaTrend
-dailyPullbackGate = (AT5 < ATD) and (AT4H > ATD) and (ATD > ATW)
+// - 4H AlphaTrend does NOT matter
+dailyPullbackGate = (AT5 < ATD) and (ATD > ATW)
 
 var bool dpWaitingForBuy = false
 var bool dpActive = false
@@ -331,9 +331,9 @@ if enableDailyPullbackBuy and dpWaitingForBuy and buy5
             oldDpLine = array.shift(dpLineHistory)
             line.delete(oldDpLine)
 
-// Update active fib until hit OR HTF bullish context breaks.
+// Update active fib until hit OR Daily/Weekly bullish context breaks.
 if dpActive
-    if not ((AT4H > ATD) and (ATD > ATW))
+    if not (ATD > ATW)
         dpActive := false
         if not na(dpLine)
             line.set_extend(dpLine, extend.none)
