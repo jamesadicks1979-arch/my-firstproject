@@ -252,6 +252,7 @@ enableFibDots = input.bool(true, "Enable Fib (AT aligned + dip below NWE/4BAND t
 fibMaxDays = input.int(2, "Fib max duration (days)", minval=1, maxval=30)
 fibLookbackBars = input.int(500, "Fib: only last N bars (right side)", minval=50, maxval=5000)
 showFibDots = input.bool(true, "Show Fib 50% dots")
+showFibLine = input.bool(true, "Show Fib 50% line")
 
 // Alignment: Daily above Weekly AND 4H above Daily (per your spec).
 atAligned = (ATD > ATW) and (AT4H > ATD)
@@ -277,6 +278,7 @@ var float fibLowAnchor = na
 var float fibHigh = na
 var float fib50 = na
 var int fibStartTime = na
+var line fib50Line = na
 
 // Enter dip state when we go below either level (NWE has priority).
 if enableFibDots and atAligned and inFibLookback and not fibActive
@@ -312,6 +314,10 @@ if enableFibDots and fibInDip and not fibActive and (reclaimNWE or reclaim4Band)
     fibLowAnchor := fibDipLow
     fibHigh := high
     fib50 := fibLowAnchor + (fibHigh - fibLowAnchor) * 0.50
+    if showFibLine
+        if not na(fib50Line)
+            line.delete(fib50Line)
+        fib50Line := line.new(fibStartTime, fib50, time, fib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.lime, 0), width=2)
     fibDipType := 0
     fibDipLow := na
     fibDipStartTime := na
@@ -324,9 +330,16 @@ if fibActive
         fibHigh := na
         fib50 := na
         fibStartTime := na
+        if not na(fib50Line)
+            line.delete(fib50Line)
+            fib50Line := na
     else
         fibHigh := math.max(fibHigh, high)
         fib50 := fibLowAnchor + (fibHigh - fibLowAnchor) * 0.50
+        if not na(fib50Line)
+            line.set_xy1(fib50Line, fibStartTime, fib50)
+            line.set_xy2(fib50Line, time, fib50)
+            line.set_extend(fib50Line, extend.right)
         // If price closes below 50%, remove the fib dots.
         if close < fib50
             fibActive := false
@@ -334,16 +347,24 @@ if fibActive
             fibHigh := na
             fib50 := na
             fibStartTime := na
+            if not na(fib50Line)
+                line.delete(fib50Line)
+                fib50Line := na
 
 plot(showFibDots and fibActive ? fib50 : na, title="Fib 50% (dots)", style=plot.style_circles, color=color.new(color.lime, 0), linewidth=3)
 
 fibHitBuy = fibActive and (time > fibStartTime) and (low <= fib50 and high >= fib50)
-// Draw the "X" at the actual fib price level (more visible + independent from the text label).
-plotshape(fibHitBuy, title="FibHitBuy X", style=shape.xcross, location=location.absolute, y=fib50, size=size.small, color=color.new(color.lime, 0))
+// Draw the "X" at the fib price level using a price-anchored label (plotshape() has no y= argument).
+if fibHitBuy
+    label.new(time, fib50, "✕", xloc=xloc.bar_time, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.lime, 0), size=size.normal)
 // Keep the text label under the hit candle for clarity.
 plotshape(fibHitBuy ? low : na, title="FibHitBuy Label", text="FIBHITBUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
 
 if fibHitBuy
+    if not na(fib50Line)
+        // Stop & remove the line once hit (per your earlier "once hit don't show anymore").
+        line.delete(fib50Line)
+        fib50Line := na
     fibActive := false
     fibLowAnchor := na
     fibHigh := na
