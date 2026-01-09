@@ -257,7 +257,8 @@ if enableFib4HRBuy and fibActive and alignedDW4H
         line.set_xy1(fibLine, fibStartTime, fib50)
         line.set_xy2(fibLine, time, fib50)
 
-    fibHitNow := (low <= fib50 and high >= fib50)
+    // Don't allow an "instant hit" on the same candle the line is created.
+    fibHitNow := (time > fibStartTime) and (low <= fib50 and high >= fib50)
     if fibHitNow
         fibActive := false
         // Once hit: remove the line entirely.
@@ -331,7 +332,8 @@ if dpActive
             line.set_xy1(dpLine, dpStartTime, dpFib50)
             line.set_xy2(dpLine, time, dpFib50)
 
-        dpHitNow := (low <= dpFib50 and high >= dpFib50)
+        // Don't allow an "instant hit" on the same candle the line is created.
+        dpHitNow := (time > dpStartTime) and (low <= dpFib50 and high >= dpFib50)
         if dpHitNow
             dpActive := false
             // Once hit: remove the line entirely.
