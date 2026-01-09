@@ -211,7 +211,10 @@ lengthMA = input.int(3, "EMA Length To Calculate Bands", minval=1)
 lengthMA1 = input.int(1, "EMA Length To Calculate Bands 1", minval=1)
 lengthMA11 = input.int(1, "EMA Length To Calculate Bands 11", minval=1)
 sd = input.bool(true, "Show Daily Pivot Bands?")
-showDailyPivotBands = sd
+// Match the original script's behavior more literally:
+// - Daily pivot bands are always plotted (when show4Band is on)
+// - 4H bands are gated by `sd` (even though the label says "Daily" in the original)
+showDailyPivotBands = true
 show4HPivotBands = sd
 
 PP = (high + low + close) / 3.0
@@ -335,7 +338,10 @@ if fibActive
 plot(showFibDots and fibActive ? fib50 : na, title="Fib 50% (dots)", style=plot.style_circles, color=color.new(color.lime, 0), linewidth=3)
 
 fibHitBuy = fibActive and (time > fibStartTime) and (low <= fib50 and high >= fib50)
-plotshape(fibHitBuy ? fib50 : na, title="FibHitBuy", text="FIBHITBUY", style=shape.xcross, location=location.absolute, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
+// Draw the "X" at the actual fib price level (more visible + independent from the text label).
+plotshape(fibHitBuy, title="FibHitBuy X", style=shape.xcross, location=location.absolute, y=fib50, size=size.small, color=color.new(color.lime, 0))
+// Keep the text label under the hit candle for clarity.
+plotshape(fibHitBuy ? low : na, title="FibHitBuy Label", text="FIBHITBUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
 
 if fibHitBuy
     fibActive := false
