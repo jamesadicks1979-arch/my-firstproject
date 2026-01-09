@@ -13,14 +13,20 @@ novolumedata = input.bool(false, title="Change calculation (no volume data)?")
 showAT4H = input.bool(true, "Show AlphaTrend (4H locked)")
 showATD = input.bool(true, "Show AlphaTrend (Daily locked)")
 showATW = input.bool(true, "Show AlphaTrend (Weekly locked)")
+showAT1H = input.bool(false, "Show AlphaTrend (1H locked)")
+showAT5 = input.bool(false, "Show AlphaTrend (5m locked)")
 showsignals4H = input.bool(true, "Show 4H Signals?")
 showsignalsD = input.bool(false, "Show Daily Signals?")
 showsignalsW = input.bool(false, "Show Weekly Signals?")
+showsignals1H = input.bool(false, "Show 1H Signals?")
+showsignals5 = input.bool(false, "Show 5m Signals?")
 
 // Always use these fixed timeframes so the indicator "holds" when you switch chart TF.
 tf4H = "240"
 tfD = "D"
 tfW = "W"
+tf1H = "60"
+tf5 = "5"
 
 //==================== AlphaTrend bundle function (runs inside request.security) ====================
 f_atBundle(_src) =>
@@ -92,6 +98,34 @@ plotshape(showATW and showsignalsW and sellW ? (ATW_2 * 1.0001) : na, title="SEL
 
 alertcondition(buyW, title="AlphaTrend BUY (Weekly)", message="AlphaTrend Weekly BUY")
 alertcondition(sellW, title="AlphaTrend SELL (Weekly)", message="AlphaTrend Weekly SELL")
+
+//==================== 1H AlphaTrend (locked) ====================
+[AT1H, AT1H_1, AT1H_2, AT1H_3, buy1H, sell1H] = request.security(syminfo.tickerid, tf1H, f_atBundle(src), barmerge.gaps_off, barmerge.lookahead_off)
+at1HColorFill = AT1H > AT1H_2 ? color.new(#00E60F, 85) : AT1H < AT1H_2 ? color.new(#80000B, 85) : AT1H_1 > AT1H_3 ? color.new(#00E60F, 85) : color.new(#80000B, 85)
+
+pAT1H = plot(showAT1H ? AT1H : na, title="AlphaTrend (1H)", color=color.new(color.teal, 0), linewidth=2)
+pAT1H2 = plot(showAT1H ? AT1H_2 : na, title="AlphaTrend[2] (1H)", color=color.new(color.navy, 0), linewidth=2)
+fill(pAT1H, pAT1H2, color=showAT1H ? at1HColorFill : na)
+
+plotshape(showAT1H and showsignals1H and buy1H ? (AT1H_2 * 0.9999) : na, title="BUY (1H)", text="1H BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.teal, 0), textcolor=color.new(color.black, 0))
+plotshape(showAT1H and showsignals1H and sell1H ? (AT1H_2 * 1.0001) : na, title="SELL (1H)", text="1H SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.navy, 0), textcolor=color.new(color.white, 0))
+
+alertcondition(buy1H, title="AlphaTrend BUY (1H)", message="AlphaTrend 1H BUY")
+alertcondition(sell1H, title="AlphaTrend SELL (1H)", message="AlphaTrend 1H SELL")
+
+//==================== 5m AlphaTrend (locked) ====================
+[AT5, AT5_1, AT5_2, AT5_3, buy5, sell5] = request.security(syminfo.tickerid, tf5, f_atBundle(src), barmerge.gaps_off, barmerge.lookahead_off)
+at5ColorFill = AT5 > AT5_2 ? color.new(#00E60F, 90) : AT5 < AT5_2 ? color.new(#80000B, 90) : AT5_1 > AT5_3 ? color.new(#00E60F, 90) : color.new(#80000B, 90)
+
+pAT5 = plot(showAT5 ? AT5 : na, title="AlphaTrend (5m)", color=color.new(color.silver, 0), linewidth=1)
+pAT52 = plot(showAT5 ? AT5_2 : na, title="AlphaTrend[2] (5m)", color=color.new(color.gray, 0), linewidth=1)
+fill(pAT5, pAT52, color=showAT5 ? at5ColorFill : na)
+
+plotshape(showAT5 and showsignals5 and buy5 ? (AT5_2 * 0.9999) : na, title="BUY (5m)", text="5m BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
+plotshape(showAT5 and showsignals5 and sell5 ? (AT5_2 * 1.0001) : na, title="SELL (5m)", text="5m SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.red, 0), textcolor=color.new(color.white, 0))
+
+alertcondition(buy5, title="AlphaTrend BUY (5m)", message="AlphaTrend 5m BUY")
+alertcondition(sell5, title="AlphaTrend SELL (5m)", message="AlphaTrend 5m SELL")
 
 //==================== 4H previous candle fib dots (fixed 4H) ====================
 showFibDots = input.bool(true, "Show 4H Fib Dots (Prev Candle 50%/61.8%)")
