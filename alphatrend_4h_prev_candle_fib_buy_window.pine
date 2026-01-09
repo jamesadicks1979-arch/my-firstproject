@@ -201,6 +201,7 @@ maxDailyFibBuyLines = input.int(20, "Max DAILYFIBBUY lines to keep", minval=1)
 
 alignedDW4H = (ATD > ATW) and (AT4H > ATD) and (AT4H > ATW)
 fiveBelow4H = AT5 < AT4H
+fiveCrossBelow4H = ta.crossunder(AT5, AT4H)
 
 // State machine:
 // - pullback tracking starts while aligned and 5m is below 4H
@@ -213,8 +214,10 @@ var float df50 = na
 var int dfStartTime = na
 var line dfLine = na
 var line[] dfHistory = array.new_line()
+var int dfBarsSinceBelow = 0
 
 dfHitNow = false
+dfMaxBarsAfterBelow = 48  // ~4 hours on a 5m chart
 
 // Reset everything if alignment breaks
 if enableDailyFibBuy and not alignedDW4H
@@ -223,17 +226,29 @@ if enableDailyFibBuy and not alignedDW4H
     dfLow := na
     dfHigh := na
     df50 := na
+    dfBarsSinceBelow := 0
 
 // Start/continue pullback low tracking (while aligned and below 4H, and not already in fib-active mode)
 if enableDailyFibBuy and alignedDW4H and not dfActive
-    if fiveBelow4H
+    // Begin a new pullback setup on the first drop below 4H (or if already below on load).
+    if (fiveCrossBelow4H or (not dfPullback and fiveBelow4H))
         dfPullback := true
-        dfLow := na(dfLow) ? low : math.min(dfLow, low)
-    else
-        // If we're no longer below 4H and we haven't started a fib yet, reset the pullback setup.
-        // This keeps the signal "to the right" (only the most recent pullback is considered).
-        dfPullback := false
-        dfLow := na
+        dfLow := low
+        dfBarsSinceBelow := 0
+
+    // While pullback is active:
+    if dfPullback
+        if fiveBelow4H
+            // Track lowest low while below 4H.
+            dfLow := na(dfLow) ? low : math.min(dfLow, low)
+            dfBarsSinceBelow := 0
+        else
+            // Allow some time for the 5m BUY to appear after moving back above 4H.
+            dfBarsSinceBelow += 1
+            if dfBarsSinceBelow > dfMaxBarsAfterBelow
+                dfPullback := false
+                dfLow := na
+                dfBarsSinceBelow := 0
 
 // If we leave the "below 4H" area before buy triggers, keep dfPullback but stop updating the low.
 // (This avoids losing the pullback low if the BUY happens after crossing back above 4H.)
@@ -246,6 +261,7 @@ if enableDailyFibBuy and alignedDW4H and dfPullback and not dfActive and buy5
     dfLow := na(dfLow) ? low : dfLow
     dfHigh := high
     df50 := dfLow + (dfHigh - dfLow) * 0.50
+    dfBarsSinceBelow := 0
     if showDailyFibBuyLine
         dfLine := line.new(dfStartTime, df50, time, df50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
         array.push(dfHistory, dfLine)
