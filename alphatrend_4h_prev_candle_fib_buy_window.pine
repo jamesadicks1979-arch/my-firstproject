@@ -2,7 +2,7 @@
 // author © KivancOzbilgic
 // developer © KivancOzbilgic
 //@version=5
-indicator("AlphaTrend (4H+1D locked) + 4H Fib + Fib Buys", shorttitle="AT4H+ATD+Fib", overlay=true, format=format.price, precision=2, max_lines_count=500, max_labels_count=500)
+indicator("AlphaTrend (locked MTF) + Fib Buys", shorttitle="AT MTF", overlay=true, format=format.price, precision=2, max_lines_count=500, max_labels_count=500)
 
 //==================== INPUTS ====================
 coeff = input.float(1, "Multiplier", step=0.1)
@@ -123,10 +123,8 @@ pAT52 = plot(showAT5 ? AT5_2 : na, title="AlphaTrend[2] (5m)", color=color.new(c
 fill(pAT5, pAT52, color=showAT5 ? at5ColorFill : na)
 
 plotshape(showAT5 and showsignals5 and buy5 ? (AT5_2 * 0.9999) : na, title="BUY (5m)", text="5m BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
-plotshape(showAT5 and showsignals5 and sell5 ? (AT5_2 * 1.0001) : na, title="SELL (5m)", text="5m SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.red, 0), textcolor=color.new(color.white, 0))
 
 alertcondition(buy5, title="AlphaTrend BUY (5m)", message="AlphaTrend 5m BUY")
-alertcondition(sell5, title="AlphaTrend SELL (5m)", message="AlphaTrend 5m SELL")
 
 //==================== MTF alignment status (top-left box) ====================
 mtfAligned = (ATD > ATW) and (AT4H > ATD) and (AT4H > ATW) and (AT1H > AT4H)
@@ -134,59 +132,6 @@ mtfAligned = (ATD > ATW) and (AT4H > ATD) and (AT4H > ATW) and (AT1H > AT4H)
 var table mtfTbl = table.new(position.top_left, 1, 1, border_width=1)
 if showAlignmentBox and barstate.islast
     table.cell(mtfTbl, 0, 0, mtfAligned ? "MTF ALIGN: ON\nD>W, 4H>D&W, 1H>4H" : "MTF ALIGN: OFF\nD>W, 4H>D&W, 1H>4H", text_color=color.white, bgcolor=mtfAligned ? color.new(color.green, 0) : color.new(color.red, 0))
-
-//==================== 4H previous candle fib dots (fixed 4H) ====================
-showFibDots = input.bool(true, "Show 4H Fib Dots (Prev Candle 50%/61.8%)")
-
-htfHighPrev = request.security(syminfo.tickerid, tf4H, high[1], barmerge.gaps_off, barmerge.lookahead_off)
-htfLowPrev = request.security(syminfo.tickerid, tf4H, low[1], barmerge.gaps_off, barmerge.lookahead_off)
-
-fib50 = htfLowPrev + (htfHighPrev - htfLowPrev) * 0.50
-fib618 = htfLowPrev + (htfHighPrev - htfLowPrev) * 0.618
-
-var float lastFib50 = na
-var float lastFib618 = na
-
-htfTime = request.security(syminfo.tickerid, tf4H, time, barmerge.gaps_off, barmerge.lookahead_off)
-newHTF = ta.change(htfTime) != 0
-
-if newHTF
-    lastFib50 := fib50
-    lastFib618 := fib618
-
-plot(showFibDots and not na(lastFib50) ? lastFib50 : na, title="4H Prev Candle 50% (Dot)", style=plot.style_circles, color=color.blue, linewidth=3)
-plot(showFibDots and not na(lastFib618) ? lastFib618 : na, title="4H Prev Candle 61.8% (Dot)", style=plot.style_circles, color=color.red, linewidth=3)
-
-hitPrev50 = not na(lastFib50) and (low <= lastFib50 and high >= lastFib50)
-hitPrev618 = not na(lastFib618) and (low <= lastFib618 and high >= lastFib618)
-alertcondition(hitPrev50, title="Hit 4H Prev 50%", message="Price touched 4H previous candle 50% retracement")
-alertcondition(hitPrev618, title="Hit 4H Prev 61.8%", message="Price touched 4H previous candle 61.8% retracement")
-
-//==================== (Optional) After 4H BUY: next N bars touch 4H prev fib50 ====================
-postBuyBars = input.int(6, "Bars to watch after 4H BUY (4H prev fib50)", minval=1)
-showPostBuyFibLabel = input.bool(true, "Show Post-Buy 4H Prev Fib50 Label")
-
-var int postBuyCount = na
-var bool postBuyFired = false
-
-if buy4H
-    postBuyCount := 0
-    postBuyFired := false
-else if not na(postBuyCount)
-    postBuyCount += 1
-    if postBuyCount > postBuyBars
-        postBuyCount := na
-
-postBuyHit50 = false
-if not na(postBuyCount)
-    inWindow = postBuyCount >= 1 and postBuyCount <= postBuyBars
-    postBuyHit50 := inWindow and not postBuyFired and not na(lastFib50) and (low <= lastFib50 and high >= lastFib50)
-    if postBuyHit50
-        postBuyFired := true
-        postBuyCount := na
-
-plotshape(showPostBuyFibLabel and postBuyHit50, title="Post-Buy 4H Prev Fib50 Touch", text="FIB BUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
-alertcondition(postBuyHit50, title="Post-Buy 4H Prev Fib50 Touch", message="After AlphaTrend 4H BUY: price touched 4H previous candle 50% within next N bars")
 
 //==================== Dynamic 50% retracement line after EVERY 4H BUY ====================
 showSwingFibLine = input.bool(true, "Show 50% line after every 4H BUY (sell-low -> post-buy high)")
