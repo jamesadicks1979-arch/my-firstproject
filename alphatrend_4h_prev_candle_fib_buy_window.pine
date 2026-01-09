@@ -319,6 +319,7 @@ nwLen = input.int(200, "Nadaraya length", minval=20, maxval=500)
 nwBandwidth = input.float(30.0, "Nadaraya bandwidth", step=1.0, minval=1.0)
 nwMult = input.float(2.0, "Band multiplier", step=0.1, minval=0.1)
 nwMaxDays = input.int(2, "Max run time (days)", minval=1, maxval=30)
+nwSrc = input.source(close, "Nadaraya source")
 
 inNwLookback = bar_index >= (last_bar_index - nwLookbackBars)
 nwContextOk = (ATD > ATW) and (AT4H > ATD)
@@ -343,17 +344,18 @@ float nwEst = na
 if enableNadarayaFib and inNwLookback and bar_index >= nwLen
     num = 0.0
     for i = 0 to nwLen - 1
-        num += array.get(_nwW, i) * close[i]
+        num += array.get(_nwW, i) * nwSrc[i]
     nwEst := num / _nwDen
 
-float nwDev = (enableNadarayaFib and inNwLookback) ? ta.stdev(close - nwEst, nwLen) : na
-float nwUpper = nwEst + nwMult * nwDev
-float nwLower = nwEst - nwMult * nwDev
+// Many popular Nadaraya-Watson envelopes use MAE (not stdev) for band width.
+float nwMae = (enableNadarayaFib and inNwLookback) ? ta.sma(math.abs(nwSrc - nwEst), nwLen) : na
+float nwUpper = nwEst + nwMult * nwMae
+float nwLower = nwEst - nwMult * nwMae
 
 plot(showNadarayaBands ? nwUpper : na, title="Nadaraya Upper", color=color.new(color.gray, 60), linewidth=1)
 plot(showNadarayaBands ? nwLower : na, title="Nadaraya Lower", color=color.new(color.gray, 60), linewidth=1)
 
-belowBand = enableNadarayaFib and inNwLookback and nwContextOk and not na(nwLower) and close < nwLower
+belowBand = enableNadarayaFib and inNwLookback and nwContextOk and not na(nwLower) and low < nwLower
 reclaimBand = enableNadarayaFib and inNwLookback and nwContextOk and not na(nwLower) and ta.crossover(close, nwLower)
 
 var bool nwInDip = false
