@@ -34,6 +34,11 @@ tp1Ticks = input.int(15, "TP1 (ticks) - close 50%", minval=0, group=grpRisk)
 grpDisplay = "Display"
 showAlphaTrend = input.bool(true, "Show AlphaTrend", group=grpDisplay)
 
+grp700 = "London 07:00 Markers"
+show700Vertical = input.bool(true, "Show 07:00 vertical line", group=grp700)
+show700OpenLine = input.bool(true, "Show 07:00 open price line", group=grp700)
+openLineHours = input.int(12, "Open line duration (hours)", minval=1, maxval=24, group=grp700)
+
 // -------------------------------------------------------------------------
 // AlphaTrend (adapted to work inside this strategy)
 // -------------------------------------------------------------------------
@@ -54,6 +59,22 @@ color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80
 atPlot = plot(showAlphaTrend ? AlphaTrend : na, color=color.new(#0022FC, 0), linewidth=3, title="AlphaTrend")
 atPlot2 = plot(showAlphaTrend ? AlphaTrend[2] : na, color=color.new(#FC0400, 0), linewidth=3, title="AlphaTrend (shifted)")
 fill(atPlot, atPlot2, color=showAlphaTrend ? color1 : na, title="AlphaTrend Fill")
+
+// -------------------------------------------------------------------------
+// 07:00 London open marker (visual only)
+// -------------------------------------------------------------------------
+isLondon700() =>
+    hour(time, "Europe/London") == 7 and minute(time, "Europe/London") == 0
+
+var float openPrice700 = na
+
+if isLondon700()
+    openPrice700 := open
+    if show700Vertical
+        line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.new(color.blue, 0), style=line.style_dashed, width=1)
+    if show700OpenLine
+        lineEnd = time + openLineHours * 60 * 60 * 1000
+        line.new(x1=time, y1=openPrice700, x2=lineEnd, y2=openPrice700, xloc=xloc.bar_time, color=color.new(color.blue, 0), style=line.style_solid, width=1)
 
 // -------------------------------------------------------------------------
 // Entry timing / once-per-day guard (London timezone)
