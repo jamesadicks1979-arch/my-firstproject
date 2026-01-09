@@ -12,29 +12,35 @@ strategy(
      initial_capital=10000
 )
 
-// Input for the time
-londonStartHour = input.int(7, "London Start Hour", minval=0, maxval=23)
-londonStartMinute = input.int(0, "London Start Minute", minval=0, maxval=59)
+// -------------------------------------------------------------------------
+// 08:00 London AlphaTrend Strategy
+// - At 08:00 London time:
+//   - If candle is ABOVE AlphaTrend -> BUY
+//   - If candle is BELOW AlphaTrend -> SELL
+// - Stop: 8 pips (default; 1 pip = 10 ticks by default)
+// - Take profit 1: close 50% at 15 ticks
+// - Take profit 2: close remainder on CLOSE across AlphaTrend (opposite side)
+// -------------------------------------------------------------------------
 
-// Inputs for Offsets (currently unused, kept for future tuning)
-pipsOffset = input.float(10, "Pips Offset (x10 ticks)", minval=0)
-stopTicksInput = input.int(6, "Stop Loss Ticks (x10 ticks)", minval=0)
+grpTime = "Entry Time"
+londonEntryHour = input.int(8, "London Entry Hour", minval=0, maxval=23, group=grpTime)
+londonEntryMinute = input.int(0, "London Entry Minute", minval=0, maxval=59, group=grpTime)
 
-// Strategy Inputs
-tp1Ticks = input.int(120, "TP1 Ticks (Half Off)", minval=0)
-tp2Ticks = input.int(250, "TP2 Ticks (Full Profit)", minval=0)
+grpRisk = "Risk / Targets"
+pipInTicks = input.int(10, "Ticks per pip", minval=1, group=grpRisk, tooltip="Used to convert pip-based stop to ticks. Default 10 ticks = 1 pip.")
+stopPips = input.float(8.0, "Stop (pips)", minval=0.0, step=0.25, group=grpRisk)
+tp1Ticks = input.int(15, "TP1 (ticks) - close 50%", minval=0, group=grpRisk)
+
+grpDisplay = "Display"
+showAlphaTrend = input.bool(true, "Show AlphaTrend", group=grpDisplay)
 
 // -------------------------------------------------------------------------
 // AlphaTrend (adapted to work inside this strategy)
 // -------------------------------------------------------------------------
 grpAT = "AlphaTrend"
-useAlphaTrendFilter = input.bool(false, "Use AlphaTrend filter for 07:05 order", group=grpAT)
-alphaFilterMode = input.string("trend", "Filter mode", options=["trend", "sell_signal"], group=grpAT)
-
 coeff = input.float(1, "Multiplier", step=0.1, group=grpAT)
 AP = input.int(14, "Common Period", minval=1, group=grpAT)
 src = input.source(close, "Source", group=grpAT)
-showsignalsk = input.bool(true, "Show Signals?", group=grpAT)
 novolumedata = input.bool(false, "Change calculation (no volume data)?", group=grpAT)
 
 ATR = ta.sma(ta.tr, AP)
@@ -45,216 +51,85 @@ AlphaTrend = 0.0
 AlphaTrend := (novolumedata ? ta.rsi(src, AP) >= 50 : ta.mfi(hlc3, AP) >= 50) ? upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
 
 color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
-k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3, title="AlphaTrend")
-k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3, title="AlphaTrend (shifted)")
-fill(k1, k2, color=color1, title="AlphaTrend Fill")
+atPlot = plot(showAlphaTrend ? AlphaTrend : na, color=color.new(#0022FC, 0), linewidth=3, title="AlphaTrend")
+atPlot2 = plot(showAlphaTrend ? AlphaTrend[2] : na, color=color.new(#FC0400, 0), linewidth=3, title="AlphaTrend (shifted)")
+fill(atPlot, atPlot2, color=showAlphaTrend ? color1 : na, title="AlphaTrend Fill")
 
-buySignalk = ta.crossover(AlphaTrend, AlphaTrend[2])
-sellSignalk = ta.crossunder(AlphaTrend, AlphaTrend[2])
-
-K1 = ta.barssince(buySignalk)
-K2 = ta.barssince(sellSignalk)
-O1 = ta.barssince(buySignalk[1])
-O2 = ta.barssince(sellSignalk[1])
-
-plotshape(buySignalk and showsignalsk and O1 > K2 ? AlphaTrend[2] * 0.9999 : na, title="BUY", text="BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
-plotshape(sellSignalk and showsignalsk and O2 > K1 ? AlphaTrend[2] * 1.0001 : na, title="SELL", text="SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
-
-alertcondition(buySignalk and O1 > K2, title="Potential BUY Alarm", message="BUY SIGNAL!")
-alertcondition(sellSignalk and O2 > K1, title="Potential SELL Alarm", message="SELL SIGNAL!")
-
-alertcondition(buySignalk[1] and O1[1] > K2, title="Confirmed BUY Alarm", message="BUY SIGNAL APPROVED!")
-alertcondition(sellSignalk[1] and O2[1] > K1, title="Confirmed SELL Alarm", message="SELL SIGNAL APPROVED!")
-
-alertcondition(ta.cross(close, AlphaTrend), title="Price Cross Alert", message="Price - AlphaTrend Crossing!")
-alertcondition(ta.crossover(low, AlphaTrend), title="Candle CrossOver Alarm", message="LAST BAR is ABOVE ALPHATREND")
-alertcondition(ta.crossunder(high, AlphaTrend), title="Candle CrossUnder Alarm", message="LAST BAR is BELOW ALPHATREND!")
-
-alertcondition(ta.cross(close[1], AlphaTrend[1]), title="Price Cross Alert After Bar Close", message="Price - AlphaTrend Crossing!")
-alertcondition(ta.crossover(low[1], AlphaTrend[1]), title="Candle CrossOver Alarm After Bar Close", message="LAST BAR is ABOVE ALPHATREND!")
-alertcondition(ta.crossunder(high[1], AlphaTrend[1]), title="Candle CrossUnder Alarm After Bar Close", message="LAST BAR is BELOW ALPHATREND!")
-
-alphaBearishForEntry =
-     alphaFilterMode == "sell_signal" ? (sellSignalk and O2 > K1) :
-     AlphaTrend < AlphaTrend[2]
-
-// Function to check if the current bar is at the specific London time
-isLondonStart() =>
+// -------------------------------------------------------------------------
+// Entry timing / once-per-day guard (London timezone)
+// -------------------------------------------------------------------------
+isEntryTime() =>
     h = hour(time, "Europe/London")
     m = minute(time, "Europe/London")
-    h == londonStartHour and m == londonStartMinute
+    h == londonEntryHour and m == londonEntryMinute
 
-// Background color for start time
-bgcolor(isLondonStart() ? color.new(color.blue, 80) : na, title="London Start Background")
+londonDayKey = year(time, "Europe/London") * 10000 + month(time, "Europe/London") * 100 + dayofmonth(time, "Europe/London")
+var int lastDayKey = na
+var bool tradedToday = false
 
-// Variables to store the opening price of the 7:00 bar and High between 7:00 and 7:15
-var float openPrice700 = na
-var float highSince700 = na
-
-// Reset or Set Variables at 7:00
-if isLondonStart()
-    openPrice700 := open
-    highSince700 := high
-    // Draw vertical line for the start
-    line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.blue, style=line.style_dashed, width=1)
-
-// Track High price between 7:00 and 7:15
-isBetween700and715() =>
-    h = hour(time, "Europe/London")
-    m = minute(time, "Europe/London")
-    // Strict between 7:00 and 7:15 check
-    h == londonStartHour and m >= londonStartMinute and m < 15
-
-if isBetween700and715()
-    if high > highSince700
-        highSince700 := high
+if na(lastDayKey) or londonDayKey != lastDayKey
+    lastDayKey := londonDayKey
+    tradedToday := false
 
 // -------------------------------------------------------------------------
-// Check Logic at 7:05 - Primary Strategy Entry
+// Entries at 08:00 London
 // -------------------------------------------------------------------------
-isCheckTime705() =>
-    h = hour(time, "Europe/London")
-    m = minute(time, "Europe/London")
-    targetM = londonStartMinute + 5
-    h == londonStartHour and m == targetM
+aboveAT = close > AlphaTrend
+belowAT = close < AlphaTrend
 
-// State variables for the daily setup
-var float dailySellLevel = na
-var float dailyStopLevel = na
-var int dailySellLineEndTime = na
-var bool orderPlacedToday = false
-
-// Persisted TP1 state per-position (fix: must not be re-declared inside a block)
-var bool isTp1Hit = false
-
-// Reset order flag at start of day (07:00)
-if isLondonStart()
-    orderPlacedToday := false
-    dailySellLevel := na
-    dailyStopLevel := na
-    dailySellLineEndTime := na
-    isTp1Hit := false
-    // Cancel any old orders from previous days (safety)
-    strategy.cancel_all()
-
-if isCheckTime705() and not na(openPrice700)
-    thresholdPrice = openPrice700 + (100 * syminfo.mintick)
-
-    // Check if price is above threshold at 7:05
-    isAbove = close > thresholdPrice
-
-    float sellOffsetTicks = na
-    float stopOffsetTicks = na
-
-    if isAbove
-        sellOffsetTicks := 200
-        stopOffsetTicks := 260
-    else
-        sellOffsetTicks := 100
-        stopOffsetTicks := 160
-
-    dailySellLevel := openPrice700 + (sellOffsetTicks * syminfo.mintick)
-    dailyStopLevel := openPrice700 + (stopOffsetTicks * syminfo.mintick)
-
-    // Duration: 2 hours
-    sellLineDuration = 2 * 60 * 60 * 1000
-    dailySellLineEndTime := time + sellLineDuration
-
-    // Visuals
-    line.new(x1=time, y1=dailySellLevel, x2=dailySellLineEndTime, y2=dailySellLevel, xloc=xloc.bar_time, color=color.green, style=line.style_solid, width=2)
-
-    // Stop Duration: Until 12:00
-    timeTo12 = (5 * 60 * 60 * 1000) - (5 * 60 * 1000)
-    stopLineEndTime = time + timeTo12
-    line.new(x1=time, y1=dailyStopLevel, x2=stopLineEndTime, y2=dailyStopLevel, xloc=xloc.bar_time, color=color.red, style=line.style_solid, width=2)
-
-    // Strategy Entry: Place Limit Order
-    // We name the order "Sell Entry"
-    if not useAlphaTrendFilter or alphaBearishForEntry
-        strategy.entry("Sell Entry", strategy.short, limit=dailySellLevel, comment="Sell Limit @" + str.tostring(dailySellLevel))
-        orderPlacedToday := true
-    else
-        orderPlacedToday := false
+if isEntryTime() and not tradedToday and strategy.position_size == 0
+    if aboveAT
+        strategy.entry("L", strategy.long, comment="08:00 Above AlphaTrend")
+        tradedToday := true
+    else if belowAT
+        strategy.entry("S", strategy.short, comment="08:00 Below AlphaTrend")
+        tradedToday := true
 
 // -------------------------------------------------------------------------
-// Daily SMA 21
+// Exits: 8 pip stop, 50% TP1 at 15 ticks, remainder on AlphaTrend cross (close)
 // -------------------------------------------------------------------------
-sma21 = request.security(syminfo.tickerid, "D", ta.sma(close, 21), lookahead=barmerge.lookahead_on)
-plot(sma21, "Daily SMA 21", color=color.yellow, linewidth=2)
+stopTicks = stopPips * pipInTicks
+stopDist = stopTicks * syminfo.mintick
+tp1Dist = tp1Ticks * syminfo.mintick
 
-// -------------------------------------------------------------------------
-// Manage Orders
-// -------------------------------------------------------------------------
-// Cancel order if time exceeds 2 hours and not filled
-if orderPlacedToday and time > dailySellLineEndTime and strategy.position_size == 0
-    strategy.cancel("Sell Entry")
-    orderPlacedToday := false // Stop checking
+var bool tp1HitLong = false
+var bool tp1HitShort = false
 
-// Reset TP1 flag after position closes
 if strategy.position_size == 0
-    isTp1Hit := false
+    tp1HitLong := false
+    tp1HitShort := false
 
-// Exit Logic (Stop Loss & Take Profits)
+if strategy.position_size > 0
+    entry = strategy.position_avg_price
+    stopPrice = entry - stopDist
+    tp1Price = entry + tp1Dist
+
+    // Stop applies to full position
+    strategy.exit("L.STOP", from_entry="L", stop=stopPrice, qty_percent=100)
+    // Close 50% at TP1
+    strategy.exit("L.TP1", from_entry="L", limit=tp1Price, qty_percent=50)
+
+    if high >= tp1Price
+        tp1HitLong := true
+
+    // Close remainder on close below AlphaTrend (after TP1 hit)
+    if tp1HitLong and close < AlphaTrend
+        strategy.close("L", comment="Close below AlphaTrend")
+
 if strategy.position_size < 0
-    // Calculate Entry Price (Average)
-    entryPrice = strategy.position_avg_price
+    entry = strategy.position_avg_price
+    stopPrice = entry + stopDist
+    tp1Price = entry - tp1Dist
 
-    // Trigger price for TP1 (120 ticks)
-    tp1Price = entryPrice - (tp1Ticks * syminfo.mintick)
+    // Stop applies to full position
+    strategy.exit("S.STOP", from_entry="S", stop=stopPrice, qty_percent=100)
+    // Close 50% at TP1
+    strategy.exit("S.TP1", from_entry="S", limit=tp1Price, qty_percent=50)
 
     if low <= tp1Price
-        isTp1Hit := true
+        tp1HitShort := true
 
-    // Dynamic Exit Logic for Remaining Half (after TP1 is hit)
-    // 1. Close if Price Closes ABOVE SMA 21.
-    // 2. OR Close at TP2 (300 ticks).
-
-    // Condition 1: Trailing Stop / Trend Following Exit
-    // We check if the current bar's close > SMA 21
-    if isTp1Hit and close > sma21
-        strategy.close("Sell Entry", comment="Exit SMA21", qty_percent=100)
-
-    // Setup Exits
-    // Exit 1: Partial 50% at TP1 (120 ticks)
-    // Stop Loss: Daily Stop Level (Red Line)
-    strategy.exit("TP1", "Sell Entry", qty_percent=50, profit=tp1Ticks, stop=dailyStopLevel, comment_profit="TP1 Hit", comment_loss="Stop Hit")
-
-    // Exit 2: Remaining Position
-    // Target: 300 ticks (30 pips)
-    // Stop: Remains at Daily Stop Level (Red Line) - User removed Breakeven requirement.
-    // Trailing/SMA Exit is handled by `strategy.close` above.
-    strategy.exit("TP2", "Sell Entry", qty_percent=100, profit=300, stop=dailyStopLevel, comment_profit="TP2 300 Ticks", comment_loss="Stop Hit")
-
-// -------------------------------------------------------------------------
-// Check Logic at 7:15 (Secondary Setup - Visualization Only for now unless requested)
-// -------------------------------------------------------------------------
-isCheckTime715() =>
-    h = hour(time, "Europe/London")
-    m = minute(time, "Europe/London")
-    targetM = londonStartMinute + 15
-    h == londonStartHour and m == targetM
-
-var bool conditionMetAt715 = false
-
-if isCheckTime715()
-    threshold50Ticks = openPrice700 + (50 * syminfo.mintick)
-    if highSince700 <= threshold50Ticks
-        conditionMetAt715 := true
-    else
-        conditionMetAt715 := false
-
-// 7:20 Action
-isCheckTime720() =>
-    h = hour(time, "Europe/London")
-    m = minute(time, "Europe/London")
-    targetM = londonStartMinute + 20
-    h == londonStartHour and m == targetM
-
-if isCheckTime720() and conditionMetAt715
-    sellPrice720 = open
-    sellLineDuration2 = 2 * 60 * 60 * 1000
-    sellLineEndTime2 = time + sellLineDuration2
-    line.new(x1=time, y1=sellPrice720, x2=sellLineEndTime2, y2=sellPrice720, xloc=xloc.bar_time, color=color.orange, style=line.style_solid, width=2)
-    // Note: Strategy entry for this secondary line is not implemented yet to avoid conflict,
-    // but can be added if requested.
+    // Close remainder on close above AlphaTrend (after TP1 hit)
+    if tp1HitShort and close > AlphaTrend
+        strategy.close("S", comment="Close above AlphaTrend")
 
