@@ -265,13 +265,14 @@ plot(show4Band ? (sd and band4hS1 != 0.0 ? band4hS1 : na) : na, title="4 S1", st
 //==================== Fib from NWE lower OR 4BAND support (AlphaTrends aligned) ====================
 enableFibDots = input.bool(true, "Enable Fib (AT aligned + dip below NWE/4BAND then reclaim)")
 fibMaxDays = input.int(2, "Fib max duration (days)", minval=1, maxval=30)
-fibLookbackBars = input.int(500, "Fib: only last N bars (right side)", minval=50, maxval=5000)
+fibLookbackDays = input.int(140, "Fib: show setups only in last N days (0 = all history)", minval=0, maxval=3650)
 showFibDots = input.bool(true, "Show Fib 50% dots")
 showFibLine = input.bool(true, "Show Fib 50% line")
 
 // Alignment: Daily above Weekly AND 4H above Daily (per your spec).
 atAligned = (ATD > ATW) and (AT4H > ATD)
-inFibLookback = bar_index >= (last_bar_index - fibLookbackBars)
+lookbackMs = fibLookbackDays * 24 * 60 * 60 * 1000
+inFibLookback = (fibLookbackDays == 0) ? true : (time >= (timenow - lookbackMs))
 fibWindowMs = fibMaxDays * 24 * 60 * 60 * 1000
 
 // Levels to use:
