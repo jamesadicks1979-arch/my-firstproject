@@ -249,8 +249,8 @@ ddd_PPEMA = request.security(syminfo.tickerid, "D", PPEMA, barmerge.gaps_off, ba
 ddd_r1111 = request.security(syminfo.tickerid, "D", r1, barmerge.gaps_off, barmerge.lookahead_off)
 ddd_s1111 = request.security(syminfo.tickerid, "D", s1, barmerge.gaps_off, barmerge.lookahead_off)
 
-plot(show4Band ? (ddd_r1111 != 0.0 ? ddd_r1111 : na) : na, title="D R1", style=plot.style_line, linewidth=2, color=color.blue)
-plot(show4Band ? (ddd_s1111 != 0.0 ? ddd_s1111 : na) : na, title="DS1", style=plot.style_line, linewidth=2, color=color.blue)
+// When AT alignment is bullish (Daily > Weekly and 4H > Daily), show only support (S1), hide resistance (R1).
+plot(show4Band ? (atAligned and ddd_s1111 != 0.0 ? ddd_s1111 : na) : na, title="DS1", style=plot.style_line, linewidth=2, color=color.blue)
 
 // 240 Pivot Bands
 d_PPEMA = request.security(syminfo.tickerid, "240", PPEMA, barmerge.gaps_off, barmerge.lookahead_off)
@@ -259,8 +259,8 @@ band4hS1 = request.security(syminfo.tickerid, "240", s1, barmerge.gaps_off, barm
 band4hR2 = request.security(syminfo.tickerid, "240", r2, barmerge.gaps_off, barmerge.lookahead_off)
 band4hS2 = request.security(syminfo.tickerid, "240", s2, barmerge.gaps_off, barmerge.lookahead_off)
 
-plot(show4Band ? (sd and band4hR1 != 0.0 ? band4hR1 : na) : na, title="4 R1", style=plot.style_line, linewidth=5, color=color.black)
-plot(show4Band ? (sd and band4hS1 != 0.0 ? band4hS1 : na) : na, title="4 S1", style=plot.style_line, linewidth=5, color=color.black)
+// 4H Pivot Bands: show only support (S1) under bullish AT alignment.
+plot(show4Band ? (sd and atAligned and band4hS1 != 0.0 ? band4hS1 : na) : na, title="4 S1", style=plot.style_line, linewidth=5, color=color.black)
 
 //==================== Fib from NWE lower OR 4BAND support (AlphaTrends aligned) ====================
 enableFibDots = input.bool(true, "Enable Fib (AT aligned + dip below NWE/4BAND then reclaim)")
