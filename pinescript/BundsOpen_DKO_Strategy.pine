@@ -39,6 +39,11 @@ show700Vertical = input.bool(true, "Show 07:00 vertical line", group=grp700)
 show700OpenLine = input.bool(true, "Show 07:00 open price line", group=grp700)
 openLineHours = input.int(12, "Open line duration (hours)", minval=1, maxval=24, group=grp700)
 
+grpMTF = "AlphaTrend - Higher Timeframes"
+showAT_D = input.bool(true, "Show Daily AlphaTrend", group=grpMTF)
+showAT_4H = input.bool(true, "Show 4H AlphaTrend", group=grpMTF)
+showAT_30 = input.bool(true, "Show 30m AlphaTrend", group=grpMTF)
+
 // -------------------------------------------------------------------------
 // AlphaTrend (adapted to work inside this strategy)
 // -------------------------------------------------------------------------
@@ -48,17 +53,29 @@ AP = input.int(14, "Common Period", minval=1, group=grpAT)
 src = input.source(close, "Source", group=grpAT)
 novolumedata = input.bool(false, "Change calculation (no volume data)?", group=grpAT)
 
-ATR = ta.sma(ta.tr, AP)
-upT = low - ATR * coeff
-downT = high + ATR * coeff
+f_alphaTrend(_coeff, _ap, _src, _noVol) =>
+    _atr = ta.sma(ta.tr, _ap)
+    _upT = low - _atr * _coeff
+    _downT = high + _atr * _coeff
+    float _at = na
+    _at := (_noVol ? ta.rsi(_src, _ap) >= 50 : ta.mfi(hlc3, _ap) >= 50) ? (_upT < nz(_at[1]) ? nz(_at[1]) : _upT) : (_downT > nz(_at[1]) ? nz(_at[1]) : _downT)
+    _at
 
-AlphaTrend = 0.0
-AlphaTrend := (novolumedata ? ta.rsi(src, AP) >= 50 : ta.mfi(hlc3, AP) >= 50) ? upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
+AlphaTrend = f_alphaTrend(coeff, AP, src, novolumedata)
 
 color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
 atPlot = plot(showAlphaTrend ? AlphaTrend : na, color=color.new(#0022FC, 0), linewidth=3, title="AlphaTrend")
 atPlot2 = plot(showAlphaTrend ? AlphaTrend[2] : na, color=color.new(#FC0400, 0), linewidth=3, title="AlphaTrend (shifted)")
 fill(atPlot, atPlot2, color=showAlphaTrend ? color1 : na, title="AlphaTrend Fill")
+
+// Higher timeframe AlphaTrend (held/anchored to its own timeframe)
+AlphaTrend_D = request.security(syminfo.tickerid, "D", f_alphaTrend(coeff, AP, close, novolumedata), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+AlphaTrend_4H = request.security(syminfo.tickerid, "240", f_alphaTrend(coeff, AP, close, novolumedata), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+AlphaTrend_30 = request.security(syminfo.tickerid, "30", f_alphaTrend(coeff, AP, close, novolumedata), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+
+plot(showAT_D ? AlphaTrend_D : na, title="AlphaTrend (Daily)", color=color.new(color.purple, 0), linewidth=2)
+plot(showAT_4H ? AlphaTrend_4H : na, title="AlphaTrend (4H)", color=color.new(color.aqua, 0), linewidth=2)
+plot(showAT_30 ? AlphaTrend_30 : na, title="AlphaTrend (30m)", color=color.new(color.gray, 0), linewidth=2)
 
 // -------------------------------------------------------------------------
 // 07:00 London open marker (visual only)
