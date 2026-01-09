@@ -196,7 +196,7 @@ alertcondition(showSwingFibLine and swingHitNow, title="BUY FIB (dynamic 50% hit
 
 //==================== 5m cross-below-4H -> (wait for 5m BUY) -> rally -> 50% fib -> "5mTrendBUY" ====================
 enable5mTrendBuy = input.bool(true, "Enable 5mTrendBUY (HTF aligned + 5m<4H cross + 5m BUY + 20 pip rally + 50% retrace)")
-pipSize = input.float(0.01, "Pip size (GBPJPY pip=0.01)", step=0.01)
+pipSize = input.float(0.01, "Pip size (GBPJPY pip=0.01)", step=0.01, minval=syminfo.mintick)
 minRallyPips = input.int(20, "Minimum rally (pips) after cross", minval=1)
 show5mTrendFibLine = input.bool(true, "Show 5mTrend fib 50% line")
 max5mTrendLines = input.int(20, "Max 5mTrend fib lines to keep on chart", minval=1)
@@ -221,22 +221,19 @@ var line trend5mLine = na
 var line[] trend5mLineHistory = array.new_line()
 
 trend5mHitNow = false
+pipsDiv = math.max(pipSize, syminfo.mintick)
 
 // Start tracking after crossunder, only if HTF alignment is satisfied.
 if enable5mTrendBuy and htfAligned and cross5mBelow4H
     trend5mActive := true
     trend5mBullish := false
     trend5mRallied := false
+    // Pre-buy tracking (we'll re-anchor on the actual 5m BUY candle)
     trend5mLow := low
     trend5mHigh := na
     trend5mFib50 := na
     trend5mStartBar := bar_index
-    if show5mTrendFibLine
-        trend5mLine := line.new(trend5mStartBar, low, bar_index, low, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.lime, 0), width=2)
-        array.push(trend5mLineHistory, trend5mLine)
-        if array.size(trend5mLineHistory) > max5mTrendLines
-            oldTrendLine = array.shift(trend5mLineHistory)
-            line.delete(oldTrendLine)
+    // Do NOT draw the line yet; we draw it on the 5m BUY candle so levels are correct.
 
 // Update tracking state
 if trend5mActive
@@ -253,14 +250,24 @@ if trend5mActive
         // Must get a 5m BUY alert before we start measuring the rally/highs.
         if not trend5mBullish and buy5
             trend5mBullish := true
+            // Start fib tracking from the 5m BUY candle so the fib isn't "off".
+            trend5mStartBar := bar_index
+            trend5mLow := low
             trend5mHigh := high
             trend5mRallied := false
             trend5mFib50 := na
+            // Create (or recreate) the line now that we have a proper anchor.
+            if show5mTrendFibLine
+                trend5mLine := line.new(trend5mStartBar, trend5mLow, bar_index, trend5mLow, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.lime, 0), width=2)
+                array.push(trend5mLineHistory, trend5mLine)
+                if array.size(trend5mLineHistory) > max5mTrendLines
+                    oldTrendLine = array.shift(trend5mLineHistory)
+                    line.delete(oldTrendLine)
         else if trend5mBullish
             trend5mHigh := math.max(trend5mHigh, high)
 
             // Check if we've rallied enough from the low.
-            rallyPips = (trend5mHigh - trend5mLow) / pipSize
+            rallyPips = (trend5mHigh - trend5mLow) / pipsDiv
             if not trend5mRallied and rallyPips >= minRallyPips
                 trend5mRallied := true
 
