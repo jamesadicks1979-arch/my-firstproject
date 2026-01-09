@@ -268,16 +268,15 @@ if enableFib4HRBuy and fibActive and alignedDW4H
 
 alertcondition(enableFib4HRBuy and fibHitNow, title="FIB4HR BUY (50% hit)", message="FIB4HR BUY: Daily>Weekly and 4H>Daily; 5m was below 4H, 5m BUY while still below, then hit 50% retracement")
 
-//==================== 5m below Daily (while HTF bullish) -> wait 5m BUY -> 50% fib -> "BUY DAILY AT" ====================
-enableDailyPullbackBuy = input.bool(true, "Enable BUY DAILY AT (5m<Daily, 4H>Daily, Daily>Weekly, then 5m BUY -> 50% fib)")
-showDailyPullbackFibLine = input.bool(true, "Show BUY DAILY AT fib 50% line")
-maxDailyPullbackLines = input.int(20, "Max BUY DAILY AT fib lines to keep on chart", minval=1)
+//==================== Daily>Weekly; 5m below Daily -> wait 5m BUY (while still below) -> 50% fib -> "FIBDAILY BUY" ====================
+enableDailyPullbackBuy = input.bool(true, "Enable FIBDAILY BUY (Daily>Weekly; 5m<Daily then 5m BUY -> 50% fib)")
+showDailyPullbackFibLine = input.bool(true, "Show FIBDAILY BUY 50% line")
+maxDailyPullbackLines = input.int(20, "Max FIBDAILY BUY lines to keep", minval=1)
 
 // Gate:
-// - 5m AlphaTrend below Daily AlphaTrend (pullback)
 // - Daily AlphaTrend above Weekly AlphaTrend
-// - 4H AlphaTrend does NOT matter
-dailyPullbackGate = (AT5 < ATD) and (ATD > ATW)
+// - 5m AlphaTrend below Daily AlphaTrend (pullback)
+dailyPullbackGate = (ATD > ATW) and (AT5 < ATD)
 
 var bool dpWaitingForBuy = false
 var bool dpActive = false
@@ -339,7 +338,7 @@ if dpActive
             if not na(dpLine)
                 line.delete(dpLine)
                 dpLine := na
-            label.new(bar_index, low, "BUY DAILY AT", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
+            label.new(bar_index, low, "FIBDAILY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
-alertcondition(enableDailyPullbackBuy and dpHitNow, title="BUY DAILY AT (50% hit)", message="BUY DAILY AT: 5m<Daily, 4H>Daily, Daily>Weekly; waited for 5m BUY then hit 50% retracement")
+alertcondition(enableDailyPullbackBuy and dpHitNow, title="FIBDAILY BUY (50% hit)", message="FIBDAILY BUY: Daily>Weekly; 5m was below Daily, waited for 5m BUY, then hit 50% retracement")
 
