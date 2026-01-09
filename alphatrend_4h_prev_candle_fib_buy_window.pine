@@ -261,15 +261,16 @@ if enableFib4HRBuy and fibActive and alignedDW4H
     fibHitNow := (time > fibStartTime) and (low <= fib50 and high >= fib50)
     if fibHitNow
         fibActive := false
-        // Once hit: remove the line entirely.
+        // Once hit: keep the 50% line on-chart.
         if not na(fibLine)
-            line.delete(fibLine)
-            fibLine := na
+            line.set_xy2(fibLine, time, fib50)
+            line.set_extend(fibLine, extend.right)
+            line.set_color(fibLine, color.new(color.green, 0))
         label.new(bar_index, low, "FIB4HR BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
 alertcondition(enableFib4HRBuy and fibHitNow, title="FIB4HR BUY (50% hit)", message="FIB4HR BUY: Daily>Weekly and 4H>Daily; 5m was below 4H, 5m BUY while still below, then hit 50% retracement")
 
-//==================== Daily>Weekly; 5m below Daily -> wait 5m BUY (while still below) -> 50% fib -> "FIBDAILY BUY" ====================
+//==================== Daily>Weekly and 4H>Daily; 5m below Daily -> wait 5m BUY (while still below) -> 50% fib -> "FIBDAILY BUY" ====================
 enableDailyPullbackBuy = input.bool(true, "Enable FIBDAILY BUY (Daily>Weekly; 5m<Daily then 5m BUY -> 50% fib)")
 showDailyPullbackFibLine = input.bool(true, "Show FIBDAILY BUY 50% line")
 maxDailyPullbackLines = input.int(20, "Max FIBDAILY BUY lines to keep", minval=1)
@@ -277,7 +278,9 @@ maxDailyPullbackLines = input.int(20, "Max FIBDAILY BUY lines to keep", minval=1
 // Gate:
 // - Daily AlphaTrend above Weekly AlphaTrend
 // - 5m AlphaTrend below Daily AlphaTrend (pullback)
+// - 4H AlphaTrend above Daily AlphaTrend (required to actually start fibs)
 dailyPullbackGate = (ATD > ATW) and (AT5 < ATD)
+dailyFib4HOk = AT4H > ATD
 
 var bool dpWaitingForBuy = false
 var bool dpActive = false
@@ -304,7 +307,7 @@ if enableDailyPullbackBuy
         dpLow := na
 
 // Once we get a 5m BUY alert while we're waiting, start the fib tracking.
-if enableDailyPullbackBuy and dpWaitingForBuy and buy5
+if enableDailyPullbackBuy and dpWaitingForBuy and buy5 and (AT5 < ATD) and dailyFib4HOk
     dpWaitingForBuy := false
     dpActive := true
     dpStartTime := time
@@ -325,6 +328,14 @@ if dpActive
             line.set_extend(dpLine, extend.none)
             line.set_color(dpLine, color.new(color.gray, 0))
     else
+        // If 4H falls below Daily, stop updating (but keep the line).
+        if not dailyFib4HOk
+            dpActive := false
+            if not na(dpLine)
+                line.set_xy2(dpLine, time, dpFib50)
+                line.set_extend(dpLine, extend.right)
+                line.set_color(dpLine, color.new(color.gray, 0))
+        else
         dpHigh := math.max(dpHigh, high)
         dpFib50 := dpLow + (dpHigh - dpLow) * 0.50
         if showDailyPullbackFibLine and not na(dpLine)
@@ -336,11 +347,83 @@ if dpActive
         dpHitNow := (time > dpStartTime) and (low <= dpFib50 and high >= dpFib50)
         if dpHitNow
             dpActive := false
-            // Once hit: remove the line entirely.
+            // Once hit: keep the 50% line on-chart.
             if not na(dpLine)
-                line.delete(dpLine)
-                dpLine := na
+                line.set_xy2(dpLine, time, dpFib50)
+                line.set_extend(dpLine, extend.right)
+                line.set_color(dpLine, color.new(color.green, 0))
             label.new(bar_index, low, "FIBDAILY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
 alertcondition(enableDailyPullbackBuy and dpHitNow, title="FIBDAILY BUY (50% hit)", message="FIBDAILY BUY: Daily>Weekly; 5m was below Daily, waited for 5m BUY, then hit 50% retracement")
+
+//==================== Daily>Weekly; 5m below Weekly -> wait 5m BUY (while still below) -> 50% fib -> "FIBWEEKLY BUY" ====================
+enableWeeklyPullbackBuy = input.bool(true, "Enable FIBWEEKLY BUY (Daily>Weekly; 5m<Weekly then 5m BUY -> 50% fib)")
+showWeeklyPullbackFibLine = input.bool(true, "Show FIBWEEKLY BUY 50% line")
+maxWeeklyPullbackLines = input.int(20, "Max FIBWEEKLY BUY lines to keep", minval=1)
+
+weeklyPullbackGate = (ATD > ATW) and (AT5 < ATW)
+
+var bool wpWaitingForBuy = false
+var bool wpActive = false
+var float wpLow = na
+var float wpHigh = na
+var float wpFib50 = na
+var int wpStartTime = na
+var line wpLine = na
+var line[] wpLineHistory = array.new_line()
+
+wpHitNow = false
+
+// Track low while 5m is below Weekly (and Daily>Weekly)
+if enableWeeklyPullbackBuy and (ATD > ATW) and not wpActive
+    if weeklyPullbackGate
+        if not wpWaitingForBuy
+            wpWaitingForBuy := true
+            wpLow := low
+        else
+            wpLow := math.min(wpLow, low)
+    else
+        wpWaitingForBuy := false
+        wpLow := na
+
+// Start fib on 5m BUY while still below Weekly
+if enableWeeklyPullbackBuy and wpWaitingForBuy and buy5 and (AT5 < ATW) and (ATD > ATW)
+    wpWaitingForBuy := false
+    wpActive := true
+    wpStartTime := time
+    wpHigh := high
+    wpFib50 := wpLow + (wpHigh - wpLow) * 0.50
+    if showWeeklyPullbackFibLine
+        wpLine := line.new(wpStartTime, wpFib50, time, wpFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
+        array.push(wpLineHistory, wpLine)
+        if array.size(wpLineHistory) > maxWeeklyPullbackLines
+            oldWp = array.shift(wpLineHistory)
+            line.delete(oldWp)
+
+// Update until hit OR Daily>Weekly breaks
+if wpActive
+    if not (ATD > ATW)
+        wpActive := false
+        if not na(wpLine)
+            line.set_xy2(wpLine, time, wpFib50)
+            line.set_extend(wpLine, extend.right)
+            line.set_color(wpLine, color.new(color.gray, 0))
+    else
+        wpHigh := math.max(wpHigh, high)
+        wpFib50 := wpLow + (wpHigh - wpLow) * 0.50
+        if showWeeklyPullbackFibLine and not na(wpLine)
+            line.set_extend(wpLine, extend.right)
+            line.set_xy1(wpLine, wpStartTime, wpFib50)
+            line.set_xy2(wpLine, time, wpFib50)
+
+        wpHitNow := (time > wpStartTime) and (low <= wpFib50 and high >= wpFib50)
+        if wpHitNow
+            wpActive := false
+            if not na(wpLine)
+                line.set_xy2(wpLine, time, wpFib50)
+                line.set_extend(wpLine, extend.right)
+                line.set_color(wpLine, color.new(color.green, 0))
+            label.new(bar_index, low, "FIBWEEKLY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
+
+alertcondition(enableWeeklyPullbackBuy and wpHitNow, title="FIBWEEKLY BUY (50% hit)", message="FIBWEEKLY BUY: Daily>Weekly; 5m was below Weekly, waited for 5m BUY, then hit 50% retracement")
 
