@@ -205,74 +205,116 @@ if enableNWE and repaint and barstate.islast
             seg += 2
         y1 := array.get(nwe, i)
 
-//==================== NWE dip/reclaim -> 50% fib DOTS (AlphaTrends aligned) ====================
-enableNWEFibDots = input.bool(true, "Enable NWE fib dots (AT aligned + dip below NWE then reclaim)")
-nweFibDotsMaxDays = input.int(2, "NWE fib max duration (days)", minval=1, maxval=30)
-showNWEFibDots = input.bool(true, "Show NWE 50% dots")
+//==================== Fib from NWE lower OR 4BAND support (AlphaTrends aligned) ====================
+enableFibDots = input.bool(true, "Enable Fib (AT aligned + dip below NWE/4BAND then reclaim)")
+fibMaxDays = input.int(2, "Fib max duration (days)", minval=1, maxval=30)
+fibLookbackBars = input.int(500, "Fib: only last N bars (right side)", minval=50, maxval=5000)
+showFibDots = input.bool(true, "Show Fib 50% dots")
 
-allATAligned = (ATD > ATW) and (AT4H > ATD) and (AT1H > AT4H)
-fibWindowMs = nweFibDotsMaxDays * 24 * 60 * 60 * 1000
+// Alignment: Daily above Weekly AND 4H above Daily (per your spec).
+atAligned = (ATD > ATW) and (AT4H > ATD)
+inFibLookback = bar_index >= (last_bar_index - fibLookbackBars)
+fibWindowMs = fibMaxDays * 24 * 60 * 60 * 1000
 
-belowLowerDots = enableNWE and enableNWEFibDots and allATAligned and not na(lowerSig) and ta.crossunder(low, lowerSig)
-reclaimLowerDots = enableNWE and enableNWEFibDots and allATAligned and not na(lowerSig) and ta.crossover(close, lowerSig)
+// Levels to use:
+// - NWE endpoint lower band (lowerSig)
+// - 4BAND 4H S1 (band4hS1) is defined in the 4BAND section below
+useNWELevel = enableNWE and not na(lowerSig)
+use4BandLevel = show4Band and show4HPivotBands and not na(band4hS1)
 
-var bool nweDipDots = false
-var float nweDipLowDots = na
-var bool nweFibDotsActive = false
-var float nweLowAnchorDots = na
-var float nweHighDots = na
-var float nweFib50Dots = na
-var int nweFibStartTimeDots = na
+belowNWE = enableFibDots and atAligned and inFibLookback and useNWELevel and close < lowerSig
+below4Band = enableFibDots and atAligned and inFibLookback and use4BandLevel and close < band4hS1
 
-if belowLowerDots
-    nweDipDots := true
-    nweDipLowDots := na(nweDipLowDots) ? low : math.min(nweDipLowDots, low)
+var bool fibInDip = false
+var int fibDipType = 0      // 1 = NWE, 2 = 4BAND
+var float fibDipLow = na
+var int fibDipStartTime = na
 
-if reclaimLowerDots and nweDipDots and not nweFibDotsActive
-    nweDipDots := false
-    nweFibDotsActive := true
-    nweFibStartTimeDots := time
-    nweLowAnchorDots := nweDipLowDots
-    nweHighDots := high
-    nweFib50Dots := nweLowAnchorDots + (nweHighDots - nweLowAnchorDots) * 0.50
-    nweDipLowDots := na
+var bool fibActive = false
+var float fibLowAnchor = na
+var float fibHigh = na
+var float fib50 = na
+var int fibStartTime = na
 
-if nweFibDotsActive
-    if (time - nweFibStartTimeDots > fibWindowMs) or (not allATAligned)
-        nweFibDotsActive := false
-        nweLowAnchorDots := na
-        nweHighDots := na
-        nweFib50Dots := na
+// Enter dip state when we go below either level (NWE has priority).
+if enableFibDots and atAligned and inFibLookback and not fibActive
+    if not fibInDip and belowNWE
+        fibInDip := true
+        fibDipType := 1
+        fibDipLow := low
+        fibDipStartTime := time
+    else if not fibInDip and below4Band
+        fibInDip := true
+        fibDipType := 2
+        fibDipLow := low
+        fibDipStartTime := time
+
+// While in dip, track lowest low.
+if fibInDip
+    fibDipLow := math.min(fibDipLow, low)
+    // Cancel stale dip (keeps it "to the right")
+    if time - fibDipStartTime > fibWindowMs or not atAligned
+        fibInDip := false
+        fibDipType := 0
+        fibDipLow := na
+        fibDipStartTime := na
+
+// Reclaim conditions depend on which band was dipped under.
+reclaimNWE = (fibDipType == 1) and useNWELevel and ta.crossover(close, lowerSig)
+reclaim4Band = (fibDipType == 2) and use4BandLevel and ta.crossover(close, band4hS1)
+
+if enableFibDots and fibInDip and not fibActive and (reclaimNWE or reclaim4Band)
+    fibInDip := false
+    fibActive := true
+    fibStartTime := time
+    fibLowAnchor := fibDipLow
+    fibHigh := high
+    fib50 := fibLowAnchor + (fibHigh - fibLowAnchor) * 0.50
+    fibDipType := 0
+    fibDipLow := na
+    fibDipStartTime := na
+
+// Update fib while active
+if fibActive
+    if (time - fibStartTime > fibWindowMs) or (not atAligned)
+        fibActive := false
+        fibLowAnchor := na
+        fibHigh := na
+        fib50 := na
+        fibStartTime := na
     else
-        nweHighDots := math.max(nweHighDots, high)
-        nweFib50Dots := nweLowAnchorDots + (nweHighDots - nweLowAnchorDots) * 0.50
-        // If price closes below 50%, cancel/remove.
-        if close < nweFib50Dots
-            nweFibDotsActive := false
-            nweLowAnchorDots := na
-            nweHighDots := na
-            nweFib50Dots := na
+        fibHigh := math.max(fibHigh, high)
+        fib50 := fibLowAnchor + (fibHigh - fibLowAnchor) * 0.50
+        // If price closes below 50%, remove the fib dots.
+        if close < fib50
+            fibActive := false
+            fibLowAnchor := na
+            fibHigh := na
+            fib50 := na
+            fibStartTime := na
 
-plot(showNWEFibDots and nweFibDotsActive ? nweFib50Dots : na, title="NWE Fib 50% (dots)", style=plot.style_circles, color=color.new(color.lime, 0), linewidth=3)
+plot(showFibDots and fibActive ? fib50 : na, title="Fib 50% (dots)", style=plot.style_circles, color=color.new(color.lime, 0), linewidth=3)
 
-nweFibDotsHitNow = nweFibDotsActive and (time > nweFibStartTimeDots) and (low <= nweFib50Dots and high >= nweFib50Dots)
-plotshape(nweFibDotsHitNow ? low : na, title="NWE Fib Buy", text="NWE FIB BUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
+fibHitBuy = fibActive and (time > fibStartTime) and (low <= fib50 and high >= fib50)
+plotshape(fibHitBuy ? fib50 : na, title="FibHitBuy", text="FIBHITBUY", style=shape.xcross, location=location.absolute, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
 
-if nweFibDotsHitNow
-    nweFibDotsActive := false
-    nweLowAnchorDots := na
-    nweHighDots := na
-    nweFib50Dots := na
+if fibHitBuy
+    fibActive := false
+    fibLowAnchor := na
+    fibHigh := na
+    fib50 := na
+    fibStartTime := na
 
-alertcondition(enableNWEFibDots and nweFibDotsHitNow, title="NWE Fib Buy (dots)", message="NWE fib 50% hit after lower-band dip/reclaim under aligned AlphaTrends.")
+alertcondition(enableFibDots and fibHitBuy, title="FibHitBuy", message="FibHitBuy: AT aligned; dipped below NWE/4BAND, reclaimed, then hit 50% retracement.")
 
 //==================== 4BAND (Pivot Bands) - converted from Pine v4 ====================
 show4Band = input.bool(true, "Show 4BAND Pivot Bands")
-lengthMA = input.int(3, "4BAND EMA Length", minval=1)
-lengthMA1 = input.int(1, "4BAND EMA Length 1", minval=1)
-lengthMA11 = input.int(1, "4BAND EMA Length 11", minval=1)
-showDailyPivotBands = input.bool(true, "4BAND: Show Daily Pivot Bands")
-show4HPivotBands = input.bool(true, "4BAND: Show 4H Pivot Bands")
+lengthMA = input.int(3, "EMA Length To Calculate Bands", minval=1)
+lengthMA1 = input.int(1, "EMA Length To Calculate Bands 1", minval=1)
+lengthMA11 = input.int(1, "EMA Length To Calculate Bands 11", minval=1)
+sd = input.bool(true, "Show Daily Pivot Bands?")
+showDailyPivotBands = sd
+show4HPivotBands = sd
 
 PP = (high + low + close) / 3.0
 PPEMA = ta.ema(PP, lengthMA)
@@ -298,15 +340,15 @@ s2 = PPEMA1 - PPD71
 ddd_r1 = request.security(syminfo.tickerid, "D", r1, barmerge.gaps_off, barmerge.lookahead_off)
 ddd_s1 = request.security(syminfo.tickerid, "D", s1, barmerge.gaps_off, barmerge.lookahead_off)
 
-plot(show4Band and showDailyPivotBands ? ddd_r1 : na, title="4BAND Daily R1", style=plot.style_line, linewidth=2, color=color.blue)
-plot(show4Band and showDailyPivotBands ? ddd_s1 : na, title="4BAND Daily S1", style=plot.style_line, linewidth=2, color=color.blue)
+plot(show4Band and showDailyPivotBands ? ddd_r1 : na, title="D R1", style=plot.style_line, linewidth=2, color=color.blue)
+plot(show4Band and showDailyPivotBands ? ddd_s1 : na, title="DS1", style=plot.style_line, linewidth=2, color=color.blue)
 
 // 240 Pivot Bands (4H)
-d_r1 = request.security(syminfo.tickerid, "240", r1, barmerge.gaps_off, barmerge.lookahead_off)
-d_s1 = request.security(syminfo.tickerid, "240", s1, barmerge.gaps_off, barmerge.lookahead_off)
-d_r2 = request.security(syminfo.tickerid, "240", r2, barmerge.gaps_off, barmerge.lookahead_off)
-d_s2 = request.security(syminfo.tickerid, "240", s2, barmerge.gaps_off, barmerge.lookahead_off)
+band4hR1 = request.security(syminfo.tickerid, "240", r1, barmerge.gaps_off, barmerge.lookahead_off)
+band4hS1 = request.security(syminfo.tickerid, "240", s1, barmerge.gaps_off, barmerge.lookahead_off)
+band4hR2 = request.security(syminfo.tickerid, "240", r2, barmerge.gaps_off, barmerge.lookahead_off)
+band4hS2 = request.security(syminfo.tickerid, "240", s2, barmerge.gaps_off, barmerge.lookahead_off)
 
-plot(show4Band and show4HPivotBands ? d_r1 : na, title="4BAND 4H R1", style=plot.style_line, linewidth=5, color=color.black)
-plot(show4Band and show4HPivotBands ? d_s1 : na, title="4BAND 4H S1", style=plot.style_line, linewidth=5, color=color.black)
+plot(show4Band and show4HPivotBands ? band4hR1 : na, title="4 R1", style=plot.style_line, linewidth=5, color=color.black)
+plot(show4Band and show4HPivotBands ? band4hS1 : na, title="4 S1", style=plot.style_line, linewidth=5, color=color.black)
 
