@@ -1,0 +1,173 @@
+//@version=5
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// author © KivancOzbilgic
+// developer © KivancOzbilgic
+strategy(
+     "Bunds Open - DKO Strategy",
+     overlay=true,
+     max_lines_count=500,
+     max_labels_count=500,
+     default_qty_type=strategy.percent_of_equity,
+     default_qty_value=10,
+     initial_capital=10000
+)
+
+// -------------------------------------------------------------------------
+// 08:00 London AlphaTrend Strategy
+// - At 08:00 London time:
+//   - If candle is ABOVE AlphaTrend -> BUY
+//   - If candle is BELOW AlphaTrend -> SELL
+// - Stop: 8 pips (default; 1 pip = 10 ticks by default)
+// - Take profit 1: close 50% at 15 ticks
+// - Take profit 2: close remainder on CLOSE across AlphaTrend (opposite side)
+// -------------------------------------------------------------------------
+
+grpTime = "Entry Time"
+londonEntryHour = input.int(8, "London Entry Hour", minval=0, maxval=23, group=grpTime)
+londonEntryMinute = input.int(0, "London Entry Minute", minval=0, maxval=59, group=grpTime)
+
+grpRisk = "Risk / Targets"
+pipInTicks = input.int(10, "Ticks per pip", minval=1, group=grpRisk, tooltip="Used to convert pip-based stop to ticks. Default 10 ticks = 1 pip.")
+stopPips = input.float(8.0, "Stop (pips)", minval=0.0, step=0.25, group=grpRisk)
+tp1Ticks = input.int(15, "TP1 (ticks) - close 50%", minval=0, group=grpRisk)
+
+grpDisplay = "Display"
+showAlphaTrend = input.bool(true, "Show AlphaTrend", group=grpDisplay)
+
+grp700 = "London 07:00 Markers"
+show700Vertical = input.bool(true, "Show 07:00 vertical line", group=grp700)
+show700OpenLine = input.bool(true, "Show 07:00 open price line", group=grp700)
+openLineHours = input.int(12, "Open line duration (hours)", minval=1, maxval=24, group=grp700)
+
+grpMTF = "AlphaTrend - Higher Timeframes"
+showAT_D = input.bool(true, "Show Daily AlphaTrend", group=grpMTF)
+showAT_4H = input.bool(true, "Show 4H AlphaTrend", group=grpMTF)
+showAT_30 = input.bool(true, "Show 30m AlphaTrend", group=grpMTF)
+
+// -------------------------------------------------------------------------
+// AlphaTrend (adapted to work inside this strategy)
+// -------------------------------------------------------------------------
+grpAT = "AlphaTrend"
+coeff = input.float(1, "Multiplier", step=0.1, group=grpAT)
+AP = input.int(14, "Common Period", minval=1, group=grpAT)
+src = input.source(close, "Source", group=grpAT)
+novolumedata = input.bool(false, "Change calculation (no volume data)?", group=grpAT)
+
+f_alphaTrend(_coeff, _ap, _src, _noVol) =>
+    _atr = ta.sma(ta.tr, _ap)
+    _upT = low - _atr * _coeff
+    _downT = high + _atr * _coeff
+    float _at = na
+    _at := (_noVol ? ta.rsi(_src, _ap) >= 50 : ta.mfi(hlc3, _ap) >= 50) ? (_upT < nz(_at[1]) ? nz(_at[1]) : _upT) : (_downT > nz(_at[1]) ? nz(_at[1]) : _downT)
+    _at
+
+AlphaTrend = f_alphaTrend(coeff, AP, src, novolumedata)
+
+color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+atPlot = plot(showAlphaTrend ? AlphaTrend : na, color=color.new(#0022FC, 0), linewidth=3, title="AlphaTrend")
+atPlot2 = plot(showAlphaTrend ? AlphaTrend[2] : na, color=color.new(#FC0400, 0), linewidth=3, title="AlphaTrend (shifted)")
+fill(atPlot, atPlot2, color=showAlphaTrend ? color1 : na, title="AlphaTrend Fill")
+
+// Higher timeframe AlphaTrend (held/anchored to its own timeframe)
+AlphaTrend_D = request.security(syminfo.tickerid, "D", f_alphaTrend(coeff, AP, close, novolumedata), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+AlphaTrend_4H = request.security(syminfo.tickerid, "240", f_alphaTrend(coeff, AP, close, novolumedata), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+AlphaTrend_30 = request.security(syminfo.tickerid, "30", f_alphaTrend(coeff, AP, close, novolumedata), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+
+plot(showAT_D ? AlphaTrend_D : na, title="AlphaTrend (Daily)", color=color.new(color.purple, 0), linewidth=2)
+plot(showAT_4H ? AlphaTrend_4H : na, title="AlphaTrend (4H)", color=color.new(color.aqua, 0), linewidth=2)
+plot(showAT_30 ? AlphaTrend_30 : na, title="AlphaTrend (30m)", color=color.new(color.gray, 0), linewidth=2)
+
+// -------------------------------------------------------------------------
+// 07:00 London open marker (visual only)
+// -------------------------------------------------------------------------
+isLondon700() =>
+    hour(time, "Europe/London") == 7 and minute(time, "Europe/London") == 0
+
+var float openPrice700 = na
+
+if isLondon700()
+    openPrice700 := open
+    if show700Vertical
+        line.new(bar_index, low, bar_index, high, extend=extend.both, color=color.new(color.blue, 0), style=line.style_dashed, width=1)
+    if show700OpenLine
+        lineEnd = time + openLineHours * 60 * 60 * 1000
+        line.new(x1=time, y1=openPrice700, x2=lineEnd, y2=openPrice700, xloc=xloc.bar_time, color=color.new(color.blue, 0), style=line.style_solid, width=1)
+
+// -------------------------------------------------------------------------
+// Entry timing / once-per-day guard (London timezone)
+// -------------------------------------------------------------------------
+isEntryTime() =>
+    h = hour(time, "Europe/London")
+    m = minute(time, "Europe/London")
+    h == londonEntryHour and m == londonEntryMinute
+
+londonDayKey = year(time, "Europe/London") * 10000 + month(time, "Europe/London") * 100 + dayofmonth(time, "Europe/London")
+var int lastDayKey = na
+var bool tradedToday = false
+
+if na(lastDayKey) or londonDayKey != lastDayKey
+    lastDayKey := londonDayKey
+    tradedToday := false
+
+// -------------------------------------------------------------------------
+// Entries at 08:00 London
+// -------------------------------------------------------------------------
+aboveAT = close > AlphaTrend
+belowAT = close < AlphaTrend
+
+if isEntryTime() and not tradedToday and strategy.position_size == 0
+    if aboveAT
+        strategy.entry("L", strategy.long, comment="08:00 Above AlphaTrend")
+        tradedToday := true
+    else if belowAT
+        strategy.entry("S", strategy.short, comment="08:00 Below AlphaTrend")
+        tradedToday := true
+
+// -------------------------------------------------------------------------
+// Exits: 8 pip stop, 50% TP1 at 15 ticks, remainder on AlphaTrend cross (close)
+// -------------------------------------------------------------------------
+stopTicks = stopPips * pipInTicks
+stopDist = stopTicks * syminfo.mintick
+tp1Dist = tp1Ticks * syminfo.mintick
+
+var bool tp1HitLong = false
+var bool tp1HitShort = false
+
+if strategy.position_size == 0
+    tp1HitLong := false
+    tp1HitShort := false
+
+if strategy.position_size > 0
+    entry = strategy.position_avg_price
+    stopPrice = entry - stopDist
+    tp1Price = entry + tp1Dist
+
+    // Stop applies to full position
+    strategy.exit("L.STOP", from_entry="L", stop=stopPrice, qty_percent=100)
+    // Close 50% at TP1
+    strategy.exit("L.TP1", from_entry="L", limit=tp1Price, qty_percent=50)
+
+    if high >= tp1Price
+        tp1HitLong := true
+
+    // Close remainder on close below AlphaTrend (after TP1 hit)
+    if tp1HitLong and close < AlphaTrend
+        strategy.close("L", comment="Close below AlphaTrend")
+
+if strategy.position_size < 0
+    entry = strategy.position_avg_price
+    stopPrice = entry + stopDist
+    tp1Price = entry - tp1Dist
+
+    // Stop applies to full position
+    strategy.exit("S.STOP", from_entry="S", stop=stopPrice, qty_percent=100)
+    // Close 50% at TP1
+    strategy.exit("S.TP1", from_entry="S", limit=tp1Price, qty_percent=50)
+
+    if low <= tp1Price
+        tp1HitShort := true
+
+    // Close remainder on close above AlphaTrend (after TP1 hit)
+    if tp1HitShort and close > AlphaTrend
+        strategy.close("S", comment="Close above AlphaTrend")
+
