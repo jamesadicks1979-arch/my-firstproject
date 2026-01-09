@@ -187,7 +187,7 @@ if swingActive and showSwingFibLine
             swingActive := false
             if not na(swingLine)
                 line.set_xy2(swingLine, time, swing50)
-                line.set_extend(swingLine, extend.none)
+                line.set_extend(swingLine, extend.right)
                 line.set_color(swingLine, color.new(color.green, 0))
             if showSwingFibBuyLabel
                 label.new(bar_index, low, "BUY FIB", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
@@ -285,7 +285,7 @@ if trend5mActive
                     trend5mActive := false
                     if show5mTrendFibLine and not na(trend5mLine)
                         line.set_xy2(trend5mLine, time, trend5mFib50)
-                        line.set_extend(trend5mLine, extend.none)
+                        line.set_extend(trend5mLine, extend.right)
                         line.set_color(trend5mLine, color.new(color.green, 0))
                     label.new(bar_index, low, "5mTrendBUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
 
@@ -360,7 +360,7 @@ if dpActive
             dpActive := false
             if showDailyPullbackFibLine and not na(dpLine)
                 line.set_xy2(dpLine, time, dpFib50)
-                line.set_extend(dpLine, extend.none)
+                line.set_extend(dpLine, extend.right)
                 line.set_color(dpLine, color.new(color.green, 0))
             label.new(bar_index, low, "BUY DAILY AT", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
