@@ -20,7 +20,6 @@ showsignalsD = input.bool(false, "Show Daily Signals?")
 showsignalsW = input.bool(false, "Show Weekly Signals?")
 showsignals1H = input.bool(false, "Show 1H Signals?")
 showsignals5 = input.bool(false, "Show 5m Signals?")
-showAlignmentBox = input.bool(true, "Show MTF Alignment Box (top-left)")
 
 // Always use these fixed timeframes so the indicator "holds" when you switch chart TF.
 tf4H = "240"
@@ -125,13 +124,6 @@ fill(pAT5, pAT52, color=showAT5 ? at5ColorFill : na)
 plotshape(showAT5 and showsignals5 and buy5 ? (AT5_2 * 0.9999) : na, title="BUY (5m)", text="5m BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
 
 alertcondition(buy5, title="AlphaTrend BUY (5m)", message="AlphaTrend 5m BUY")
-
-//==================== MTF alignment status (top-left box) ====================
-mtfAligned = (ATD > ATW) and (AT4H > ATD) and (AT4H > ATW) and (AT1H > AT4H)
-
-var table mtfTbl = table.new(position.top_left, 1, 1, border_width=1)
-if showAlignmentBox and barstate.islast
-    table.cell(mtfTbl, 0, 0, mtfAligned ? "MTF ALIGN: ON\nD>W, 4H>D&W, 1H>4H" : "MTF ALIGN: OFF\nD>W, 4H>D&W, 1H>4H", text_color=color.white, bgcolor=mtfAligned ? color.new(color.green, 0) : color.new(color.red, 0))
 
 //==================== Dynamic 50% retracement line after EVERY 4H BUY ====================
 showSwingFibLine = input.bool(true, "Show 50% line after every 4H BUY (sell-low -> post-buy high)")
