@@ -261,10 +261,10 @@ if enableFib4HRBuy and fibActive and alignedDW4H
     fibHitNow := (time > fibStartTime) and (low <= fib50 and high >= fib50)
     if fibHitNow
         fibActive := false
-        // Once hit: keep the 50% line on-chart.
+        // Once hit: stop the line at the hit candle.
         if not na(fibLine)
             line.set_xy2(fibLine, time, fib50)
-            line.set_extend(fibLine, extend.right)
+            line.set_extend(fibLine, extend.none)
             line.set_color(fibLine, color.new(color.green, 0))
         label.new(bar_index, low, "FIB4HR BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
@@ -326,7 +326,7 @@ if dpActive
         dpActive := false
         if not na(dpLine)
             // Keep the line visible to the right even if context breaks.
-            line.set_extend(dpLine, extend.right)
+            line.set_extend(dpLine, extend.none)
             line.set_color(dpLine, color.new(color.gray, 0))
     else
         // If 4H falls below Daily, stop updating (but keep the line).
@@ -334,7 +334,7 @@ if dpActive
             dpActive := false
             if not na(dpLine)
                 line.set_xy2(dpLine, time, dpFib50)
-                line.set_extend(dpLine, extend.right)
+                line.set_extend(dpLine, extend.none)
                 line.set_color(dpLine, color.new(color.gray, 0))
         else
             dpHigh := math.max(dpHigh, high)
@@ -348,10 +348,10 @@ if dpActive
             dpHitNow := (time > dpStartTime) and (low <= dpFib50 and high >= dpFib50)
             if dpHitNow
                 dpActive := false
-                // Once hit: keep the 50% line on-chart.
+                // Once hit: stop the line at the hit candle.
                 if not na(dpLine)
                     line.set_xy2(dpLine, time, dpFib50)
-                    line.set_extend(dpLine, extend.right)
+                    line.set_extend(dpLine, extend.none)
                     line.set_color(dpLine, color.new(color.green, 0))
                 label.new(bar_index, low, "FIBDAILY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
@@ -407,7 +407,7 @@ if wpActive
         wpActive := false
         if not na(wpLine)
             line.set_xy2(wpLine, time, wpFib50)
-            line.set_extend(wpLine, extend.right)
+            line.set_extend(wpLine, extend.none)
             line.set_color(wpLine, color.new(color.gray, 0))
     else
         wpHigh := math.max(wpHigh, high)
@@ -422,7 +422,7 @@ if wpActive
             wpActive := false
             if not na(wpLine)
                 line.set_xy2(wpLine, time, wpFib50)
-                line.set_extend(wpLine, extend.right)
+                line.set_extend(wpLine, extend.none)
                 line.set_color(wpLine, color.new(color.green, 0))
             label.new(bar_index, low, "FIBWEEKLY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
