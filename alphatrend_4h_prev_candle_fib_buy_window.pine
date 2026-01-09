@@ -110,6 +110,11 @@ plotshape(showAT1H and showsignals1H and sell1H ? (AT1H_2 * 1.0001) : na, title=
 alertcondition(buy1H, title="AlphaTrend BUY (1H)", message="AlphaTrend 1H BUY")
 alertcondition(sell1H, title="AlphaTrend SELL (1H)", message="AlphaTrend 1H SELL")
 
+//==================== Shared alignment gate ====================
+// Daily AlphaTrend above Weekly AND 4H above Daily
+// (Used by pivot display + fib setup logic)
+atAligned = (ATD > ATW) and (AT4H > ATD)
+
 //==================== Nadaraya-Watson Envelope [LuxAlgo] (matched) ====================
 // Matches the user's provided LuxAlgo NWE calculations.
 enableNWE = input.bool(true, "Enable Nadaraya-Watson Envelope [LuxAlgo]")
@@ -270,7 +275,6 @@ showFibDots = input.bool(true, "Show Fib 50% dots")
 showFibLine = input.bool(true, "Show Fib 50% line")
 
 // Alignment: Daily above Weekly AND 4H above Daily (per your spec).
-atAligned = (ATD > ATW) and (AT4H > ATD)
 lookbackMs = fibLookbackDays * 24 * 60 * 60 * 1000
 inFibLookback = (fibLookbackDays == 0) ? true : (time >= (timenow - lookbackMs))
 fibWindowMs = fibMaxDays * 24 * 60 * 60 * 1000
