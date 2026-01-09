@@ -214,13 +214,14 @@ if buy4H and showSwingFibLine
     swing50 := swingLow + (swingHigh - swingLow) * 0.50
     swingStart := bar_index
     swingActive := true
-    swingLine := line.new(swingStart, swing50, bar_index, swing50, xloc=xloc.bar_index, extend=extend.none, color=color.new(color.lime, 0), width=2)
+    swingLine := line.new(swingStart, swing50, bar_index, swing50, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.lime, 0), width=2)
 
 if swingActive and showSwingFibLine
     if trendState4H == -1
         swingActive := false
         if not na(swingLine)
             line.set_xy2(swingLine, bar_index, swing50)
+            line.set_extend(swingLine, extend.none)
             line.set_color(swingLine, color.new(color.gray, 0))
     else
         swingHigh := math.max(swingHigh, high)
@@ -234,27 +235,30 @@ if swingActive and showSwingFibLine
             swingActive := false
             if not na(swingLine)
                 line.set_xy2(swingLine, bar_index, swing50)
+                line.set_extend(swingLine, extend.none)
                 line.set_color(swingLine, color.new(color.green, 0))
             if showSwingFibBuyLabel
                 label.new(bar_index, low, "BUY FIB", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
 
 alertcondition(showSwingFibLine and swingHitNow, title="BUY FIB (dynamic 50% hit)", message="After AlphaTrend 4H BUY: price hit dynamic 50% retracement (sell-low -> post-buy high)")
 
-//==================== 5m cross-below-4H -> rally -> 50% fib -> "5mTrendBUY" ====================
-enable5mTrendBuy = input.bool(true, "Enable 5mTrendBUY (5m<4H cross + 20 pips rally + 50% retrace)")
-pipSize = input.float(0.0001, "Pip size (Forex often 0.0001; JPY pairs 0.01)", step=0.0001)
+//==================== 5m cross-below-4H -> (wait for 5m BUY) -> rally -> 50% fib -> "5mTrendBUY" ====================
+enable5mTrendBuy = input.bool(true, "Enable 5mTrendBUY (HTF aligned + 5m<4H cross + 5m BUY + 20 pip rally + 50% retrace)")
+pipSize = input.float(0.01, "Pip size (GBPJPY pip=0.01)", step=0.01)
 minRallyPips = input.int(20, "Minimum rally (pips) after cross", minval=1)
 show5mTrendFibLine = input.bool(true, "Show 5mTrend fib 50% line")
 
 // Higher timeframe alignment gate:
 // - Daily AlphaTrend above Weekly AlphaTrend
 // - 4H AlphaTrend above both Daily and Weekly
-htfAligned = showATD and showATW and (ATD > ATW) and (AT4H > ATD) and (AT4H > ATW)
+// - 1H AlphaTrend above 4H AlphaTrend
+htfAligned = (ATD > ATW) and (AT4H > ATD) and (AT4H > ATW) and (AT1H > AT4H)
 
 // Trigger: 5m AlphaTrend crosses below 4H AlphaTrend
 cross5mBelow4H = ta.crossunder(AT5, AT4H)
 
 var bool trend5mActive = false
+var bool trend5mBullish = false
 var bool trend5mRallied = false
 var float trend5mLow = na
 var float trend5mHigh = na
@@ -267,13 +271,14 @@ trend5mHitNow = false
 // Start tracking after crossunder, only if HTF alignment is satisfied.
 if enable5mTrendBuy and htfAligned and cross5mBelow4H
     trend5mActive := true
+    trend5mBullish := false
     trend5mRallied := false
     trend5mLow := low
-    trend5mHigh := high
+    trend5mHigh := na
     trend5mFib50 := na
     trend5mStartBar := bar_index
     if show5mTrendFibLine
-        trend5mLine := line.new(trend5mStartBar, low, bar_index, low, xloc=xloc.bar_index, extend=extend.none, color=color.new(color.lime, 0), width=2)
+        trend5mLine := line.new(trend5mStartBar, low, bar_index, low, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.lime, 0), width=2)
 
 // Update tracking state
 if trend5mActive
@@ -281,32 +286,42 @@ if trend5mActive
     if not htfAligned
         trend5mActive := false
         if not na(trend5mLine)
+            line.set_extend(trend5mLine, extend.none)
             line.set_color(trend5mLine, color.new(color.gray, 0))
     else
-        // While active, keep the lowest low since the trigger and the highest high since the trigger.
+        // Always keep the lowest low since the crossunder trigger.
         trend5mLow := math.min(trend5mLow, low)
-        trend5mHigh := math.max(trend5mHigh, high)
 
-        // Check if we've rallied enough from the low.
-        rallyPips = (trend5mHigh - trend5mLow) / pipSize
-        if not trend5mRallied and rallyPips >= minRallyPips
-            trend5mRallied := true
+        // Must get a 5m BUY alert before we start measuring the rally/highs.
+        if not trend5mBullish and buy5
+            trend5mBullish := true
+            trend5mHigh := high
+            trend5mRallied := false
+            trend5mFib50 := na
+        else if trend5mBullish
+            trend5mHigh := math.max(trend5mHigh, high)
 
-        // Once rallied, compute/update 50% fib and extend/update the line.
-        if trend5mRallied
-            trend5mFib50 := trend5mLow + (trend5mHigh - trend5mLow) * 0.50
-            if show5mTrendFibLine and not na(trend5mLine)
-                line.set_xy1(trend5mLine, trend5mStartBar, trend5mFib50)
-                line.set_xy2(trend5mLine, bar_index, trend5mFib50)
+            // Check if we've rallied enough from the low.
+            rallyPips = (trend5mHigh - trend5mLow) / pipSize
+            if not trend5mRallied and rallyPips >= minRallyPips
+                trend5mRallied := true
 
-            // When price touches the 50% level, mark buy and stop this setup.
-            trend5mHitNow := (low <= trend5mFib50 and high >= trend5mFib50)
-            if trend5mHitNow
-                trend5mActive := false
+            // Once rallied, compute/update 50% fib and extend/update the line.
+            if trend5mRallied
+                trend5mFib50 := trend5mLow + (trend5mHigh - trend5mLow) * 0.50
                 if show5mTrendFibLine and not na(trend5mLine)
+                    line.set_xy1(trend5mLine, trend5mStartBar, trend5mFib50)
                     line.set_xy2(trend5mLine, bar_index, trend5mFib50)
-                    line.set_color(trend5mLine, color.new(color.green, 0))
-                label.new(bar_index, low, "5mTrendBUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
 
-alertcondition(enable5mTrendBuy and trend5mHitNow, title="5mTrendBUY", message="5mTrendBUY: HTF aligned, 5m AT crossed below 4H, rallied >= threshold, then hit 50% retracement")
+                // When price touches the 50% level, mark buy and stop this setup.
+                trend5mHitNow := (low <= trend5mFib50 and high >= trend5mFib50)
+                if trend5mHitNow
+                    trend5mActive := false
+                    if show5mTrendFibLine and not na(trend5mLine)
+                        line.set_xy2(trend5mLine, bar_index, trend5mFib50)
+                        line.set_extend(trend5mLine, extend.none)
+                        line.set_color(trend5mLine, color.new(color.green, 0))
+                    label.new(bar_index, low, "5mTrendBUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
+
+alertcondition(enable5mTrendBuy and trend5mHitNow, title="5mTrendBUY", message="5mTrendBUY: HTF aligned (incl 1H>4H), 5m AT crossed below 4H, got 5m BUY, rallied >= threshold, then hit 50% retracement")
 
