@@ -149,6 +149,8 @@ var line[] dpLineHistory = array.new_line()
 var bool dpLineHit = false
 var float dpHitLevel = na
 var int dpHitTime = na
+dpMaxWaitBars = input.int(48, "Daily fib: max bars to wait after going back above Daily", minval=1)
+var int dpBarsSinceBelow = 0
 
 dpHitNow = false
 
@@ -158,15 +160,21 @@ if enableDailyPullbackBuy
         if not dpWaitingForBuy
             dpWaitingForBuy := true
             dpLow := low
+            dpBarsSinceBelow := 0
         else
             dpLow := math.min(dpLow, low)
-    // Cancel if gate breaks before the buy happens.
+            dpBarsSinceBelow := 0
+    // If we are no longer below Daily, keep waiting for a limited number of bars,
+    // but stop updating the low (so the setup can trigger on the later 5m BUY).
     if dpWaitingForBuy and not dailyPullbackGate
-        dpWaitingForBuy := false
-        dpLow := na
+        dpBarsSinceBelow += 1
+        if dpBarsSinceBelow > dpMaxWaitBars
+            dpWaitingForBuy := false
+            dpLow := na
+            dpBarsSinceBelow := 0
 
 // Once we get a 5m BUY alert while we're waiting, start the fib tracking.
-if enableDailyPullbackBuy and dpWaitingForBuy and buy5 and dailyPullbackGate
+if enableDailyPullbackBuy and dpWaitingForBuy and buy5 and dailyContextOk
     dpWaitingForBuy := false
     dpActive := true
     dpStartTime := time
@@ -175,6 +183,7 @@ if enableDailyPullbackBuy and dpWaitingForBuy and buy5 and dailyPullbackGate
     dpLineHit := false
     dpHitLevel := na
     dpHitTime := na
+    dpBarsSinceBelow := 0
     if showDailyPullbackFibLine
         dpLine := line.new(dpStartTime, dpFib50, time, dpFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
         array.push(dpLineHistory, dpLine)
@@ -241,6 +250,8 @@ var line[] wpLineHistory = array.new_line()
 var bool wpLineHit = false
 var float wpHitLevel = na
 var int wpHitTime = na
+wpMaxWaitBars = input.int(48, "Weekly fib: max bars to wait after going back above Weekly", minval=1)
+var int wpBarsSinceBelow = 0
 
 wpHitNow = false
 
@@ -250,14 +261,24 @@ if enableWeeklyPullbackBuy and (ATD > ATW) and not wpActive
         if not wpWaitingForBuy
             wpWaitingForBuy := true
             wpLow := low
+            wpBarsSinceBelow := 0
         else
             wpLow := math.min(wpLow, low)
+            wpBarsSinceBelow := 0
     else
-        wpWaitingForBuy := false
-        wpLow := na
+        // Keep waiting for a limited number of bars after leaving below Weekly,
+        // but stop updating wpLow.
+        if wpWaitingForBuy
+            wpBarsSinceBelow += 1
+            if wpBarsSinceBelow > wpMaxWaitBars
+                wpWaitingForBuy := false
+                wpLow := na
+                wpBarsSinceBelow := 0
+        else
+            wpLow := na
 
 // Start fib on 5m BUY while still below Weekly
-if enableWeeklyPullbackBuy and wpWaitingForBuy and buy5 and (AT5 < ATW) and (ATD > ATW)
+if enableWeeklyPullbackBuy and wpWaitingForBuy and buy5 and weeklyContextOk
     wpWaitingForBuy := false
     wpActive := true
     wpStartTime := time
@@ -266,6 +287,7 @@ if enableWeeklyPullbackBuy and wpWaitingForBuy and buy5 and (AT5 < ATW) and (ATD
     wpLineHit := false
     wpHitLevel := na
     wpHitTime := na
+    wpBarsSinceBelow := 0
     if showWeeklyPullbackFibLine
         wpLine := line.new(wpStartTime, wpFib50, time, wpFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
         array.push(wpLineHistory, wpLine)
