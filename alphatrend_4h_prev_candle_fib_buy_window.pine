@@ -313,8 +313,8 @@ if wpLineHit and not na(wpLine) and not na(wpHitLevel) and not na(wpHitTime)
 
 //==================== Nadaraya lower-band dip -> reclaim -> 50% fib (max 2 days) ====================
 enableNadarayaFib = input.bool(true, "Enable Nadaraya Fib (D>W & 4H>D; dip below band then reclaim)")
-showNadarayaBands = input.bool(false, "Show Nadaraya bands")
-nwLookbackBars = input.int(500, "Nadaraya lookback bars (run further back)", minval=50, maxval=5000)
+showNadarayaBands = input.bool(true, "Show Nadaraya bands")
+nwLookbackBars = input.int(500, "Nadaraya lookback bars (last N candles)", minval=50, maxval=5000)
 nwLen = input.int(200, "Nadaraya length", minval=20, maxval=500)
 nwBandwidth = input.float(30.0, "Nadaraya bandwidth", step=1.0, minval=1.0)
 nwMult = input.float(2.0, "Band multiplier", step=0.1, minval=0.1)
