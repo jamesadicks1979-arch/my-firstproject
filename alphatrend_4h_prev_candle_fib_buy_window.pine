@@ -335,10 +335,10 @@ if dpActive
         dpHitNow := (low <= dpFib50 and high >= dpFib50)
         if dpHitNow
             dpActive := false
-            if showDailyPullbackFibLine and not na(dpLine)
-                line.set_xy2(dpLine, time, dpFib50)
-                line.set_extend(dpLine, extend.right)
-                line.set_color(dpLine, color.new(color.green, 0))
+            // Once hit: remove the line entirely.
+            if not na(dpLine)
+                line.delete(dpLine)
+                dpLine := na
             label.new(bar_index, low, "BUY DAILY AT", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
 alertcondition(enableDailyPullbackBuy and dpHitNow, title="BUY DAILY AT (50% hit)", message="BUY DAILY AT: 5m<Daily, 4H>Daily, Daily>Weekly; waited for 5m BUY then hit 50% retracement")
