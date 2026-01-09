@@ -278,7 +278,8 @@ fibWindowMs = fibMaxDays * 24 * 60 * 60 * 1000
 // - NWE endpoint lower band (lowerSig)
 // - 4BAND 4H S1 (band4hS1) is defined in the 4BAND section below
 useNWELevel = enableNWE and not na(lowerSig)
-use4BandLevel = show4Band and show4HPivotBands and not na(band4hS1)
+// In the original 4BAND script, the 240 bands are gated by `sd`.
+use4BandLevel = show4Band and sd and not na(band4hS1)
 
 belowNWE = enableFibDots and atAligned and inFibLookback and useNWELevel and close < lowerSig
 below4Band = enableFibDots and atAligned and inFibLookback and use4BandLevel and close < band4hS1
