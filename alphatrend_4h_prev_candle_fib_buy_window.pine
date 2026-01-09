@@ -121,154 +121,9 @@ pAT5 = plot(showAT5 ? AT5 : na, title="AlphaTrend (5m)", color=color.new(color.s
 pAT52 = plot(showAT5 ? AT5_2 : na, title="AlphaTrend[2] (5m)", color=color.new(color.gray, 0), linewidth=1)
 fill(pAT5, pAT52, color=showAT5 ? at5ColorFill : na)
 
-plotshape(showAT5 and showsignals5 and buy5 ? (AT5_2 * 0.9999) : na, title="BUY (5m)", text="5m BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
+// (Removed) 5m BUY labels/alerts: fib labels only.
 
-alertcondition(buy5, title="AlphaTrend BUY (5m)", message="AlphaTrend 5m BUY")
-
-//==================== Dynamic 50% retracement line after EVERY 4H BUY ====================
-showSwingFibLine = input.bool(true, "Show 50% line after every 4H BUY (sell-low -> post-buy high)")
-showSwingFibBuyLabel = input.bool(true, "Show BUY FIB label when 50% line is hit")
-maxSwingFibLines = input.int(20, "Max 4H fib lines to keep on chart", minval=1)
-
-// Trend state driven by 4H signals, tracked on current chart timeframe
-var int trendState4H = 0 // -1 sell, +1 buy
-if barstate.isfirst
-    trendState4H := AT4H >= AT4H_2 ? 1 : -1
-if sell4H
-    trendState4H := -1
-if buy4H
-    trendState4H := 1
-
-// Lowest low while in 4H sell state (tracked on the chart TF)
-var float sellStateLow = na
-if sell4H
-    sellStateLow := low
-else if trendState4H == -1
-    sellStateLow := na(sellStateLow) ? low : math.min(sellStateLow, low)
-
-var line swingLine = na
-var line[] swingLineHistory = array.new_line()
-var bool swingActive = false
-var float swingLow = na
-var float swingHigh = na
-var float swing50 = na
-var int swingStartTime = na
-bool swingHitNow = false
-
-if buy4H and showSwingFibLine
-    swingLow := na(sellStateLow) ? low : sellStateLow
-    swingHigh := high
-    swing50 := swingLow + (swingHigh - swingLow) * 0.50
-    swingStartTime := time
-    swingActive := true
-    swingLine := line.new(swingStartTime, swing50, time, swing50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.lime, 0), width=2)
-    array.push(swingLineHistory, swingLine)
-    if array.size(swingLineHistory) > maxSwingFibLines
-        oldLine = array.shift(swingLineHistory)
-        line.delete(oldLine)
-
-if swingActive and showSwingFibLine
-    if trendState4H == -1
-        swingActive := false
-        if not na(swingLine)
-            line.set_xy2(swingLine, time, swing50)
-            line.set_extend(swingLine, extend.none)
-            line.set_color(swingLine, color.new(color.gray, 0))
-    else
-        swingHigh := math.max(swingHigh, high)
-        swing50 := swingLow + (swingHigh - swingLow) * 0.50
-        if not na(swingLine)
-            line.set_extend(swingLine, extend.right)
-            line.set_xy1(swingLine, swingStartTime, swing50)
-            line.set_xy2(swingLine, time, swing50)
-
-        swingHitNow := (low <= swing50 and high >= swing50)
-        if swingHitNow
-            swingActive := false
-            if not na(swingLine)
-                line.set_xy2(swingLine, time, swing50)
-                line.set_extend(swingLine, extend.right)
-                line.set_color(swingLine, color.new(color.green, 0))
-            if showSwingFibBuyLabel
-                label.new(bar_index, low, "BUY FIB", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
-
-alertcondition(showSwingFibLine and swingHitNow, title="BUY FIB (dynamic 50% hit)", message="After AlphaTrend 4H BUY: price hit dynamic 50% retracement (sell-low -> post-buy high)")
-
-//==================== D>W and 4H>D; 5m below 4H -> wait 5m BUY (while still below) -> 50% fib -> "FIB4HR BUY" ====================
-enableFib4HRBuy = input.bool(true, "Enable FIB4HR BUY (D>W & 4H>D; 5m<4H then 5m BUY -> 50% retrace)")
-showFib4HRBuyLine = input.bool(true, "Show FIB4HR BUY 50% line")
-maxFib4HRBuyLines = input.int(20, "Max FIB4HR BUY lines to keep", minval=1)
-
-alignedDW4H = (ATD > ATW) and (AT4H > ATD)
-fiveBelow4H = AT5 < AT4H
-
-// Track pullback low while 5m is below 4H (only under alignment).
-var bool fibPB = false
-var float fibLow = na
-
-// Active fib tracking after the 5m BUY.
-var bool fibActive = false
-var float fibHigh = na
-var float fib50 = na
-var int fibStartTime = na
-var line fibLine = na
-var line[] fibHistory = array.new_line()
-fibHitNow = false
-
-// Reset if alignment breaks (no fib setup should continue)
-if enableFib4HRBuy and not alignedDW4H
-    fibPB := false
-    fibLow := na
-    fibActive := false
-    fibHigh := na
-    fib50 := na
-
-// Pullback tracking: must be BELOW 4H.
-if enableFib4HRBuy and alignedDW4H and not fibActive
-    if fiveBelow4H
-        fibPB := true
-        fibLow := na(fibLow) ? low : math.min(fibLow, low)
-    else
-        // If 5m is no longer below 4H, the setup is invalid until it goes below again.
-        fibPB := false
-        fibLow := na
-
-// Trigger: 5m BUY alert must happen WHILE still below 4H.
-if enableFib4HRBuy and alignedDW4H and fibPB and fiveBelow4H and not fibActive and buy5
-    fibActive := true
-    fibPB := false
-    fibStartTime := time
-    fibLow := na(fibLow) ? low : fibLow
-    fibHigh := high
-    fib50 := fibLow + (fibHigh - fibLow) * 0.50
-    if showFib4HRBuyLine
-        fibLine := line.new(fibStartTime, fib50, time, fib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
-        array.push(fibHistory, fibLine)
-        if array.size(fibHistory) > maxFib4HRBuyLines
-            oldFib = array.shift(fibHistory)
-            line.delete(oldFib)
-
-// Update fib until hit (or alignment breaks, which resets above)
-if enableFib4HRBuy and fibActive and alignedDW4H
-    fibHigh := math.max(fibHigh, high)
-    fib50 := fibLow + (fibHigh - fibLow) * 0.50
-    if showFib4HRBuyLine and not na(fibLine)
-        line.set_extend(fibLine, extend.right)
-        line.set_xy1(fibLine, fibStartTime, fib50)
-        line.set_xy2(fibLine, time, fib50)
-
-    // Don't allow an "instant hit" on the same candle the line is created.
-    fibHitNow := (time > fibStartTime) and (low <= fib50 and high >= fib50)
-    if fibHitNow
-        fibActive := false
-        // Once hit: stop the line at the hit candle.
-        if not na(fibLine)
-            line.set_xy2(fibLine, time, fib50)
-            line.set_extend(fibLine, extend.none)
-            line.set_color(fibLine, color.new(color.green, 0))
-        label.new(bar_index, low, "FIB4HR BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
-
-alertcondition(enableFib4HRBuy and fibHitNow, title="FIB4HR BUY (50% hit)", message="FIB4HR BUY: Daily>Weekly and 4H>Daily; 5m was below 4H, 5m BUY while still below, then hit 50% retracement")
+// (Removed) 4H swing fib + 4H fib module: keeping only Daily/Weekly fib setups.
 
 //==================== Daily>Weekly and 4H>Daily; 5m below Daily -> wait 5m BUY (while still below) -> 50% fib -> "FIBDAILY BUY" ====================
 enableDailyPullbackBuy = input.bool(true, "Enable FIBDAILY BUY (Daily>Weekly; 5m<Daily then 5m BUY -> 50% fib)")
@@ -279,8 +134,9 @@ maxDailyPullbackLines = input.int(20, "Max FIBDAILY BUY lines to keep", minval=1
 // - Daily AlphaTrend above Weekly AlphaTrend
 // - 5m AlphaTrend below Daily AlphaTrend (pullback)
 // - 4H AlphaTrend above Daily AlphaTrend (required to actually start fibs)
-dailyPullbackGate = (ATD > ATW) and (AT5 < ATD)
 dailyFib4HOk = AT4H > ATD
+dailyPullbackGate = (ATD > ATW) and dailyFib4HOk and (AT5 < ATD)
+dailyContextOk = (ATD > ATW) and dailyFib4HOk
 
 var bool dpWaitingForBuy = false
 var bool dpActive = false
@@ -290,6 +146,9 @@ var float dpFib50 = na
 var int dpStartTime = na
 var line dpLine = na
 var line[] dpLineHistory = array.new_line()
+var bool dpLineHit = false
+var float dpHitLevel = na
+var int dpHitTime = na
 
 dpHitNow = false
 
@@ -307,12 +166,15 @@ if enableDailyPullbackBuy
         dpLow := na
 
 // Once we get a 5m BUY alert while we're waiting, start the fib tracking.
-if enableDailyPullbackBuy and dpWaitingForBuy and buy5 and (AT5 < ATD) and dailyFib4HOk
+if enableDailyPullbackBuy and dpWaitingForBuy and buy5 and dailyPullbackGate
     dpWaitingForBuy := false
     dpActive := true
     dpStartTime := time
     dpHigh := high
     dpFib50 := dpLow + (dpHigh - dpLow) * 0.50
+    dpLineHit := false
+    dpHitLevel := na
+    dpHitTime := na
     if showDailyPullbackFibLine
         dpLine := line.new(dpStartTime, dpFib50, time, dpFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
         array.push(dpLineHistory, dpLine)
@@ -320,40 +182,43 @@ if enableDailyPullbackBuy and dpWaitingForBuy and buy5 and (AT5 < ATD) and daily
             oldDpLine = array.shift(dpLineHistory)
             line.delete(oldDpLine)
 
-// Update active fib until hit OR Daily/Weekly bullish context breaks.
+// Update active fib until hit OR context breaks.
 if dpActive
-    if not (ATD > ATW)
+    if not dailyContextOk
         dpActive := false
         if not na(dpLine)
-            // Keep the line visible to the right even if context breaks.
-            line.set_extend(dpLine, extend.none)
-            line.set_color(dpLine, color.new(color.gray, 0))
+            line.delete(dpLine)
+            dpLine := na
     else
-        // If 4H falls below Daily, stop updating (but keep the line).
-        if not dailyFib4HOk
+        dpHigh := math.max(dpHigh, high)
+        dpFib50 := dpLow + (dpHigh - dpLow) * 0.50
+        if showDailyPullbackFibLine and not na(dpLine)
+            line.set_extend(dpLine, extend.right)
+            line.set_xy1(dpLine, dpStartTime, dpFib50)
+            line.set_xy2(dpLine, time, dpFib50)
+
+        // Don't allow an "instant hit" on the same candle the line is created.
+        dpHitNow := (time > dpStartTime) and (low <= dpFib50 and high >= dpFib50)
+        if dpHitNow
             dpActive := false
+            dpLineHit := true
+            dpHitLevel := dpFib50
+            dpHitTime := time
+            // Stop the line at the hit candle.
             if not na(dpLine)
                 line.set_xy2(dpLine, time, dpFib50)
                 line.set_extend(dpLine, extend.none)
-                line.set_color(dpLine, color.new(color.gray, 0))
-        else
-            dpHigh := math.max(dpHigh, high)
-            dpFib50 := dpLow + (dpHigh - dpLow) * 0.50
-            if showDailyPullbackFibLine and not na(dpLine)
-                line.set_extend(dpLine, extend.right)
-                line.set_xy1(dpLine, dpStartTime, dpFib50)
-                line.set_xy2(dpLine, time, dpFib50)
+                line.set_color(dpLine, color.new(color.green, 0))
+            label.new(bar_index, low, "FIBDAILY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
-            // Don't allow an "instant hit" on the same candle the line is created.
-            dpHitNow := (time > dpStartTime) and (low <= dpFib50 and high >= dpFib50)
-            if dpHitNow
-                dpActive := false
-                // Once hit: stop the line at the hit candle.
-                if not na(dpLine)
-                    line.set_xy2(dpLine, time, dpFib50)
-                    line.set_extend(dpLine, extend.none)
-                    line.set_color(dpLine, color.new(color.green, 0))
-                label.new(bar_index, low, "FIBDAILY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
+// After hit: remove the fib line once price closes below the 50% level.
+if dpLineHit and not na(dpLine) and not na(dpHitLevel) and not na(dpHitTime)
+    if time > dpHitTime and close < dpHitLevel
+        line.delete(dpLine)
+        dpLine := na
+        dpLineHit := false
+        dpHitLevel := na
+        dpHitTime := na
 
 alertcondition(enableDailyPullbackBuy and dpHitNow, title="FIBDAILY BUY (50% hit)", message="FIBDAILY BUY: Daily>Weekly; 5m was below Daily, waited for 5m BUY, then hit 50% retracement")
 
@@ -363,6 +228,7 @@ showWeeklyPullbackFibLine = input.bool(true, "Show FIBWEEKLY BUY 50% line")
 maxWeeklyPullbackLines = input.int(20, "Max FIBWEEKLY BUY lines to keep", minval=1)
 
 weeklyPullbackGate = (ATD > ATW) and (AT5 < ATW)
+weeklyContextOk = (ATD > ATW)
 
 var bool wpWaitingForBuy = false
 var bool wpActive = false
@@ -372,6 +238,9 @@ var float wpFib50 = na
 var int wpStartTime = na
 var line wpLine = na
 var line[] wpLineHistory = array.new_line()
+var bool wpLineHit = false
+var float wpHitLevel = na
+var int wpHitTime = na
 
 wpHitNow = false
 
@@ -394,6 +263,9 @@ if enableWeeklyPullbackBuy and wpWaitingForBuy and buy5 and (AT5 < ATW) and (ATD
     wpStartTime := time
     wpHigh := high
     wpFib50 := wpLow + (wpHigh - wpLow) * 0.50
+    wpLineHit := false
+    wpHitLevel := na
+    wpHitTime := na
     if showWeeklyPullbackFibLine
         wpLine := line.new(wpStartTime, wpFib50, time, wpFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
         array.push(wpLineHistory, wpLine)
@@ -403,12 +275,11 @@ if enableWeeklyPullbackBuy and wpWaitingForBuy and buy5 and (AT5 < ATW) and (ATD
 
 // Update until hit OR Daily>Weekly breaks
 if wpActive
-    if not (ATD > ATW)
+    if not weeklyContextOk
         wpActive := false
         if not na(wpLine)
-            line.set_xy2(wpLine, time, wpFib50)
-            line.set_extend(wpLine, extend.none)
-            line.set_color(wpLine, color.new(color.gray, 0))
+            line.delete(wpLine)
+            wpLine := na
     else
         wpHigh := math.max(wpHigh, high)
         wpFib50 := wpLow + (wpHigh - wpLow) * 0.50
@@ -420,6 +291,9 @@ if wpActive
         wpHitNow := (time > wpStartTime) and (low <= wpFib50 and high >= wpFib50)
         if wpHitNow
             wpActive := false
+            wpLineHit := true
+            wpHitLevel := wpFib50
+            wpHitTime := time
             if not na(wpLine)
                 line.set_xy2(wpLine, time, wpFib50)
                 line.set_extend(wpLine, extend.none)
@@ -427,4 +301,13 @@ if wpActive
             label.new(bar_index, low, "FIBWEEKLY BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
 alertcondition(enableWeeklyPullbackBuy and wpHitNow, title="FIBWEEKLY BUY (50% hit)", message="FIBWEEKLY BUY: Daily>Weekly; 5m was below Weekly, waited for 5m BUY, then hit 50% retracement")
+
+// After hit: remove the fib line once price closes below the 50% level.
+if wpLineHit and not na(wpLine) and not na(wpHitLevel) and not na(wpHitTime)
+    if time > wpHitTime and close < wpHitLevel
+        line.delete(wpLine)
+        wpLine := na
+        wpLineHit := false
+        wpHitLevel := na
+        wpHitTime := na
 
