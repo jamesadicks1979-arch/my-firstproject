@@ -213,9 +213,6 @@ var float fib50 = na
 var int fibStartTime = na
 var line fibLine = na
 var line[] fibHistory = array.new_line()
-var bool fibFreezeNextBar = false
-var int fibHitTime = na
-
 fibHitNow = false
 
 // Reset if alignment breaks (no fib setup should continue)
@@ -225,8 +222,6 @@ if enableFib4HRBuy and not alignedDW4H
     fibActive := false
     fibHigh := na
     fib50 := na
-    fibFreezeNextBar := false
-    fibHitTime := na
 
 // Pullback tracking: must be BELOW 4H.
 if enableFib4HRBuy and alignedDW4H and not fibActive
@@ -246,8 +241,6 @@ if enableFib4HRBuy and alignedDW4H and fibPB and fiveBelow4H and not fibActive a
     fibLow := na(fibLow) ? low : fibLow
     fibHigh := high
     fib50 := fibLow + (fibHigh - fibLow) * 0.50
-    fibFreezeNextBar := false
-    fibHitTime := na
     if showFib4HRBuyLine
         fibLine := line.new(fibStartTime, fib50, time, fib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
         array.push(fibHistory, fibLine)
@@ -267,23 +260,11 @@ if enableFib4HRBuy and fibActive and alignedDW4H
     fibHitNow := (low <= fib50 and high >= fib50)
     if fibHitNow
         fibActive := false
-        if showFib4HRBuyLine and not na(fibLine)
-            line.set_xy2(fibLine, time, fib50)
-            // Keep extending through the NEXT candle, then freeze.
-            line.set_extend(fibLine, extend.right)
-            line.set_color(fibLine, color.new(color.green, 0))
-        fibFreezeNextBar := true
-        fibHitTime := time
+        // Once hit: remove the line entirely.
+        if not na(fibLine)
+            line.delete(fibLine)
+            fibLine := na
         label.new(bar_index, low, "FIB4HR BUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
-
-// After the fib is touched, keep the line for one more candle, then stop extending.
-if enableFib4HRBuy and fibFreezeNextBar and not na(fibLine) and not na(fibHitTime)
-    // First bar after the hit candle:
-    if time > fibHitTime
-        line.set_xy2(fibLine, time, fib50)
-        line.set_extend(fibLine, extend.none)
-        fibFreezeNextBar := false
-        fibHitTime := na
 
 alertcondition(enableFib4HRBuy and fibHitNow, title="FIB4HR BUY (50% hit)", message="FIB4HR BUY: Daily>Weekly and 4H>Daily; 5m was below 4H, 5m BUY while still below, then hit 50% retracement")
 
