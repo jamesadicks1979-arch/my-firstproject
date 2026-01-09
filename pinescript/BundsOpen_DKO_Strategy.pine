@@ -1,7 +1,7 @@
+//@version=5
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // author © KivancOzbilgic
 // developer © KivancOzbilgic
-//@version=5
 strategy(
      "Bunds Open - DKO Strategy",
      overlay=true,
