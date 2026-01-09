@@ -229,6 +229,11 @@ if enableDailyFibBuy and alignedDW4H and not dfActive
     if fiveBelow4H
         dfPullback := true
         dfLow := na(dfLow) ? low : math.min(dfLow, low)
+    else
+        // If we're no longer below 4H and we haven't started a fib yet, reset the pullback setup.
+        // This keeps the signal "to the right" (only the most recent pullback is considered).
+        dfPullback := false
+        dfLow := na
 
 // If we leave the "below 4H" area before buy triggers, keep dfPullback but stop updating the low.
 // (This avoids losing the pullback low if the BUY happens after crossing back above 4H.)
