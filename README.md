@@ -1,11 +1,9 @@
-# bunds-open-play
+# bunds-open-play (Pine Script)
 
-This repo contains a small “open play” Vite sandbox project.
+This repo contains a **TradingView Pine Script v5** file: `bunds-open-play.pine`.
 
-## Run it
+## Use in TradingView
 
-```bash
-cd bunds-open-play
-npm install
-npm run dev
-```
+- Open TradingView → **Pine Editor**
+- Paste the contents of `bunds-open-play.pine`
+- Click **Add to chart**

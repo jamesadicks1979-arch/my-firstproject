@@ -1,0 +1,43 @@
+//@version=5
+indicator("Bunds Open Play (Template)", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// -----------------------------------------------------------------------------
+// "Open play" Pine Script template
+// - Designed as a clean starting point you can paste logic into.
+// - Includes a small, useful baseline (EMA trend + ATR bands) and alert hooks.
+// -----------------------------------------------------------------------------
+
+// Inputs
+emaLen      = input.int(50, "EMA length", minval=1)
+atrLen      = input.int(14, "ATR length", minval=1)
+atrMult     = input.float(2.0, "ATR multiplier", minval=0.1, step=0.1)
+showBands   = input.bool(true, "Show ATR bands")
+showSignals = input.bool(true, "Show signals")
+
+// Core calculations
+emaVal = ta.ema(close, emaLen)
+atrVal = ta.atr(atrLen)
+
+upperBand = emaVal + atrMult * atrVal
+lowerBand = emaVal - atrMult * atrVal
+
+// Simple signals (example logic)
+longSignal  = ta.crossover(close, emaVal)
+shortSignal = ta.crossunder(close, emaVal)
+
+// Plotting
+plot(emaVal, "EMA", color=color.new(color.teal, 0), linewidth=2)
+plot(showBands ? upperBand : na, "Upper ATR band", color=color.new(color.teal, 70), linewidth=1)
+plot(showBands ? lowerBand : na, "Lower ATR band", color=color.new(color.teal, 70), linewidth=1)
+
+// Signal markers
+plotshape(showSignals and longSignal, title="Long", style=shape.labelup, text="L", location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
+plotshape(showSignals and shortSignal, title="Short", style=shape.labeldown, text="S", location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, size=size.tiny)
+
+// Alerts
+alertcondition(longSignal, title="Long signal", message="Bunds Open Play: Long signal")
+alertcondition(shortSignal, title="Short signal", message="Bunds Open Play: Short signal")
+
+// Optional debug label (toggle by editing the script)
+// label.new(bar_index, high, "ema=" + str.tostring(emaVal) + "\natr=" + str.tostring(atrVal), style=label.style_label_left)
+
