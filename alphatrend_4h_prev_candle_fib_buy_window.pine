@@ -128,6 +128,7 @@ alertcondition(buy5, title="AlphaTrend BUY (5m)", message="AlphaTrend 5m BUY")
 //==================== Dynamic 50% retracement line after EVERY 4H BUY ====================
 showSwingFibLine = input.bool(true, "Show 50% line after every 4H BUY (sell-low -> post-buy high)")
 showSwingFibBuyLabel = input.bool(true, "Show BUY FIB label when 50% line is hit")
+maxSwingFibLines = input.int(20, "Max 4H fib lines to keep on chart", minval=1)
 
 // Trend state driven by 4H signals, tracked on current chart timeframe
 var int trendState4H = 0 // -1 sell, +1 buy
@@ -146,6 +147,7 @@ else if trendState4H == -1
     sellStateLow := na(sellStateLow) ? low : math.min(sellStateLow, low)
 
 var line swingLine = na
+var line[] swingLineHistory = array.new_line()
 var bool swingActive = false
 var float swingLow = na
 var float swingHigh = na
@@ -160,6 +162,10 @@ if buy4H and showSwingFibLine
     swingStart := bar_index
     swingActive := true
     swingLine := line.new(swingStart, swing50, bar_index, swing50, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.lime, 0), width=2)
+    array.push(swingLineHistory, swingLine)
+    if array.size(swingLineHistory) > maxSwingFibLines
+        oldLine = array.shift(swingLineHistory)
+        line.delete(oldLine)
 
 if swingActive and showSwingFibLine
     if trendState4H == -1
@@ -192,6 +198,7 @@ enable5mTrendBuy = input.bool(true, "Enable 5mTrendBUY (HTF aligned + 5m<4H cros
 pipSize = input.float(0.01, "Pip size (GBPJPY pip=0.01)", step=0.01)
 minRallyPips = input.int(20, "Minimum rally (pips) after cross", minval=1)
 show5mTrendFibLine = input.bool(true, "Show 5mTrend fib 50% line")
+max5mTrendLines = input.int(20, "Max 5mTrend fib lines to keep on chart", minval=1)
 
 // Higher timeframe alignment gate:
 // - Daily AlphaTrend above Weekly AlphaTrend
@@ -210,6 +217,7 @@ var float trend5mHigh = na
 var float trend5mFib50 = na
 var int trend5mStartBar = na
 var line trend5mLine = na
+var line[] trend5mLineHistory = array.new_line()
 
 trend5mHitNow = false
 
@@ -224,6 +232,10 @@ if enable5mTrendBuy and htfAligned and cross5mBelow4H
     trend5mStartBar := bar_index
     if show5mTrendFibLine
         trend5mLine := line.new(trend5mStartBar, low, bar_index, low, xloc=xloc.bar_index, extend=extend.right, color=color.new(color.lime, 0), width=2)
+        array.push(trend5mLineHistory, trend5mLine)
+        if array.size(trend5mLineHistory) > max5mTrendLines
+            oldTrendLine = array.shift(trend5mLineHistory)
+            line.delete(oldTrendLine)
 
 // Update tracking state
 if trend5mActive
