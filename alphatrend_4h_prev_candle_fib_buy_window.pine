@@ -311,31 +311,23 @@ if wpLineHit and not na(wpLine) and not na(wpHitLevel) and not na(wpHitTime)
         wpHitLevel := na
         wpHitTime := na
 
-//==================== Nadaraya-Watson Envelope [LuxAlgo] (matched) ====================
-// NOTE: This block matches the user's provided LuxAlgo NWE calculations (499/500 constants).
-enableNWE = input.bool(true, "Enable Nadaraya-Watson Envelope [LuxAlgo]")
+//==================== Nadaraya-Watson Envelope [LuxAlgo] (non-repainting endpoint method) ====================
+// Matches the LuxAlgo script when "Repainting Smoothing" is OFF.
+// (Repainting mode uses ~500 line objects and will conflict with fib lines in a combined script.)
+enableNWE = input.bool(true, "Enable Nadaraya-Watson Envelope [LuxAlgo] (non-repaint)")
 h = input.float(8.0, "Bandwidth", minval=0)
 mult = input.float(3.0, "Multiplier", minval=0)
 nweSrc = input.source(close, "NWE Source")
-repaint = input.bool(true, "Repainting Smoothing", tooltip="Disabling repainting outputs endpoint calculations")
 upCss = input.color(color.teal, "NWE Up Color")
 dnCss = input.color(color.red, "NWE Down Color")
 
 // Gaussian window
 gauss(x, _h) => math.exp(-(math.pow(x, 2) / (_h * _h * 2)))
 
-n = bar_index
-
-// Precreate line pool for repaint mode (500 lines max)
-var line[] ln = array.new_line(0)
-if barstate.isfirst and repaint
-    for _i = 0 to 499
-        array.push(ln, line.new(na, na, na, na))
-
 // Endpoint method (non-repaint): coefs/den precomputed once
 var float[] coefs = array.new_float(0)
 var float den = na
-if barstate.isfirst and not repaint
+if barstate.isfirst
     for i = 0 to 499
         w = gauss(i, h)
         array.push(coefs, w)
@@ -346,7 +338,7 @@ float mae = na
 float upper = na
 float lower = na
 
-if enableNWE and not repaint and bar_index >= 499
+if enableNWE and bar_index >= 499
     sumOut = 0.0
     for i = 0 to 499
         sumOut += nweSrc[i] * array.get(coefs, i)
@@ -355,43 +347,8 @@ if enableNWE and not repaint and bar_index >= 499
     upper := out + mae
     lower := out - mae
 
-plot(enableNWE and not repaint ? upper : na, "Upper", upCss)
-plot(enableNWE and not repaint ? lower : na, "Lower", dnCss)
-
-// Repainting mode: compute and draw envelope on last bar
-if enableNWE and repaint and barstate.islast
-    float y2 = na
-    float y1 = na
-    float sae = 0.0
-    float[] nwe = array.new_float(0)
-
-    for i = 0 to math.min(499, n - 1)
-        sum = 0.0
-        sumw = 0.0
-        for j = 0 to math.min(499, n - 1)
-            w = gauss(i - j, h)
-            sum += nweSrc[j] * w
-            sumw += w
-        y2 := sum / sumw
-        sae += math.abs(nweSrc[i] - y2)
-        array.push(nwe, y2)
-
-    sae := sae / math.min(499, n - 1) * mult
-
-    // Update precreated lines (use only odd i => ~500 segments total)
-    seg = 0
-    for i = 0 to math.min(499, n - 1)
-        if i % 2 == 1
-            upperLine = array.get(ln, seg)
-            lowerLine = array.get(ln, seg + 1)
-            line.set_xy1(upperLine, n - i + 1, y1 + sae)
-            line.set_xy2(upperLine, n - i, array.get(nwe, i) + sae)
-            line.set_color(upperLine, upCss)
-            line.set_xy1(lowerLine, n - i + 1, y1 - sae)
-            line.set_xy2(lowerLine, n - i, array.get(nwe, i) - sae)
-            line.set_color(lowerLine, dnCss)
-            seg += 2
-        y1 := array.get(nwe, i)
+plot(enableNWE ? upper : na, "Upper", upCss)
+plot(enableNWE ? lower : na, "Lower", dnCss)
 
 //==================== NWE dip -> reclaim -> 50% fib (max 2 days) ====================
 enableNWEFib = input.bool(true, "Enable NWE Fib (4H>Daily & Daily>Weekly; dip below lower then reclaim)")
@@ -400,7 +357,7 @@ nweFibMaxDays = input.int(2, "NWE fib max duration (days)", minval=1, maxval=30)
 ctxNWEFib = (AT4H > ATD) and (ATD > ATW)
 twoDaysMs = nweFibMaxDays * 24 * 60 * 60 * 1000
 
-// Use non-repaint lower/upper series for signals (stable historically).
+// Use LuxAlgo endpoint lower series for signals.
 float lowerSig = lower
 
 var bool nweInDip = false
@@ -411,8 +368,8 @@ var float nweFib50 = na
 var int nweFibStartTime = na
 var line nweFibLine = na
 
-belowLower = enableNWE and enableNWEFib and not repaint and ctxNWEFib and not na(lowerSig) and low < lowerSig
-reclaimLower = enableNWE and enableNWEFib and not repaint and ctxNWEFib and not na(lowerSig) and ta.crossover(close, lowerSig)
+belowLower = enableNWE and enableNWEFib and ctxNWEFib and not na(lowerSig) and ta.crossunder(low, lowerSig)
+reclaimLower = enableNWE and enableNWEFib and ctxNWEFib and not na(lowerSig) and ta.crossover(close, lowerSig)
 
 if belowLower
     nweInDip := true
