@@ -194,102 +194,76 @@ if swingActive and showSwingFibLine
 
 alertcondition(showSwingFibLine and swingHitNow, title="BUY FIB (dynamic 50% hit)", message="After AlphaTrend 4H BUY: price hit dynamic 50% retracement (sell-low -> post-buy high)")
 
-//==================== 5m cross-below-4H -> (wait for 5m BUY) -> rally -> 50% fib -> "5mTrendBUY" ====================
-enable5mTrendBuy = input.bool(true, "Enable 5mTrendBUY (HTF aligned + 5m<4H cross + 5m BUY + 20 pip rally + 50% retrace)")
-pipSize = input.float(0.01, "Pip size (GBPJPY pip=0.01)", step=0.01, minval=0.0)
-minRallyPips = input.int(20, "Minimum rally (pips) after cross", minval=1)
-show5mTrendFibLine = input.bool(true, "Show 5mTrend fib 50% line")
-max5mTrendLines = input.int(20, "Max 5mTrend fib lines to keep on chart", minval=1)
+//==================== D>W and 4H>D&W; 5m below 4H -> wait 5m BUY -> 50% fib -> "4H ALPHABUY" ====================
+enable4HAlphaBuyFib = input.bool(true, "Enable 4H ALPHABUY fib (D>W & 4H>D&W; 5m<4H then 5m BUY -> 50% retrace)")
+show4HAlphaBuyFibLine = input.bool(true, "Show 4H ALPHABUY fib 50% line")
+max4HAlphaBuyFibLines = input.int(20, "Max 4H ALPHABUY fib lines to keep on chart", minval=1)
 
-// Higher timeframe alignment gate:
-// - Daily AlphaTrend above Weekly AlphaTrend
-// - 4H AlphaTrend above both Daily and Weekly
-// - 1H AlphaTrend above 4H AlphaTrend
-htfAligned = (ATD > ATW) and (AT4H > ATD) and (AT4H > ATW) and (AT1H > AT4H)
+alignedDW4H = (ATD > ATW) and (AT4H > ATD) and (AT4H > ATW)
+fiveBelow4H = AT5 < AT4H
 
-// Trigger: 5m AlphaTrend crosses below 4H AlphaTrend
-cross5mBelow4H = ta.crossunder(AT5, AT4H)
+var bool abWaiting = false
+var bool abActive = false
+var float abLow = na
+var float abHigh = na
+var float abFib50 = na
+var int abStartTime = na
+var line abLine = na
+var line[] abLineHistory = array.new_line()
 
-var bool trend5mActive = false
-var bool trend5mBullish = false
-var bool trend5mRallied = false
-var float trend5mLow = na
-var float trend5mHigh = na
-var float trend5mFib50 = na
-var int trend5mStartTime = na
-var line trend5mLine = na
-var line[] trend5mLineHistory = array.new_line()
+abHitNow = false
 
-trend5mHitNow = false
-pipsDiv = math.max(pipSize, syminfo.mintick)
+// While aligned and 5m is below 4H, build the pullback low and wait for 5m BUY.
+if enable4HAlphaBuyFib
+    if alignedDW4H and fiveBelow4H and not abActive
+        abWaiting := true
+        abLow := na(abLow) ? low : math.min(abLow, low)
+    // Cancel waiting if alignment breaks
+    if abWaiting and not alignedDW4H
+        abWaiting := false
+        abLow := na
 
-// Start tracking after crossunder, only if HTF alignment is satisfied.
-if enable5mTrendBuy and htfAligned and cross5mBelow4H
-    trend5mActive := true
-    trend5mBullish := false
-    trend5mRallied := false
-    // Pre-buy tracking (we'll re-anchor on the actual 5m BUY candle)
-    trend5mLow := low
-    trend5mHigh := na
-    trend5mFib50 := na
-    trend5mStartTime := time
-    // Do NOT draw the line yet; we draw it on the 5m BUY candle so levels are correct.
+// When 5m BUY happens after being below 4H (and still aligned), start the fib from that pullback low.
+if enable4HAlphaBuyFib and abWaiting and alignedDW4H and buy5
+    abWaiting := false
+    abActive := true
+    abStartTime := time
+    abHigh := high
+    abFib50 := abLow + (abHigh - abLow) * 0.50
+    if show4HAlphaBuyFibLine
+        abLine := line.new(abStartTime, abFib50, time, abFib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.green, 0), width=2)
+        array.push(abLineHistory, abLine)
+        if array.size(abLineHistory) > max4HAlphaBuyFibLines
+            oldAbLine = array.shift(abLineHistory)
+            line.delete(oldAbLine)
 
-// Update tracking state
-if trend5mActive
-    // If alignment breaks, stop the setup and gray out the line.
-    if not htfAligned
-        trend5mActive := false
-        if not na(trend5mLine)
-            line.set_extend(trend5mLine, extend.none)
-            line.set_color(trend5mLine, color.new(color.gray, 0))
+// Update active fib until hit OR alignment breaks.
+if abActive
+    if not alignedDW4H
+        abActive := false
+        abLow := na
+        if not na(abLine)
+            line.set_extend(abLine, extend.none)
+            line.set_color(abLine, color.new(color.gray, 0))
     else
-        // Always keep the lowest low since the crossunder trigger.
-        trend5mLow := math.min(trend5mLow, low)
+        abHigh := math.max(abHigh, high)
+        abFib50 := abLow + (abHigh - abLow) * 0.50
+        if show4HAlphaBuyFibLine and not na(abLine)
+            line.set_extend(abLine, extend.right)
+            line.set_xy1(abLine, abStartTime, abFib50)
+            line.set_xy2(abLine, time, abFib50)
 
-        // Must get a 5m BUY alert before we start measuring the rally/highs.
-        if not trend5mBullish and buy5
-            trend5mBullish := true
-            // Start fib tracking from the 5m BUY candle so the fib isn't "off".
-            trend5mStartTime := time
-            trend5mLow := low
-            trend5mHigh := high
-            trend5mRallied := false
-            trend5mFib50 := na
-            // Create (or recreate) the line now that we have a proper anchor.
-            if show5mTrendFibLine
-                trend5mLine := line.new(trend5mStartTime, trend5mLow, time, trend5mLow, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.lime, 0), width=2)
-                array.push(trend5mLineHistory, trend5mLine)
-                if array.size(trend5mLineHistory) > max5mTrendLines
-                    oldTrendLine = array.shift(trend5mLineHistory)
-                    line.delete(oldTrendLine)
-        else if trend5mBullish
-            trend5mHigh := math.max(trend5mHigh, high)
+        abHitNow := (low <= abFib50 and high >= abFib50)
+        if abHitNow
+            abActive := false
+            abLow := na
+            if show4HAlphaBuyFibLine and not na(abLine)
+                line.set_xy2(abLine, time, abFib50)
+                line.set_extend(abLine, extend.right)
+                line.set_color(abLine, color.new(color.green, 0))
+            label.new(bar_index, low, "4H ALPHABUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.new(color.black, 0))
 
-            // Check if we've rallied enough from the low.
-            rallyPips = (trend5mHigh - trend5mLow) / pipsDiv
-            if not trend5mRallied and rallyPips >= minRallyPips
-                trend5mRallied := true
-
-            // Once rallied, compute/update 50% fib and extend/update the line.
-            if trend5mRallied
-                trend5mFib50 := trend5mLow + (trend5mHigh - trend5mLow) * 0.50
-                if show5mTrendFibLine and not na(trend5mLine)
-                    line.set_extend(trend5mLine, extend.right)
-                    line.set_xy1(trend5mLine, trend5mStartTime, trend5mFib50)
-                    line.set_xy2(trend5mLine, time, trend5mFib50)
-
-                // When price touches the 50% level, mark buy and stop this setup.
-                trend5mHitNow := (low <= trend5mFib50 and high >= trend5mFib50)
-                if trend5mHitNow
-                    trend5mActive := false
-                    if show5mTrendFibLine and not na(trend5mLine)
-                        line.set_xy2(trend5mLine, time, trend5mFib50)
-                        line.set_extend(trend5mLine, extend.right)
-                        line.set_color(trend5mLine, color.new(color.green, 0))
-                    label.new(bar_index, low, "5mTrendBUY", xloc=xloc.bar_index, style=label.style_label_up, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
-
-alertcondition(enable5mTrendBuy and trend5mHitNow, title="5mTrendBUY", message="5mTrendBUY: HTF aligned (incl 1H>4H), 5m AT crossed below 4H, got 5m BUY, rallied >= threshold, then hit 50% retracement")
+alertcondition(enable4HAlphaBuyFib and abHitNow, title="4H ALPHABUY (50% hit)", message="4H ALPHABUY: D>W and 4H>D&W; 5m was below 4H, then 5m BUY, then hit 50% retracement")
 
 //==================== 5m below Daily (while HTF bullish) -> wait 5m BUY -> 50% fib -> "BUY DAILY AT" ====================
 enableDailyPullbackBuy = input.bool(true, "Enable BUY DAILY AT (5m<Daily, 4H>Daily, Daily>Weekly, then 5m BUY -> 50% fib)")
