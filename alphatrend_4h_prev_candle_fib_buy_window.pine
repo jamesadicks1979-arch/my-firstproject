@@ -114,6 +114,8 @@ alertcondition(sell1H, title="AlphaTrend SELL (1H)", message="AlphaTrend 1H SELL
 // Daily AlphaTrend above Weekly AND 4H above Daily
 // (Used by pivot display + fib setup logic)
 atAligned = (ATD > ATW) and (AT4H > ATD)
+// Short alignment: Daily and 4H below Weekly
+atShortAligned = (ATD < ATW) and (AT4H < ATW)
 
 //==================== Nadaraya-Watson Envelope [LuxAlgo] (matched) ====================
 // Matches the user's provided LuxAlgo NWE calculations.
@@ -256,6 +258,8 @@ ddd_s1111 = request.security(syminfo.tickerid, "D", s1, barmerge.gaps_off, barme
 
 // When AT alignment is bullish (Daily > Weekly and 4H > Daily), show only support (S1), hide resistance (R1).
 plot(show4Band ? (atAligned and ddd_s1111 != 0.0 ? ddd_s1111 : na) : na, title="DS1", style=plot.style_line, linewidth=2, color=color.blue)
+// When AT alignment is bearish (Daily < Weekly and 4H < Weekly), show only resistance (R1).
+plot(show4Band ? (atShortAligned and ddd_r1111 != 0.0 ? ddd_r1111 : na) : na, title="D R1", style=plot.style_line, linewidth=2, color=color.blue)
 
 // 240 Pivot Bands
 d_PPEMA = request.security(syminfo.tickerid, "240", PPEMA, barmerge.gaps_off, barmerge.lookahead_off)
@@ -266,6 +270,8 @@ band4hS2 = request.security(syminfo.tickerid, "240", s2, barmerge.gaps_off, barm
 
 // 4H Pivot Bands: show only support (S1) under bullish AT alignment.
 plot(show4Band ? (sd and atAligned and band4hS1 != 0.0 ? band4hS1 : na) : na, title="4 S1", style=plot.style_line, linewidth=5, color=color.black)
+// 4H Pivot Bands: show only resistance (R1) under bearish AT alignment.
+plot(show4Band ? (sd and atShortAligned and band4hR1 != 0.0 ? band4hR1 : na) : na, title="4 R1", style=plot.style_line, linewidth=5, color=color.black)
 
 //==================== Fib from NWE lower OR 4BAND support (AlphaTrends aligned) ====================
 enableFibDots = input.bool(true, "Enable Fib (AT aligned + dip below NWE/4BAND then reclaim)")
