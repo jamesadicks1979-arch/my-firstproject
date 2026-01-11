@@ -1,0 +1,395 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// author © KivancOzbilgic
+// developer © KivancOzbilgic
+//@version=5
+indicator("AlphaTrend (locked MTF) + Fib Buys", shorttitle="AT MTF", overlay=true, format=format.price, precision=2, max_lines_count=500, max_labels_count=500, max_bars_back=5000)
+
+//==================== INPUTS ====================
+coeff = input.float(1, "Multiplier", step=0.1)
+AP = input.int(14, "Common Period")
+src = input.source(close, "Source")
+novolumedata = input.bool(false, title="Change calculation (no volume data)?")
+
+showAT4H = input.bool(true, "Show AlphaTrend (4H locked)")
+showATD = input.bool(true, "Show AlphaTrend (Daily locked)")
+showATW = input.bool(true, "Show AlphaTrend (Weekly locked)")
+showAT1H = input.bool(false, "Show AlphaTrend (1H locked)")
+
+showsignals4H = input.bool(true, "Show 4H Signals?")
+showsignalsD = input.bool(false, "Show Daily Signals?")
+showsignalsW = input.bool(false, "Show Weekly Signals?")
+showsignals1H = input.bool(false, "Show 1H Signals?")
+
+// Always use these fixed timeframes so the indicator "holds" when you switch chart TF.
+tf4H = "240"
+tfD = "D"
+tfW = "W"
+tf1H = "60"
+
+//==================== AlphaTrend bundle function (runs inside request.security) ====================
+f_atBundle(_src) =>
+    ATR = ta.sma(ta.tr, AP)
+    upT = low - ATR * coeff
+    dnT = high + ATR * coeff
+
+    // Call both every bar (avoids Pine consistency warnings)
+    rsiVal = ta.rsi(_src, AP)
+    mfiVal = ta.mfi(hlc3, AP)
+    bullOK = novolumedata ? (rsiVal >= 50) : (mfiVal >= 50)
+
+    float at = na
+    at := bullOK ?
+         (upT < nz(at[1]) ? nz(at[1]) : upT) :
+         (dnT > nz(at[1]) ? nz(at[1]) : dnT)
+
+    buySig = ta.crossover(at, at[2])
+    sellSig = ta.crossunder(at, at[2])
+
+    K1 = ta.barssince(buySig)
+    K2 = ta.barssince(sellSig)
+    O1 = ta.barssince(buySig[1])
+    O2 = ta.barssince(sellSig[1])
+
+    aBuy = buySig and O1 > K2
+    aSell = sellSig and O2 > K1
+
+    [at, at[1], at[2], at[3], aBuy, aSell]
+
+//==================== 4H AlphaTrend (locked) ====================
+[AT4H, AT4H_1, AT4H_2, AT4H_3, buy4H, sell4H] = request.security(syminfo.tickerid, tf4H, f_atBundle(src), barmerge.gaps_off, barmerge.lookahead_off)
+at4HColorFill = AT4H > AT4H_2 ? #00E60F : AT4H < AT4H_2 ? #80000B : AT4H_1 > AT4H_3 ? #00E60F : #80000B
+
+pAT4H = plot(showAT4H ? AT4H : na, title="AlphaTrend (4H)", color=color.new(#0022FC, 0), linewidth=3)
+pAT4H2 = plot(showAT4H ? AT4H_2 : na, title="AlphaTrend[2] (4H)", color=color.new(#FC0400, 0), linewidth=3)
+fill(pAT4H, pAT4H2, color=showAT4H ? at4HColorFill : na)
+
+plotshape(showAT4H and showsignals4H and buy4H ? (AT4H_2 * 0.9999) : na, title="BUY (4H)", text="BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
+plotshape(showAT4H and showsignals4H and sell4H ? (AT4H_2 * 1.0001) : na, title="SELL (4H)", text="SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
+
+alertcondition(buy4H, title="AlphaTrend BUY (4H)", message="AlphaTrend 4H BUY")
+alertcondition(sell4H, title="AlphaTrend SELL (4H)", message="AlphaTrend 4H SELL")
+
+//==================== Daily AlphaTrend (locked) ====================
+[ATD, ATD_1, ATD_2, ATD_3, buyD, sellD] = request.security(syminfo.tickerid, tfD, f_atBundle(src), barmerge.gaps_off, barmerge.lookahead_off)
+atDColorFill = ATD > ATD_2 ? color.new(#00E60F, 65) : ATD < ATD_2 ? color.new(#80000B, 65) : ATD_1 > ATD_3 ? color.new(#00E60F, 65) : color.new(#80000B, 65)
+
+pATD = plot(showATD ? ATD : na, title="AlphaTrend (Daily)", color=color.new(color.aqua, 0), linewidth=2)
+pATD2 = plot(showATD ? ATD_2 : na, title="AlphaTrend[2] (Daily)", color=color.new(color.orange, 0), linewidth=2)
+fill(pATD, pATD2, color=showATD ? atDColorFill : na)
+
+plotshape(showATD and showsignalsD and buyD ? (ATD_2 * 0.9999) : na, title="BUY (Daily)", text="D BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.aqua, 0), textcolor=color.new(color.black, 0))
+plotshape(showATD and showsignalsD and sellD ? (ATD_2 * 1.0001) : na, title="SELL (Daily)", text="D SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.orange, 0), textcolor=color.new(color.black, 0))
+
+alertcondition(buyD, title="AlphaTrend BUY (Daily)", message="AlphaTrend Daily BUY")
+alertcondition(sellD, title="AlphaTrend SELL (Daily)", message="AlphaTrend Daily SELL")
+
+//==================== Weekly AlphaTrend (locked) ====================
+[ATW, ATW_1, ATW_2, ATW_3, buyW, sellW] = request.security(syminfo.tickerid, tfW, f_atBundle(src), barmerge.gaps_off, barmerge.lookahead_off)
+atWColorFill = ATW > ATW_2 ? color.new(#00E60F, 80) : ATW < ATW_2 ? color.new(#80000B, 80) : ATW_1 > ATW_3 ? color.new(#00E60F, 80) : color.new(#80000B, 80)
+
+pATW = plot(showATW ? ATW : na, title="AlphaTrend (Weekly)", color=color.new(color.fuchsia, 0), linewidth=2)
+pATW2 = plot(showATW ? ATW_2 : na, title="AlphaTrend[2] (Weekly)", color=color.new(color.yellow, 0), linewidth=2)
+fill(pATW, pATW2, color=showATW ? atWColorFill : na)
+
+plotshape(showATW and showsignalsW and buyW ? (ATW_2 * 0.9999) : na, title="BUY (Weekly)", text="W BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.fuchsia, 0), textcolor=color.new(color.black, 0))
+plotshape(showATW and showsignalsW and sellW ? (ATW_2 * 1.0001) : na, title="SELL (Weekly)", text="W SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.yellow, 0), textcolor=color.new(color.black, 0))
+
+alertcondition(buyW, title="AlphaTrend BUY (Weekly)", message="AlphaTrend Weekly BUY")
+alertcondition(sellW, title="AlphaTrend SELL (Weekly)", message="AlphaTrend Weekly SELL")
+
+//==================== 1H AlphaTrend (locked) ====================
+[AT1H, AT1H_1, AT1H_2, AT1H_3, buy1H, sell1H] = request.security(syminfo.tickerid, tf1H, f_atBundle(src), barmerge.gaps_off, barmerge.lookahead_off)
+at1HColorFill = AT1H > AT1H_2 ? color.new(#00E60F, 85) : AT1H < AT1H_2 ? color.new(#80000B, 85) : AT1H_1 > AT1H_3 ? color.new(#00E60F, 85) : color.new(#80000B, 85)
+
+pAT1H = plot(showAT1H ? AT1H : na, title="AlphaTrend (1H)", color=color.new(color.teal, 0), linewidth=2)
+pAT1H2 = plot(showAT1H ? AT1H_2 : na, title="AlphaTrend[2] (1H)", color=color.new(color.navy, 0), linewidth=2)
+fill(pAT1H, pAT1H2, color=showAT1H ? at1HColorFill : na)
+
+plotshape(showAT1H and showsignals1H and buy1H ? (AT1H_2 * 0.9999) : na, title="BUY (1H)", text="1H BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(color.teal, 0), textcolor=color.new(color.black, 0))
+plotshape(showAT1H and showsignals1H and sell1H ? (AT1H_2 * 1.0001) : na, title="SELL (1H)", text="1H SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.navy, 0), textcolor=color.new(color.white, 0))
+
+alertcondition(buy1H, title="AlphaTrend BUY (1H)", message="AlphaTrend 1H BUY")
+alertcondition(sell1H, title="AlphaTrend SELL (1H)", message="AlphaTrend 1H SELL")
+
+//==================== Alignment gates ====================
+// Fib logic gate (unchanged): Daily above Weekly AND 4H above Daily
+atAligned = (ATD > ATW) and (AT4H > ATD)
+
+// Pivot display gate (what you requested):
+// - If Daily > Weekly => ONLY SUPPORT pivots (S1)
+// - If Daily < Weekly => ONLY RESISTANCE pivots (R1)
+pivotBull = ATD > ATW
+pivotBear = ATD < ATW
+
+//==================== Nadaraya-Watson Envelope [LuxAlgo] (matched) ====================
+enableNWE = input.bool(true, "Enable Nadaraya-Watson Envelope [LuxAlgo]")
+h = input.float(8.0, "Bandwidth", minval=0)
+mult = input.float(3.0, "Multiplier", minval=0)
+nweSrc = input.source(close, "NWE Source")
+repaint = input.bool(true, "Repainting Smoothing", tooltip="Disabling repainting outputs endpoint calculations")
+upCss = input.color(color.teal, "NWE Up Color")
+dnCss = input.color(color.red, "NWE Down Color")
+
+// Gaussian window
+gauss(x, _h) => math.exp(-(math.pow(x, 2) / (_h * _h * 2)))
+
+// Endpoint method (LuxAlgo non-repaint): coefs/den precomputed (also used for fib signals even if repaint is ON)
+var float[] coefs = array.new_float(0)
+var float den = na
+var float hLast = na
+if barstate.isfirst or hLast != h
+    array.clear(coefs)
+    for i = 0 to 499
+        w = gauss(i, h)
+        array.push(coefs, w)
+    den := array.sum(coefs)
+    hLast := h
+
+float out = na
+float mae = na
+float upper = na
+float lower = na
+float outEndpoint = na
+float maeEndpoint = na
+float lowerSig = na
+
+// Always compute endpoint values once we have enough bars (used for signals/fibs).
+if enableNWE and bar_index >= 499
+    sumOut = 0.0
+    for i = 0 to 499
+        sumOut += nweSrc[i] * array.get(coefs, i)
+    outEndpoint := sumOut / den
+    maeEndpoint := ta.sma(math.abs(nweSrc - outEndpoint), 499) * mult
+    lowerSig := outEndpoint - maeEndpoint
+
+// Non-repaint plots match LuxAlgo when repaint is OFF.
+if enableNWE and not repaint and bar_index >= 499
+    out := outEndpoint
+    mae := maeEndpoint
+    upper := out + mae
+    lower := out - mae
+
+plot(enableNWE and not repaint ? upper : na, "Upper", upCss)
+plot(enableNWE and not repaint ? lower : na, "Lower", dnCss)
+
+// Repainting mode: draw envelope using a preallocated pool of lines (500 max).
+var line[] ln = array.new_line(0)
+if barstate.isfirst and repaint
+    for _i = 0 to 499
+        array.push(ln, line.new(na, na, na, na))
+
+if enableNWE and repaint and barstate.islast
+    float y2 = na
+    float y1 = na
+    float sae = 0.0
+    float[] nwe = array.new_float(0)
+    n = bar_index
+
+    // Compute NWE points
+    for i = 0 to math.min(499, n - 1)
+        sum = 0.0
+        sumw = 0.0
+        for j = 0 to math.min(499, n - 1)
+            w = gauss(i - j, h)
+            sum += nweSrc[j] * w
+            sumw += w
+        y2 := sum / sumw
+        sae += math.abs(nweSrc[i] - y2)
+        array.push(nwe, y2)
+
+    sae := sae / math.min(499, n - 1) * mult
+
+    // Update line pool (LuxAlgo draws only on odd i)
+    seg = 0
+    for i = 0 to math.min(499, n - 1)
+        if i % 2 == 1
+            upperLine = array.get(ln, seg)
+            lowerLine = array.get(ln, seg + 1)
+            line.set_xy1(upperLine, n - i + 1, y1 + sae)
+            line.set_xy2(upperLine, n - i, array.get(nwe, i) + sae)
+            line.set_color(upperLine, upCss)
+            line.set_xy1(lowerLine, n - i + 1, y1 - sae)
+            line.set_xy2(lowerLine, n - i, array.get(nwe, i) - sae)
+            line.set_color(lowerLine, dnCss)
+            seg += 2
+        y1 := array.get(nwe, i)
+
+//==================== 4BAND (Pivot Bands) - v4 script translated to v5 ====================
+show4Band = input.bool(true, "Show 4BAND Pivot Bands")
+lengthMA = input.int(3, title="EMA Length To Calculate Bands", minval=1)
+lengthMA1 = input.int(1, title="EMA Length To Calculate Bands", minval=1)
+lengthMA11 = input.int(1, title="EMA Length To Calculate Bands", minval=1)
+sd = input.bool(true, title="Show Daily Pivot Bands?")
+
+// Get data for previous days (kept for parity with the v4 script; not used downstream)
+hhh = request.security(syminfo.tickerid, "", high[1], barmerge.gaps_off, barmerge.lookahead_off)
+lll = request.security(syminfo.tickerid, "", low[1], barmerge.gaps_off, barmerge.lookahead_off)
+high1d = request.security(syminfo.tickerid, "", high[1], barmerge.gaps_off, barmerge.lookahead_off)
+low1d = request.security(syminfo.tickerid, "", low[1], barmerge.gaps_off, barmerge.lookahead_off)
+opend = request.security(syminfo.tickerid, "", open, barmerge.gaps_off, barmerge.lookahead_off)
+low2d = request.security(syminfo.tickerid, "", low[2], barmerge.gaps_off, barmerge.lookahead_off)
+close1d = request.security(syminfo.tickerid, "", close[1], barmerge.gaps_off, barmerge.lookahead_off)
+high2d = request.security(syminfo.tickerid, "", high[2], barmerge.gaps_off, barmerge.lookahead_off)
+open1d = request.security(syminfo.tickerid, "", open[1], barmerge.gaps_off, barmerge.lookahead_off)
+
+PP = (high + low + close) / 3.0
+PPEMA = ta.ema(PP, lengthMA)
+PPEMA1 = ta.ema(PP, lengthMA1)
+PPEMA11 = ta.ema(PP, lengthMA11)
+
+HP1 = (PP + (PP - low))
+LP1 = (PP - (high - PP))
+HP2 = (PP + 2 * (PP - low))
+LP2 = (PP - 2 * (high - PP))
+
+PPD71 = (((HP1 - LP1) + (HP1[1] - LP1[1]) + (HP1[2] - LP1[2]) + (HP1[3] - LP1[3]) + (HP1[4] - LP1[4]) + (HP1[5] - LP1[5]) + (HP1[6] - LP1[6])) / 7.0)
+PPD72 = (((HP2 - LP2) + (HP2[1] - LP2[1]) + (HP2[2] - LP2[2]) + (HP2[3] - LP2[3]) + (HP2[4] - LP2[4]) + (HP2[5] - LP2[5]) + (HP2[6] - LP2[6])) / 7.0)
+
+r1 = PPEMA + PPD71
+s1 = PPEMA - PPD71
+r2 = PPEMA1 + PPD71
+s2 = PPEMA1 - PPD71
+
+// Daily Pivot Bands
+ddd_r1111 = request.security(syminfo.tickerid, "D", r1, barmerge.gaps_off, barmerge.lookahead_off)
+ddd_s1111 = request.security(syminfo.tickerid, "D", s1, barmerge.gaps_off, barmerge.lookahead_off)
+
+plot(show4Band ? (pivotBull and ddd_s1111 != 0.0 ? ddd_s1111 : na) : na, title="DS1", style=plot.style_line, linewidth=2, color=color.blue)
+plot(show4Band ? (pivotBear and ddd_r1111 != 0.0 ? ddd_r1111 : na) : na, title="D R1", style=plot.style_line, linewidth=2, color=color.blue)
+
+// 240 Pivot Bands
+band4hR1 = request.security(syminfo.tickerid, "240", r1, barmerge.gaps_off, barmerge.lookahead_off)
+band4hS1 = request.security(syminfo.tickerid, "240", s1, barmerge.gaps_off, barmerge.lookahead_off)
+band4hR2 = request.security(syminfo.tickerid, "240", r2, barmerge.gaps_off, barmerge.lookahead_off)
+band4hS2 = request.security(syminfo.tickerid, "240", s2, barmerge.gaps_off, barmerge.lookahead_off)
+
+plot(show4Band ? (sd and pivotBull and band4hS1 != 0.0 ? band4hS1 : na) : na, title="4 S1", style=plot.style_line, linewidth=5, color=color.black)
+plot(show4Band ? (sd and pivotBear and band4hR1 != 0.0 ? band4hR1 : na) : na, title="4 R1", style=plot.style_line, linewidth=5, color=color.black)
+
+//==================== Fib from NWE lower OR 4BAND support (AlphaTrends aligned) ====================
+enableFibDots = input.bool(true, "Enable Fib (AT aligned + dip below NWE/4BAND then reclaim)")
+fibMaxDays = input.int(2, "Fib max duration (days)", minval=1, maxval=30)
+fibLookbackDays = input.int(140, "Fib: show setups only in last N days (0 = all history)", minval=0, maxval=3650)
+showFibDots = input.bool(true, "Show Fib 50% dots")
+showFibLine = input.bool(true, "Show Fib 50% line")
+
+lookbackMs = fibLookbackDays * 24 * 60 * 60 * 1000
+inFibLookback = (fibLookbackDays == 0) ? true : (time >= (timenow - lookbackMs))
+fibWindowMs = fibMaxDays * 24 * 60 * 60 * 1000
+
+useNWELevel = enableNWE and not na(lowerSig)
+use4BandLevel = show4Band and sd and not na(band4hS1)
+
+belowNWE = enableFibDots and atAligned and inFibLookback and useNWELevel and close < lowerSig
+below4Band = enableFibDots and atAligned and inFibLookback and use4BandLevel and close < band4hS1
+
+var bool fibInDip = false
+var int fibDipType = 0      // 1 = NWE, 2 = 4BAND
+var float fibDipLow = na
+var int fibDipStartTime = na
+
+var bool fibActive = false
+var float fibLowAnchor = na
+var float fibHigh = na
+var float fib50 = na
+var int fibStartTime = na
+var line fib50Line = na
+
+// Enter dip state when we go below either level (NWE has priority).
+if enableFibDots and atAligned and inFibLookback and not fibActive
+    if not fibInDip and belowNWE
+        fibInDip := true
+        fibDipType := 1
+        fibDipLow := low
+        fibDipStartTime := time
+    else if not fibInDip and below4Band
+        fibInDip := true
+        fibDipType := 2
+        fibDipLow := low
+        fibDipStartTime := time
+
+// While in dip, track lowest low.
+if fibInDip
+    fibDipLow := math.min(fibDipLow, low)
+    // Cancel stale dip
+    if time - fibDipStartTime > fibWindowMs or not atAligned
+        fibInDip := false
+        fibDipType := 0
+        fibDipLow := na
+        fibDipStartTime := na
+
+// Reclaim conditions depend on which band was dipped under.
+crossOverLowerSig = useNWELevel ? ta.crossover(close, lowerSig) : false
+crossOver4BandS1 = use4BandLevel ? ta.crossover(close, band4hS1) : false
+reclaimNWE = (fibDipType == 1) and crossOverLowerSig
+reclaim4Band = (fibDipType == 2) and crossOver4BandS1
+
+if enableFibDots and fibInDip and not fibActive and (reclaimNWE or reclaim4Band)
+    fibInDip := false
+    fibActive := true
+    fibStartTime := time
+    fibLowAnchor := fibDipLow
+    fibHigh := high
+    fib50 := fibLowAnchor + (fibHigh - fibLowAnchor) * 0.50
+
+    if showFibLine
+        if not na(fib50Line)
+            line.delete(fib50Line)
+        fib50Line := line.new(fibStartTime, fib50, time, fib50, xloc=xloc.bar_time, extend=extend.right, color=color.new(color.lime, 0), width=2)
+
+    fibDipType := 0
+    fibDipLow := na
+    fibDipStartTime := na
+
+// Update fib while active
+if fibActive
+    if (time - fibStartTime > fibWindowMs) or (not atAligned)
+        fibActive := false
+        fibLowAnchor := na
+        fibHigh := na
+        fib50 := na
+        fibStartTime := na
+        if not na(fib50Line)
+            line.delete(fib50Line)
+            fib50Line := na
+    else
+        fibHigh := math.max(fibHigh, high)
+        fib50 := fibLowAnchor + (fibHigh - fibLowAnchor) * 0.50
+        if not na(fib50Line)
+            line.set_xy1(fib50Line, fibStartTime, fib50)
+            line.set_xy2(fib50Line, time, fib50)
+            line.set_extend(fib50Line, extend.right)
+
+        // If price closes below 50%, remove.
+        if close < fib50
+            fibActive := false
+            fibLowAnchor := na
+            fibHigh := na
+            fib50 := na
+            fibStartTime := na
+            if not na(fib50Line)
+                line.delete(fib50Line)
+                fib50Line := na
+
+plot(showFibDots and fibActive ? fib50 : na, title="Fib 50% (dots)", style=plot.style_circles, color=color.new(color.lime, 0), linewidth=3)
+
+fibHitBuy = fibActive and (time > fibStartTime) and (low <= fib50 and high >= fib50)
+
+// Draw an "X" at the fib price (plotshape() can't target an arbitrary y-price).
+if fibHitBuy
+    label.new(time, fib50, "✕", xloc=xloc.bar_time, yloc=yloc.price, style=label.style_none, textcolor=color.new(color.lime, 0), size=size.normal)
+
+plotshape(fibHitBuy ? low : na, title="FibHitBuy Label", text="FIBHITBUY", style=shape.labelup, location=location.belowbar, size=size.tiny, color=color.new(color.lime, 0), textcolor=color.new(color.black, 0))
+
+if fibHitBuy
+    if not na(fib50Line)
+        line.delete(fib50Line)
+        fib50Line := na
+    fibActive := false
+    fibLowAnchor := na
+    fibHigh := na
+    fib50 := na
+    fibStartTime := na
+
+alertcondition(enableFibDots and fibHitBuy, title="FibHitBuy", message="FibHitBuy: AT aligned; dipped below NWE/4BAND, reclaimed, then hit 50% retracement.")
+
