@@ -157,20 +157,20 @@ f_nweEndpoint(_src) =>
 
     [_upper, _lower, _out, _mae, _crossoverUp, _crossunderDown]
 
-float upper = na
-float lower = na
+float nweUpper4H = na
+float nweLower4H = na
 bool crossover_up = false
 bool crossunder_down = false
 
 // 4H locked values
-[upper, lower, _out4h, _mae4h, crossover_up, crossunder_down] = request.security(syminfo.tickerid, tf4H, f_nweEndpoint(nweSrc), barmerge.gaps_off, barmerge.lookahead_off)
+[nweUpper4H, nweLower4H, _out4h, _mae4h, crossover_up, crossunder_down] = request.security(syminfo.tickerid, tf4H, f_nweEndpoint(nweSrc), barmerge.gaps_off, barmerge.lookahead_off)
 
 // Exported signal band used by fib logic
-float lowerSig = enableNWE ? lower : na
+float lowerSig = enableNWE ? nweLower4H : na
 
 // Plot upper and lower bands (LuxAlgo behavior: hide when repaint is ON)
-plot(enableNWE and not repaint ? upper : na, "Upper (4H)", color=upCss, linewidth=1)
-plot(enableNWE and not repaint ? lower : na, "Lower (4H)", color=dnCss, linewidth=1)
+plot(enableNWE and not repaint ? nweUpper4H : na, "Upper (4H)", color=upCss, linewidth=1)
+plot(enableNWE and not repaint ? nweLower4H : na, "Lower (4H)", color=dnCss, linewidth=1)
 
 // Ensure arrow shapes only print once per 4H bar on lower timeframes
 htfTimeNWE = request.security(syminfo.tickerid, tf4H, time, barmerge.gaps_off, barmerge.lookahead_off)
@@ -303,8 +303,10 @@ if fibInDip
         fibDipStartTime := na
 
 // Reclaim conditions depend on which band was dipped under.
-reclaimNWE = (fibDipType == 1) and useNWELevel and ta.crossover(close, lowerSig)
-reclaim4Band = (fibDipType == 2) and use4BandLevel and ta.crossover(close, band4hS1)
+crossOverLowerSig = useNWELevel ? ta.crossover(close, lowerSig) : false
+crossOver4BandS1 = use4BandLevel ? ta.crossover(close, band4hS1) : false
+reclaimNWE = (fibDipType == 1) and crossOverLowerSig
+reclaim4Band = (fibDipType == 2) and crossOver4BandS1
 
 if enableFibDots and fibInDip and not fibActive and (reclaimNWE or reclaim4Band)
     fibInDip := false
