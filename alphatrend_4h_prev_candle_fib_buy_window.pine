@@ -159,11 +159,13 @@ f_nweEndpoint(_src) =>
 
 float nweUpper4H = na
 float nweLower4H = na
+float _out4h = na
+float _mae4h = na
 bool crossover_up = false
 bool crossunder_down = false
 
 // 4H locked values
-[nweUpper4H, nweLower4H, _out4h, _mae4h, crossover_up, crossunder_down] = request.security(syminfo.tickerid, tf4H, f_nweEndpoint(nweSrc), barmerge.gaps_off, barmerge.lookahead_off)
+[nweUpper4H, nweLower4H, _out4h, _mae4h, crossover_up, crossunder_down] := request.security(syminfo.tickerid, tf4H, f_nweEndpoint(nweSrc), barmerge.gaps_off, barmerge.lookahead_off)
 
 // Exported signal band used by fib logic
 float lowerSig = enableNWE ? nweLower4H : na
