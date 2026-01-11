@@ -135,12 +135,6 @@ gauss(x, _h) => math.exp(-(math.pow(x, 2) / (_h * _h * 2)))
 // LuxAlgo endpoint method (non-repaint). Returned series are 4H-locked via request.security().
 f_nweEndpoint(_src) =>
     float _out = na
-    float _mae = na
-    float _upper = na
-    float _lower = na
-    bool _crossoverUp = false
-    bool _crossunderDown = false
-
     if bar_index >= 499
         float sum = 0.0
         float sumw = 0.0
@@ -149,11 +143,13 @@ f_nweEndpoint(_src) =>
             sum += _src[i] * w
             sumw += w
         _out := sum / sumw
-        _mae := ta.sma(math.abs(_src - _out), 499) * mult
-        _upper := _out + _mae
-        _lower := _out - _mae
-        _crossoverUp := ta.crossover(_src, _upper)
-        _crossunderDown := ta.crossunder(_src, _lower)
+
+    // Call these every bar to avoid Pine "may not execute on every bar" warnings.
+    float _mae = ta.sma(math.abs(_src - _out), 499) * mult
+    float _upper = _out + _mae
+    float _lower = _out - _mae
+    bool _crossoverUp = ta.crossover(_src, _upper)
+    bool _crossunderDown = ta.crossunder(_src, _lower)
 
     [_upper, _lower, _out, _mae, _crossoverUp, _crossunderDown]
 
