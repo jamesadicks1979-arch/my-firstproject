@@ -1,0 +1,205 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// author © KivancOzbilgic
+// developer © KivancOzbilgic
+//@version=5
+indicator("AlphaTrend UK Sessions: 09:00/10:00 + 16:00/16:30 + 19:00/19:35 (held MTF)", shorttitle="AT UK 3 sessions", overlay=true, format=format.price, precision=2, max_lines_count=500, max_labels_count=500)
+
+// ===== Inputs (original)
+coeff        = input.float(1, "Multiplier", step=0.1)
+AP           = input.int(14, "Common Period")
+src          = input.source(close, "Source")
+novolumedata = input.bool(false, "Change calculation (no volume data)?")
+
+// ===== Show items
+show0900Line    = input.bool(true, "Show 09:00 UK vertical line")
+show1000Line    = input.bool(true, "Show 10:00 UK vertical line")
+show1600Line    = input.bool(true, "Show 16:00 UK vertical line")
+show1630Line    = input.bool(true, "Show 16:30 UK vertical line")
+show1900Line    = input.bool(true, "Show 19:00 UK vertical line")
+show1935Line    = input.bool(true, "Show 19:35 UK vertical line")
+
+showEntryText   = input.bool(true, "Show LONG/SHORT text at session entry")
+showExitText    = input.bool(true, "Show PROFIT/LOSS EXIT text at session exit")
+oneTradePerDay  = input.bool(true, "Only one trade per UK day (per session)")
+
+lineColor0900 = input.color(color.new(color.fuchsia, 0), "09:00 line color")
+lineColor1000 = input.color(color.new(color.aqua, 0), "10:00 line color")
+lineColor1600 = input.color(color.new(color.fuchsia, 0), "16:00 line color")
+lineColor1630 = input.color(color.new(color.aqua, 0), "16:30 line color")
+lineColor1900 = input.color(color.new(color.fuchsia, 0), "19:00 line color")
+lineColor1935 = input.color(color.new(color.aqua, 0), "19:35 line color")
+
+lineStyleIn   = input.string("Dotted", "Line style", options=["Solid", "Dotted", "Dashed"])
+lineWidth     = input.int(1, "Line width", minval=1, maxval=5)
+lineStyle     = lineStyleIn == "Solid" ? line.style_solid : lineStyleIn == "Dashed" ? line.style_dashed : line.style_dotted
+
+// ===== Locked MTF AlphaTrends (display only)
+showAT_30m = input.bool(true, "Show AlphaTrend (30m held)")
+showAT_1h  = input.bool(true, "Show AlphaTrend (1H held)")
+showAT_4h  = input.bool(true, "Show AlphaTrend (4H held)")
+
+// =====================================================================
+// AlphaTrend (EXACT original logic) on current chart timeframe
+// =====================================================================
+ATR   = ta.sma(ta.tr, AP)
+upT   = low - ATR * coeff
+downT = high + ATR * coeff
+
+AlphaTrend = 0.0
+AlphaTrend := (novolumedata ? ta.rsi(src, AP) >= 50 : ta.mfi(hlc3, AP) >= 50) ? upT < nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : upT : downT > nz(AlphaTrend[1]) ? nz(AlphaTrend[1]) : downT
+
+color1 = AlphaTrend > AlphaTrend[2] ? #00E60F : AlphaTrend < AlphaTrend[2] ? #80000B : AlphaTrend[1] > AlphaTrend[3] ? #00E60F : #80000B
+k1 = plot(AlphaTrend, color=color.new(#0022FC, 0), linewidth=3, title="AlphaTrend")
+k2 = plot(AlphaTrend[2], color=color.new(#FC0400, 0), linewidth=3, title="AlphaTrend[2]")
+fill(k1, k2, color=color1)
+
+// Bull/bear state (same rule as original color logic)
+alphaBull = (AlphaTrend > AlphaTrend[2]) or (AlphaTrend == AlphaTrend[2] and AlphaTrend[1] > AlphaTrend[3])
+
+// =====================================================================
+// Locked MTF AlphaTrend held (display only)
+// =====================================================================
+f_alphaTrend_original(_src, _AP, _coeff, _novol) =>
+    _ATR   = ta.sma(ta.tr, _AP)
+    _upT   = low - _ATR * _coeff
+    _downT = high + _ATR * _coeff
+    float _AT = 0.0
+    _AT := (_novol ? ta.rsi(_src, _AP) >= 50 : ta.mfi(hlc3, _AP) >= 50) ? (_upT < nz(_AT[1]) ? nz(_AT[1]) : _upT) : (_downT > nz(_AT[1]) ? nz(_AT[1]) : _downT)
+    _AT
+
+at30m_held = request.security(syminfo.tickerid, "30",  f_alphaTrend_original(src, AP, coeff, novolumedata)[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+at1h_held  = request.security(syminfo.tickerid, "60",  f_alphaTrend_original(src, AP, coeff, novolumedata)[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+at4h_held  = request.security(syminfo.tickerid, "240", f_alphaTrend_original(src, AP, coeff, novolumedata)[1], gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+
+plot(showAT_30m ? at30m_held : na, title="AlphaTrend (30m held)", color=color.new(color.fuchsia, 0), linewidth=2)
+plot(showAT_1h  ? at1h_held  : na, title="AlphaTrend (1H held)",  color=color.new(color.lime, 0), linewidth=2)
+plot(showAT_4h  ? at4h_held  : na, title="AlphaTrend (4H held)",  color=color.new(color.orange, 0), linewidth=2)
+
+// =====================================================================
+// Session time triggers (UK time)
+// =====================================================================
+isTimeUK(_h, _m) =>
+    timeframe.isintraday and hour(time, "Europe/London") == _h and minute(time, "Europe/London") == _m
+
+is0900 = isTimeUK(9, 0)
+is1000 = isTimeUK(10, 0)
+is1600 = isTimeUK(16, 0)
+is1630 = isTimeUK(16, 30)
+is1900 = isTimeUK(19, 0)
+is1935 = isTimeUK(19, 35)
+
+dayKey = time("D", "Europe/London")
+
+// =====================================================================
+// “Indicator trade” state (entry at session entry time, exit at session exit time)
+// Direction uses state at candle OPEN => alphaBull[1]
+// =====================================================================
+var int   lastEntryDay_0900 = na
+var int   lastEntryDay_1600 = na
+var int   lastEntryDay_1900 = na
+
+var int   posDir       = 0     // 1 long, -1 short, 0 flat
+var float entryPrice   = na
+var int   entryDayKey  = na
+var int   entrySession = 0     // 1=09:00, 2=16:00, 3=19:00
+
+canEnter0900 = not oneTradePerDay or (lastEntryDay_0900 != dayKey)
+canEnter1600 = not oneTradePerDay or (lastEntryDay_1600 != dayKey)
+canEnter1900 = not oneTradePerDay or (lastEntryDay_1900 != dayKey)
+
+enterLong_0900  = is0900 and (posDir == 0) and canEnter0900 and nz(alphaBull[1])
+enterShort_0900 = is0900 and (posDir == 0) and canEnter0900 and not nz(alphaBull[1])
+
+enterLong_1600  = is1600 and (posDir == 0) and canEnter1600 and nz(alphaBull[1])
+enterShort_1600 = is1600 and (posDir == 0) and canEnter1600 and not nz(alphaBull[1])
+
+enterLong_1900  = is1900 and (posDir == 0) and canEnter1900 and nz(alphaBull[1])
+enterShort_1900 = is1900 and (posDir == 0) and canEnter1900 and not nz(alphaBull[1])
+
+// Vertical lines
+if show0900Line and is0900
+    line.new(bar_index, low, bar_index, high, extend=extend.both, color=lineColor0900, style=lineStyle, width=lineWidth)
+if show1000Line and is1000
+    line.new(bar_index, low, bar_index, high, extend=extend.both, color=lineColor1000, style=lineStyle, width=lineWidth)
+
+if show1600Line and is1600
+    line.new(bar_index, low, bar_index, high, extend=extend.both, color=lineColor1600, style=lineStyle, width=lineWidth)
+if show1630Line and is1630
+    line.new(bar_index, low, bar_index, high, extend=extend.both, color=lineColor1630, style=lineStyle, width=lineWidth)
+
+if show1900Line and is1900
+    line.new(bar_index, low, bar_index, high, extend=extend.both, color=lineColor1900, style=lineStyle, width=lineWidth)
+if show1935Line and is1935
+    line.new(bar_index, low, bar_index, high, extend=extend.both, color=lineColor1935, style=lineStyle, width=lineWidth)
+
+// Entry labels
+plotshape(showEntryText and enterLong_0900,  title="LONG 09:00",  text="LONG 09:00",  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
+plotshape(showEntryText and enterShort_0900, title="SHORT 09:00", text="SHORT 09:00", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   textcolor=color.white, size=size.tiny)
+
+plotshape(showEntryText and enterLong_1600,  title="LONG 16:00",  text="LONG 16:00",  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
+plotshape(showEntryText and enterShort_1600, title="SHORT 16:00", text="SHORT 16:00", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   textcolor=color.white, size=size.tiny)
+
+plotshape(showEntryText and enterLong_1900,  title="LONG 19:00",  text="LONG 19:00",  style=shape.labelup,   location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, size=size.tiny)
+plotshape(showEntryText and enterShort_1900, title="SHORT 19:00", text="SHORT 19:00", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0),   textcolor=color.white, size=size.tiny)
+
+// Update trade state on entry (use entry candle OPEN)
+if enterLong_0900
+    posDir := 1
+    entryPrice := open
+    entryDayKey := dayKey
+    entrySession := 1
+    lastEntryDay_0900 := dayKey
+if enterShort_0900
+    posDir := -1
+    entryPrice := open
+    entryDayKey := dayKey
+    entrySession := 1
+    lastEntryDay_0900 := dayKey
+
+if enterLong_1600
+    posDir := 1
+    entryPrice := open
+    entryDayKey := dayKey
+    entrySession := 2
+    lastEntryDay_1600 := dayKey
+if enterShort_1600
+    posDir := -1
+    entryPrice := open
+    entryDayKey := dayKey
+    entrySession := 2
+    lastEntryDay_1600 := dayKey
+
+if enterLong_1900
+    posDir := 1
+    entryPrice := open
+    entryDayKey := dayKey
+    entrySession := 3
+    lastEntryDay_1900 := dayKey
+if enterShort_1900
+    posDir := -1
+    entryPrice := open
+    entryDayKey := dayKey
+    entrySession := 3
+    lastEntryDay_1900 := dayKey
+
+// Exit at session exit time (use exit candle OPEN)
+doExit_0900 = is1000 and (posDir != 0) and (entrySession == 1) and (entryDayKey == dayKey)
+doExit_1600 = is1630 and (posDir != 0) and (entrySession == 2) and (entryDayKey == dayKey)
+doExit_1900 = is1935 and (posDir != 0) and (entrySession == 3) and (entryDayKey == dayKey)
+doExit = doExit_0900 or doExit_1600 or doExit_1900
+
+exitPrice = open
+pnl = posDir == 1 ? (exitPrice - entryPrice) : (entryPrice - exitPrice)
+
+exitProfit = doExit and (pnl >= 0)
+exitLoss   = doExit and (pnl < 0)
+
+plotshape(showExitText and exitProfit, title="EXIT PROFIT", text="PROFIT EXIT", style=shape.labeldown, location=location.abovebar, color=color.new(color.teal, 0),   textcolor=color.white, size=size.tiny)
+plotshape(showExitText and exitLoss,   title="EXIT LOSS",   text="LOSS EXIT",   style=shape.labeldown, location=location.abovebar, color=color.new(color.maroon, 0), textcolor=color.white, size=size.tiny)
+
+if doExit
+    posDir := 0
+    entryPrice := na
+    entryDayKey := na
+    entrySession := 0
+
