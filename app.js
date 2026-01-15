@@ -1,4 +1,5 @@
 const STORAGE_KEY = "trade-notes-vault:v1";
+const APPWRITE_CONFIG_KEY = "trade-notes-vault:appwrite-config:v1";
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
 const state = {
@@ -6,6 +7,15 @@ const state = {
   selectedId: null,
   editingId: null,
   imageQueue: [],
+  appwrite: {
+    config: null,
+    client: null,
+    account: null,
+    databases: null,
+    storage: null,
+    user: null,
+  },
+  syncInProgress: false,
 };
 
 const elements = {
@@ -35,13 +45,32 @@ const elements = {
   searchInput: document.getElementById("search-input"),
   filterCategory: document.getElementById("filter-category"),
   sortSelect: document.getElementById("sort-select"),
+  appwriteEndpoint: document.getElementById("appwrite-endpoint"),
+  appwriteProject: document.getElementById("appwrite-project"),
+  appwriteDatabase: document.getElementById("appwrite-database"),
+  appwriteCollection: document.getElementById("appwrite-collection"),
+  appwriteBucket: document.getElementById("appwrite-bucket"),
+  saveConfigButton: document.getElementById("save-config"),
+  clearConfigButton: document.getElementById("clear-config"),
+  authName: document.getElementById("auth-name"),
+  authEmail: document.getElementById("auth-email"),
+  authPassword: document.getElementById("auth-password"),
+  signUpButton: document.getElementById("sign-up"),
+  signInButton: document.getElementById("sign-in"),
+  signOutButton: document.getElementById("sign-out"),
+  syncButton: document.getElementById("sync-now"),
+  cloudMessage: document.getElementById("cloud-message"),
+  cloudStatus: document.getElementById("cloud-status"),
 };
 
-function init() {
+async function init() {
   state.notes = loadNotes();
   bindEvents();
+  loadAppwriteConfig();
+  await setupAppwriteFromConfig();
   renderNotesList();
   renderNoteDetail();
+  refreshCloudStatus();
 }
 
 function bindEvents() {
@@ -51,6 +80,12 @@ function bindEvents() {
   elements.searchInput.addEventListener("input", renderNotesList);
   elements.filterCategory.addEventListener("change", renderNotesList);
   elements.sortSelect.addEventListener("change", renderNotesList);
+  elements.saveConfigButton.addEventListener("click", handleSaveConfig);
+  elements.clearConfigButton.addEventListener("click", handleClearConfig);
+  elements.signUpButton.addEventListener("click", handleSignUp);
+  elements.signInButton.addEventListener("click", handleSignIn);
+  elements.signOutButton.addEventListener("click", handleSignOut);
+  elements.syncButton.addEventListener("click", handleSyncNow);
 }
 
 function loadNotes() {
@@ -63,7 +98,7 @@ function loadNotes() {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    return parsed;
+    return parsed.map(normalizeNote).filter(Boolean);
   } catch (error) {
     console.error("Failed to load notes", error);
     return [];
@@ -85,7 +120,7 @@ function persistNotes(nextNotes) {
   }
 }
 
-function handleFormSubmit(event) {
+async function handleFormSubmit(event) {
   event.preventDefault();
   const headline = elements.headline.value.trim();
   if (!headline) {
@@ -138,6 +173,10 @@ function handleFormSubmit(event) {
   renderNotesList();
   renderNoteDetail(nextNote.id);
   setMessage("Note saved.", "success");
+  const syncedNote = await syncLocalNoteToCloud(nextNote);
+  if (syncedNote) {
+    updateNoteInState(syncedNote);
+  }
 }
 
 function handleClear() {
@@ -199,6 +238,7 @@ function readFileAsDataUrl(file) {
         name: file.name,
         size: file.size,
         type: file.type,
+        fileId: null,
         dataUrl: reader.result,
       });
     reader.onerror = () => reject(reader.error);
@@ -212,9 +252,18 @@ function renderImagePreview() {
     const wrapper = document.createElement("div");
     wrapper.className = "image-thumb";
 
+    const src = resolveImageSource(image);
     const img = document.createElement("img");
-    img.src = image.dataUrl;
     img.alt = image.name || "Chart image";
+    if (src) {
+      img.src = src;
+      wrapper.appendChild(img);
+    } else {
+      const fallback = document.createElement("div");
+      fallback.className = "image-fallback";
+      fallback.textContent = "Preview unavailable";
+      wrapper.appendChild(fallback);
+    }
 
     const button = document.createElement("button");
     button.type = "button";
@@ -224,7 +273,7 @@ function renderImagePreview() {
       renderImagePreview();
     });
 
-    wrapper.append(img, button);
+    wrapper.appendChild(button);
     elements.imagePreview.appendChild(wrapper);
   });
 }
@@ -272,11 +321,14 @@ function renderNotesList() {
     card.appendChild(snippet);
 
     if (note.images?.length) {
-      const thumbnail = document.createElement("img");
-      thumbnail.className = "note-thumbnail";
-      thumbnail.src = note.images[0].dataUrl;
-      thumbnail.alt = `Chart image for ${note.headline}`;
-      card.appendChild(thumbnail);
+      const src = resolveImageSource(note.images[0]);
+      if (src) {
+        const thumbnail = document.createElement("img");
+        thumbnail.className = "note-thumbnail";
+        thumbnail.src = src;
+        thumbnail.alt = `Chart image for ${note.headline}`;
+        card.appendChild(thumbnail);
+      }
     }
 
     if (note.tags?.length) {
@@ -366,12 +418,16 @@ function renderNoteDetail(noteId = state.selectedId) {
     const grid = document.createElement("div");
     grid.className = "detail-images";
     note.images.forEach((image) => {
+      const src = resolveImageSource(image);
+      if (!src) {
+        return;
+      }
       const link = document.createElement("a");
-      link.href = image.dataUrl;
+      link.href = getImageLinkUrl(image) || src;
       link.target = "_blank";
       link.rel = "noopener";
       const img = document.createElement("img");
-      img.src = image.dataUrl;
+      img.src = src;
       img.alt = image.name || "Chart image";
       link.appendChild(img);
       grid.appendChild(link);
@@ -466,11 +522,12 @@ function loadNoteForEdit(note) {
   renderNoteDetail(note.id);
 }
 
-function handleDelete(noteId) {
+async function handleDelete(noteId) {
   const confirmed = window.confirm("Delete this note? This cannot be undone.");
   if (!confirmed) {
     return;
   }
+  const noteToDelete = state.notes.find((note) => note.id === noteId);
   const nextNotes = state.notes.filter((note) => note.id !== noteId);
   if (!persistNotes(nextNotes)) {
     return;
@@ -484,6 +541,9 @@ function handleDelete(noteId) {
   renderNotesList();
   renderNoteDetail();
   setMessage("Note deleted.", "success");
+  if (noteToDelete) {
+    await deleteNoteFromCloud(noteToDelete);
+  }
 }
 
 function resetForm() {
@@ -494,6 +554,67 @@ function resetForm() {
   elements.clearButton.textContent = "Clear";
   elements.message.className = "form-message";
   elements.message.textContent = "";
+}
+
+function updateNoteInState(updatedNote) {
+  state.notes = state.notes.map((note) =>
+    note.id === updatedNote.id ? updatedNote : note
+  );
+  persistNotes(state.notes);
+  renderNotesList();
+  renderNoteDetail(updatedNote.id);
+}
+
+function normalizeNote(rawNote) {
+  if (!rawNote || typeof rawNote !== "object") {
+    return null;
+  }
+  const trade = rawNote.trade ?? {};
+  const images = Array.isArray(rawNote.images)
+    ? rawNote.images.map(normalizeImage).filter(Boolean)
+    : [];
+  const createdAt =
+    rawNote.createdAt || rawNote.updatedAt || new Date().toISOString();
+  const updatedAt =
+    rawNote.updatedAt || rawNote.createdAt || new Date().toISOString();
+
+  return {
+    id: rawNote.id || createId(),
+    appwriteId: rawNote.appwriteId || null,
+    headline: rawNote.headline || "",
+    category: rawNote.category || "Other",
+    priority: rawNote.priority || "Normal",
+    reminderDate: rawNote.reminderDate || "",
+    tradeDate: rawNote.tradeDate || "",
+    trade: {
+      symbol: trade.symbol || "",
+      direction: trade.direction || "",
+      entry: trade.entry || "",
+      exit: trade.exit || "",
+      outcome: trade.outcome || "",
+      pnl: trade.pnl || "",
+      strategy: trade.strategy || "",
+    },
+    notes: rawNote.notes || "",
+    chartNotes: rawNote.chartNotes || "",
+    tags: Array.isArray(rawNote.tags) ? rawNote.tags : [],
+    images,
+    createdAt,
+    updatedAt,
+  };
+}
+
+function normalizeImage(image) {
+  if (!image || typeof image !== "object") {
+    return null;
+  }
+  return {
+    name: image.name || "Chart image",
+    size: image.size || 0,
+    type: image.type || "image",
+    fileId: image.fileId || null,
+    dataUrl: image.dataUrl || "",
+  };
 }
 
 function parseTags(value) {
@@ -574,6 +695,653 @@ function truncateText(text, maxLength) {
   return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
 }
 
+function loadAppwriteConfig() {
+  const raw = localStorage.getItem(APPWRITE_CONFIG_KEY);
+  if (!raw) {
+    return;
+  }
+  try {
+    const config = JSON.parse(raw);
+    state.appwrite.config = config;
+    setAppwriteFormValues(config);
+  } catch (error) {
+    console.error("Failed to load Appwrite config", error);
+  }
+}
+
+function setAppwriteFormValues(config) {
+  if (!config) {
+    return;
+  }
+  elements.appwriteEndpoint.value = config.endpoint || "";
+  elements.appwriteProject.value = config.projectId || "";
+  elements.appwriteDatabase.value = config.databaseId || "";
+  elements.appwriteCollection.value = config.collectionId || "";
+  elements.appwriteBucket.value = config.bucketId || "";
+}
+
+function getAppwriteConfigFromInputs() {
+  return {
+    endpoint: elements.appwriteEndpoint.value.trim(),
+    projectId: elements.appwriteProject.value.trim(),
+    databaseId: elements.appwriteDatabase.value.trim(),
+    collectionId: elements.appwriteCollection.value.trim(),
+    bucketId: elements.appwriteBucket.value.trim(),
+  };
+}
+
+async function handleSaveConfig() {
+  const config = getAppwriteConfigFromInputs();
+  if (
+    !config.endpoint ||
+    !config.projectId ||
+    !config.databaseId ||
+    !config.collectionId
+  ) {
+    setCloudMessage(
+      "Endpoint, project, database, and collection IDs are required.",
+      "error"
+    );
+    return;
+  }
+  state.appwrite.config = config;
+  localStorage.setItem(APPWRITE_CONFIG_KEY, JSON.stringify(config));
+  await setupAppwriteFromConfig();
+  if (config.bucketId) {
+    setCloudMessage("Config saved.", "success");
+  } else {
+    setCloudMessage("Config saved. Add a bucket ID to sync images.", "success");
+  }
+}
+
+function handleClearConfig() {
+  localStorage.removeItem(APPWRITE_CONFIG_KEY);
+  state.appwrite = {
+    config: null,
+    client: null,
+    account: null,
+    databases: null,
+    storage: null,
+    user: null,
+  };
+  state.syncInProgress = false;
+  setAppwriteFormValues({});
+  refreshCloudStatus();
+  setCloudMessage("Cloud config cleared.", "success");
+}
+
+async function setupAppwriteFromConfig() {
+  const config = state.appwrite.config;
+  if (!config) {
+    refreshCloudStatus();
+    return;
+  }
+  if (!window.Appwrite) {
+    setCloudMessage("Appwrite SDK not loaded.", "error");
+    refreshCloudStatus();
+    return;
+  }
+  const { Client, Account, Databases, Storage } = window.Appwrite;
+  const client = new Client();
+  client.setEndpoint(config.endpoint).setProject(config.projectId);
+  state.appwrite.client = client;
+  state.appwrite.account = new Account(client);
+  state.appwrite.databases = new Databases(client);
+  state.appwrite.storage = new Storage(client);
+  await fetchCurrentUser();
+  refreshCloudStatus();
+}
+
+async function fetchCurrentUser() {
+  if (!state.appwrite.account) {
+    state.appwrite.user = null;
+    return;
+  }
+  try {
+    const user = await state.appwrite.account.get();
+    state.appwrite.user = user;
+  } catch (error) {
+    state.appwrite.user = null;
+  }
+}
+
+function refreshCloudStatus() {
+  const config = state.appwrite.config;
+  const user = state.appwrite.user;
+  let statusText = "Cloud sync not configured.";
+
+  if (config && !state.appwrite.client) {
+    statusText = "Appwrite SDK unavailable.";
+  } else if (config && user) {
+    statusText = `Signed in as ${user.email}`;
+  } else if (config) {
+    statusText = "Configured. Sign in to sync.";
+  }
+
+  if (state.syncInProgress) {
+    statusText = "Syncing...";
+  }
+
+  elements.cloudStatus.textContent = statusText;
+  const ready = Boolean(config && state.appwrite.client);
+  elements.signUpButton.disabled = !ready;
+  elements.signInButton.disabled = !ready;
+  elements.signOutButton.disabled = !user;
+  elements.syncButton.disabled = !user || state.syncInProgress;
+}
+
+async function handleSignUp() {
+  if (!ensureAppwriteReady()) {
+    return;
+  }
+  const name = elements.authName.value.trim();
+  const email = elements.authEmail.value.trim();
+  const password = elements.authPassword.value.trim();
+
+  if (!email || !password) {
+    setCloudMessage("Email and password are required.", "error");
+    return;
+  }
+
+  try {
+    const { ID } = window.Appwrite;
+    await state.appwrite.account.create(
+      ID.unique(),
+      email,
+      password,
+      name || undefined
+    );
+    await state.appwrite.account.createEmailPasswordSession(email, password);
+    await fetchCurrentUser();
+    refreshCloudStatus();
+    setCloudMessage("Account created and signed in.", "success");
+  } catch (error) {
+    setCloudMessage(formatAppwriteError(error), "error");
+  }
+}
+
+async function handleSignIn() {
+  if (!ensureAppwriteReady()) {
+    return;
+  }
+  const email = elements.authEmail.value.trim();
+  const password = elements.authPassword.value.trim();
+
+  if (!email || !password) {
+    setCloudMessage("Email and password are required.", "error");
+    return;
+  }
+
+  try {
+    await state.appwrite.account.createEmailPasswordSession(email, password);
+    await fetchCurrentUser();
+    refreshCloudStatus();
+    setCloudMessage("Signed in.", "success");
+  } catch (error) {
+    setCloudMessage(formatAppwriteError(error), "error");
+  }
+}
+
+async function handleSignOut() {
+  if (!ensureAppwriteReady()) {
+    return;
+  }
+  try {
+    await state.appwrite.account.deleteSession("current");
+  } catch (error) {
+    setCloudMessage(formatAppwriteError(error), "error");
+  } finally {
+    state.appwrite.user = null;
+    refreshCloudStatus();
+    setCloudMessage("Signed out.", "success");
+  }
+}
+
+async function handleSyncNow() {
+  await syncNotesWithAppwrite();
+}
+
+async function syncNotesWithAppwrite() {
+  if (!ensureSignedIn()) {
+    return;
+  }
+  if (state.syncInProgress) {
+    return;
+  }
+
+  state.syncInProgress = true;
+  refreshCloudStatus();
+  setCloudMessage("Syncing notes...", "info");
+
+  try {
+    const remoteDocs = await listAllDocuments();
+    const mergedNotes = mergeNotesWithRemote(state.notes, remoteDocs);
+    const remoteById = new Map(remoteDocs.map((doc) => [doc.$id, doc]));
+    const syncedNotes = [];
+
+    for (const note of mergedNotes) {
+      const syncedNote = await syncLocalNoteToCloud(note, remoteById);
+      syncedNotes.push(syncedNote || note);
+    }
+
+    state.notes = syncedNotes;
+    persistNotes(state.notes);
+    renderNotesList();
+    renderNoteDetail();
+    setCloudMessage("Sync complete.", "success");
+  } catch (error) {
+    setCloudMessage(`Sync failed. ${formatAppwriteError(error)}`, "error");
+  } finally {
+    state.syncInProgress = false;
+    refreshCloudStatus();
+  }
+}
+
+async function syncLocalNoteToCloud(note, remoteById = null) {
+  if (!state.appwrite.user || !state.appwrite.databases) {
+    return null;
+  }
+  const config = state.appwrite.config;
+  if (!config) {
+    return null;
+  }
+
+  let remoteDoc = null;
+  if (note.appwriteId) {
+    remoteDoc =
+      remoteById?.get(note.appwriteId) ||
+      (await fetchRemoteDocument(note.appwriteId));
+  }
+  const noteWithImages = await ensureImagesUploaded(note);
+  const imageIds = (noteWithImages.images || [])
+    .map((image) => image.fileId)
+    .filter(Boolean);
+  const payload = buildDocumentPayload(noteWithImages, imageIds);
+
+  if (remoteDoc) {
+    const remoteUpdated = getRemoteUpdatedAt(remoteDoc);
+    const localUpdated = new Date(noteWithImages.updatedAt).getTime();
+    if (localUpdated <= remoteUpdated) {
+      return noteWithImages;
+    }
+    await state.appwrite.databases.updateDocument(
+      config.databaseId,
+      config.collectionId,
+      noteWithImages.appwriteId,
+      payload
+    );
+    return noteWithImages;
+  }
+
+  const permissions = buildUserPermissions();
+  const { ID } = window.Appwrite;
+  const created = await state.appwrite.databases.createDocument(
+    config.databaseId,
+    config.collectionId,
+    ID.unique(),
+    payload,
+    permissions
+  );
+  return {
+    ...noteWithImages,
+    appwriteId: created.$id,
+  };
+}
+
+async function ensureImagesUploaded(note) {
+  const bucketId = getBucketId();
+  if (!bucketId || !state.appwrite.storage) {
+    if (note.images?.length) {
+      setCloudMessage("Bucket ID missing. Images will stay local.", "error");
+    }
+    return note;
+  }
+  const permissions = buildUserPermissions();
+  const { ID } = window.Appwrite;
+  const images = [];
+
+  for (const image of note.images || []) {
+    if (image.fileId) {
+      images.push(image);
+      continue;
+    }
+    if (!image.dataUrl) {
+      continue;
+    }
+    const file = await dataUrlToFile(image.dataUrl, image.name || "chart.png");
+    const created = await state.appwrite.storage.createFile(
+      bucketId,
+      ID.unique(),
+      file,
+      permissions
+    );
+    images.push({
+      ...image,
+      fileId: created.$id,
+    });
+  }
+
+  return {
+    ...note,
+    images,
+  };
+}
+
+function mergeNotesWithRemote(localNotes, remoteDocs) {
+  const merged = new Map();
+  const localByAppwriteId = new Map();
+
+  localNotes.forEach((note) => {
+    merged.set(note.id, note);
+    if (note.appwriteId) {
+      localByAppwriteId.set(note.appwriteId, note);
+    }
+  });
+
+  remoteDocs.forEach((doc) => {
+    const remoteNote = mapDocumentToNote(doc);
+    const localMatch =
+      localByAppwriteId.get(doc.$id) ||
+      (doc.noteId ? merged.get(doc.noteId) : null);
+
+    if (!localMatch) {
+      merged.set(remoteNote.id, remoteNote);
+      return;
+    }
+
+    const localUpdated = new Date(localMatch.updatedAt || 0).getTime();
+    const remoteUpdated = new Date(remoteNote.updatedAt || 0).getTime();
+    if (remoteUpdated > localUpdated) {
+      merged.set(localMatch.id, {
+        ...remoteNote,
+        id: localMatch.id,
+        appwriteId: doc.$id,
+      });
+    } else {
+      const updatedLocal = {
+        ...localMatch,
+        appwriteId: localMatch.appwriteId || doc.$id,
+      };
+      merged.set(updatedLocal.id, updatedLocal);
+    }
+  });
+
+  return Array.from(merged.values());
+}
+
+function mapDocumentToNote(doc) {
+  const images = buildImagesFromDoc(doc);
+  return {
+    id: doc.noteId || `note_${doc.$id}`,
+    appwriteId: doc.$id,
+    headline: doc.headline || "",
+    category: doc.category || "Other",
+    priority: doc.priority || "Normal",
+    reminderDate: doc.reminderDate || "",
+    tradeDate: doc.tradeDate || "",
+    trade: {
+      symbol: doc.tradeSymbol || "",
+      direction: doc.tradeDirection || "",
+      entry: doc.tradeEntry || "",
+      exit: doc.tradeExit || "",
+      outcome: doc.tradeOutcome || "",
+      pnl: doc.tradePnl || "",
+      strategy: doc.tradeStrategy || "",
+    },
+    notes: doc.notes || "",
+    chartNotes: doc.chartNotes || "",
+    tags: Array.isArray(doc.tags) ? doc.tags : [],
+    images,
+    createdAt: doc.createdAt || doc.$createdAt,
+    updatedAt: doc.updatedAt || doc.$updatedAt,
+  };
+}
+
+function buildImagesFromDoc(doc) {
+  const imageIds = Array.isArray(doc.imageIds) ? doc.imageIds : [];
+  return imageIds.map((fileId) => ({
+    name: "Chart image",
+    size: 0,
+    type: "image",
+    fileId,
+    dataUrl: buildFilePreviewUrl(fileId),
+  }));
+}
+
+function buildDocumentPayload(note, imageIds) {
+  return {
+    noteId: note.id,
+    headline: note.headline,
+    category: note.category || "Other",
+    priority: note.priority || "Normal",
+    reminderDate: note.reminderDate || "",
+    tradeDate: note.tradeDate || "",
+    tradeSymbol: note.trade?.symbol || "",
+    tradeDirection: note.trade?.direction || "",
+    tradeEntry: note.trade?.entry || "",
+    tradeExit: note.trade?.exit || "",
+    tradeOutcome: note.trade?.outcome || "",
+    tradePnl: note.trade?.pnl || "",
+    tradeStrategy: note.trade?.strategy || "",
+    notes: note.notes || "",
+    chartNotes: note.chartNotes || "",
+    tags: Array.isArray(note.tags) ? note.tags : [],
+    imageIds,
+    createdAt: note.createdAt,
+    updatedAt: note.updatedAt,
+  };
+}
+
+async function listAllDocuments() {
+  const config = state.appwrite.config;
+  if (!config) {
+    return [];
+  }
+  const { Query } = window.Appwrite;
+  const documents = [];
+  let cursor = null;
+
+  while (true) {
+    const queries = [Query.limit(100), Query.orderDesc("$updatedAt")];
+    if (cursor) {
+      queries.push(Query.cursorAfter(cursor));
+    }
+    const response = await state.appwrite.databases.listDocuments(
+      config.databaseId,
+      config.collectionId,
+      queries
+    );
+    documents.push(...response.documents);
+    if (response.documents.length < 100) {
+      break;
+    }
+    cursor = response.documents[response.documents.length - 1].$id;
+  }
+
+  return documents;
+}
+
+async function fetchRemoteDocument(documentId) {
+  const config = state.appwrite.config;
+  if (!config) {
+    return null;
+  }
+  try {
+    return await state.appwrite.databases.getDocument(
+      config.databaseId,
+      config.collectionId,
+      documentId
+    );
+  } catch (error) {
+    return null;
+  }
+}
+
+async function deleteNoteFromCloud(note) {
+  if (!state.appwrite.user || !state.appwrite.databases) {
+    return;
+  }
+  const config = state.appwrite.config;
+  if (!config || !note.appwriteId) {
+    return;
+  }
+  try {
+    await state.appwrite.databases.deleteDocument(
+      config.databaseId,
+      config.collectionId,
+      note.appwriteId
+    );
+  } catch (error) {
+    setCloudMessage(`Cloud delete failed. ${formatAppwriteError(error)}`, "error");
+  }
+
+  const bucketId = getBucketId();
+  if (!bucketId || !state.appwrite.storage) {
+    return;
+  }
+  for (const image of note.images || []) {
+    if (!image.fileId) {
+      continue;
+    }
+    try {
+      await state.appwrite.storage.deleteFile(bucketId, image.fileId);
+    } catch (error) {
+      setCloudMessage(
+        `Image delete failed. ${formatAppwriteError(error)}`,
+        "error"
+      );
+    }
+  }
+}
+
+function buildUserPermissions() {
+  const userId = state.appwrite.user?.$id;
+  if (!userId || !window.Appwrite) {
+    return [];
+  }
+  const { Permission, Role } = window.Appwrite;
+  return [
+    Permission.read(Role.user(userId)),
+    Permission.update(Role.user(userId)),
+    Permission.delete(Role.user(userId)),
+  ];
+}
+
+function getRemoteUpdatedAt(doc) {
+  const value = doc.updatedAt || doc.$updatedAt || 0;
+  return new Date(value).getTime();
+}
+
+function getBucketId() {
+  return state.appwrite.config?.bucketId?.trim() || "";
+}
+
+function buildFilePreviewUrl(fileId) {
+  const bucketId = getBucketId();
+  if (!bucketId || !state.appwrite.storage) {
+    return "";
+  }
+  try {
+    const url = state.appwrite.storage.getFilePreview(bucketId, fileId, 800, 0);
+    return typeof url === "string" ? url : url.toString();
+  } catch (error) {
+    return "";
+  }
+}
+
+function buildFileViewUrl(fileId) {
+  const bucketId = getBucketId();
+  if (!bucketId || !state.appwrite.storage) {
+    return "";
+  }
+  try {
+    const url = state.appwrite.storage.getFileView(bucketId, fileId);
+    return typeof url === "string" ? url : url.toString();
+  } catch (error) {
+    return "";
+  }
+}
+
+function resolveImageSource(image) {
+  if (!image) {
+    return "";
+  }
+  if (image.dataUrl) {
+    return image.dataUrl;
+  }
+  if (image.fileId) {
+    const previewUrl = buildFilePreviewUrl(image.fileId);
+    if (previewUrl) {
+      image.dataUrl = previewUrl;
+      return previewUrl;
+    }
+  }
+  return "";
+}
+
+function getImageLinkUrl(image) {
+  if (!image) {
+    return "";
+  }
+  if (image.fileId) {
+    return buildFileViewUrl(image.fileId);
+  }
+  return image.dataUrl || "";
+}
+
+async function dataUrlToFile(dataUrl, fileName) {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return new File([blob], fileName, { type: blob.type || "image/png" });
+}
+
+function ensureAppwriteReady() {
+  if (!state.appwrite.config) {
+    setCloudMessage("Add Appwrite config first.", "error");
+    return false;
+  }
+  if (!state.appwrite.client || !state.appwrite.account) {
+    setCloudMessage("Appwrite is not ready. Check the config.", "error");
+    return false;
+  }
+  return true;
+}
+
+function ensureSignedIn() {
+  if (!ensureAppwriteReady()) {
+    return false;
+  }
+  if (!state.appwrite.user) {
+    setCloudMessage("Sign in to sync notes.", "error");
+    return false;
+  }
+  return true;
+}
+
+function formatAppwriteError(error) {
+  if (!error) {
+    return "Unknown error.";
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error.message) {
+    return error.message;
+  }
+  if (error.response && error.response.message) {
+    return error.response.message;
+  }
+  return "Unknown error.";
+}
+
+function setCloudMessage(text, status) {
+  elements.cloudMessage.textContent = text;
+  elements.cloudMessage.className = "form-message";
+  if (status === "error") {
+    elements.cloudMessage.classList.add("error");
+  }
+}
+
 function setMessage(text, status) {
   elements.message.textContent = text;
   elements.message.className = "form-message";
@@ -582,4 +1350,6 @@ function setMessage(text, status) {
   }
 }
 
-init();
+init().catch((error) => {
+  console.error("Failed to initialize app", error);
+});

@@ -92,6 +92,11 @@ h1 {
   grid-template-columns: minmax(320px, 1fr) minmax(360px, 1.2fr);
 }
 
+.column-stack {
+  display: grid;
+  gap: 24px;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -110,6 +115,26 @@ h1 {
 h2 {
   margin: 0;
   font-size: 22px;
+}
+
+.cloud-panel h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.cloud-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.cloud-section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  display: grid;
+  gap: 12px;
 }
 
 .muted {
@@ -193,6 +218,17 @@ h2 {
   display: block;
 }
 
+.image-fallback {
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 8px;
+  text-align: center;
+}
+
 .image-thumb button {
   position: absolute;
   top: 6px;
@@ -217,6 +253,11 @@ h2 {
   color: var(--warning);
 }
 
+.cloud-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .button-row {
   display: flex;
   gap: 12px;
@@ -234,6 +275,12 @@ button {
 
 button:hover {
   background: var(--accent-dark);
+}
+
+button:disabled {
+  background: #e2e8f0;
+  color: #94a3b8;
+  cursor: not-allowed;
 }
 
 button.ghost {

@@ -14,27 +14,145 @@
           <h1>Capture reminders, targets, and trade reviews.</h1>
           <p class="subhead">
             Store chart images with journal notes, outcomes, and reminders in one
-            place.
+            place. Add Appwrite to sign in and sync across devices.
           </p>
         </div>
         <div class="storage-card">
-          <span class="storage-title">Local storage</span>
+          <span class="storage-title">Local plus cloud</span>
           <span class="storage-note"
-            >Your notes stay in this browser. Keep images under 2 MB.</span
+            >Use local storage or Appwrite to sync. Keep images under 2 MB.</span
           >
         </div>
       </header>
 
       <main class="layout">
-        <section class="panel form-panel">
-          <header class="panel-header">
-            <h2>Create a note</h2>
-            <p class="muted">
-              Add a headline, log your trade, and attach chart screenshots.
-            </p>
-          </header>
+        <div class="column-stack">
+          <section class="panel cloud-panel">
+            <header class="panel-header">
+              <h2>Cloud sync (Appwrite)</h2>
+              <p class="muted">Sign in to access notes from any device.</p>
+            </header>
 
-          <form id="note-form">
+            <div class="cloud-grid">
+              <div class="cloud-section">
+                <h3>Configuration</h3>
+                <div class="field">
+                  <label for="appwrite-endpoint">Endpoint</label>
+                  <input
+                    id="appwrite-endpoint"
+                    name="appwrite-endpoint"
+                    type="url"
+                    placeholder="https://cloud.appwrite.io/v1"
+                  />
+                </div>
+                <div class="field">
+                  <label for="appwrite-project">Project ID</label>
+                  <input
+                    id="appwrite-project"
+                    name="appwrite-project"
+                    type="text"
+                    placeholder="Project ID"
+                  />
+                </div>
+                <div class="field">
+                  <label for="appwrite-database">Database ID</label>
+                  <input
+                    id="appwrite-database"
+                    name="appwrite-database"
+                    type="text"
+                    placeholder="Database ID"
+                  />
+                </div>
+                <div class="field">
+                  <label for="appwrite-collection">Collection ID</label>
+                  <input
+                    id="appwrite-collection"
+                    name="appwrite-collection"
+                    type="text"
+                    placeholder="Collection ID"
+                  />
+                </div>
+                <div class="field">
+                  <label for="appwrite-bucket">Bucket ID</label>
+                  <input
+                    id="appwrite-bucket"
+                    name="appwrite-bucket"
+                    type="text"
+                    placeholder="Bucket ID"
+                  />
+                  <p class="field-hint">
+                    Bucket is required for chart image sync.
+                  </p>
+                </div>
+                <div class="button-row">
+                  <button id="save-config" type="button">Save config</button>
+                  <button id="clear-config" type="button" class="ghost">
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <div class="cloud-section">
+                <h3>Account</h3>
+                <div class="field">
+                  <label for="auth-name">Name</label>
+                  <input
+                    id="auth-name"
+                    name="auth-name"
+                    type="text"
+                    placeholder="Trader name"
+                  />
+                </div>
+                <div class="field">
+                  <label for="auth-email">Email</label>
+                  <input
+                    id="auth-email"
+                    name="auth-email"
+                    type="email"
+                    placeholder="you@example.com"
+                  />
+                </div>
+                <div class="field">
+                  <label for="auth-password">Password</label>
+                  <input
+                    id="auth-password"
+                    name="auth-password"
+                    type="password"
+                    placeholder="8+ characters"
+                  />
+                </div>
+                <div class="button-row">
+                  <button id="sign-up" type="button">Create account</button>
+                  <button id="sign-in" type="button" class="ghost">
+                    Sign in
+                  </button>
+                </div>
+                <div class="button-row">
+                  <button id="sign-out" type="button" class="ghost">
+                    Sign out
+                  </button>
+                  <button id="sync-now" type="button">Sync now</button>
+                </div>
+                <div
+                  id="cloud-message"
+                  class="form-message"
+                  aria-live="polite"
+                ></div>
+                <div class="cloud-status">
+                  <span id="cloud-status">Cloud sync not configured.</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel form-panel">
+            <header class="panel-header">
+              <h2>Create a note</h2>
+              <p class="muted">
+                Add a headline, log your trade, and attach chart screenshots.
+              </p>
+            </header>
+
+            <form id="note-form">
             <div class="field">
               <label for="headline">Headline</label>
               <input
@@ -198,7 +316,8 @@
               </button>
             </div>
           </form>
-        </section>
+          </section>
+        </div>
 
         <section class="panel notes-panel">
           <header class="panel-header">
@@ -241,6 +360,7 @@
       </main>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/appwrite@latest"></script>
     <script src="app.js"></script>
   </body>
 </html>
