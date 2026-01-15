@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trade Notes Vault</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Trade Notes Vault</p>
+          <h1>Capture reminders, targets, and trade reviews.</h1>
+          <p class="subhead">
+            Store chart images with journal notes, outcomes, and reminders in one
+            place.
+          </p>
+        </div>
+        <div class="storage-card">
+          <span class="storage-title">Local storage</span>
+          <span class="storage-note"
+            >Your notes stay in this browser. Keep images under 2 MB.</span
+          >
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel form-panel">
+          <header class="panel-header">
+            <h2>Create a note</h2>
+            <p class="muted">
+              Add a headline, log your trade, and attach chart screenshots.
+            </p>
+          </header>
+
+          <form id="note-form">
+            <div class="field">
+              <label for="headline">Headline</label>
+              <input
+                id="headline"
+                name="headline"
+                type="text"
+                placeholder="Daily reminder, target, or trade recap"
+                required
+              />
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="category">Category</label>
+                <select id="category" name="category">
+                  <option value="Daily reminder">Daily reminder</option>
+                  <option value="Target">Target</option>
+                  <option value="Trade review">Trade review</option>
+                  <option value="Idea">Idea</option>
+                  <option value="Checklist">Checklist</option>
+                  <option value="Research">Research</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="priority">Priority</label>
+                <select id="priority" name="priority">
+                  <option value="Normal">Normal</option>
+                  <option value="High">High</option>
+                  <option value="Low">Low</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="reminder-date">Reminder date</label>
+                <input id="reminder-date" name="reminder-date" type="date" />
+              </div>
+              <div class="field">
+                <label for="trade-date">Trade date</label>
+                <input id="trade-date" name="trade-date" type="date" />
+              </div>
+            </div>
+
+            <div class="section-divider">
+              <span>Trade details</span>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="symbol">Symbol</label>
+                <input
+                  id="symbol"
+                  name="symbol"
+                  type="text"
+                  placeholder="AAPL, ES, BTCUSD"
+                />
+              </div>
+              <div class="field">
+                <label for="direction">Direction</label>
+                <select id="direction" name="direction">
+                  <option value="">Select</option>
+                  <option value="Long">Long</option>
+                  <option value="Short">Short</option>
+                  <option value="Flat">Flat</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="entry">Entry price</label>
+                <input id="entry" name="entry" type="text" placeholder="132.50" />
+              </div>
+              <div class="field">
+                <label for="exit">Exit price</label>
+                <input id="exit" name="exit" type="text" placeholder="138.10" />
+              </div>
+            </div>
+
+            <div class="field-row">
+              <div class="field">
+                <label for="outcome">Outcome</label>
+                <select id="outcome" name="outcome">
+                  <option value="">Select</option>
+                  <option value="Win">Win</option>
+                  <option value="Loss">Loss</option>
+                  <option value="Break-even">Break-even</option>
+                  <option value="Open">Open</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="pnl">P/L</label>
+                <input id="pnl" name="pnl" type="text" placeholder="+250 or -1.2%" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="strategy">Setup / strategy</label>
+              <input
+                id="strategy"
+                name="strategy"
+                type="text"
+                placeholder="Breakout, pullback, trend continuation"
+              />
+            </div>
+
+            <div class="field">
+              <label for="notes">Journal notes</label>
+              <textarea
+                id="notes"
+                name="notes"
+                rows="5"
+                placeholder="Write your plan, execution notes, and lessons learned."
+              ></textarea>
+            </div>
+
+            <div class="field">
+              <label for="chart-notes">Chart notes</label>
+              <textarea
+                id="chart-notes"
+                name="chart-notes"
+                rows="3"
+                placeholder="Add notes you want to reference alongside the chart."
+              ></textarea>
+            </div>
+
+            <div class="field">
+              <label for="tags">Tags</label>
+              <input
+                id="tags"
+                name="tags"
+                type="text"
+                placeholder="breakout, earnings, plan"
+              />
+              <p class="field-hint">Separate tags with commas.</p>
+            </div>
+
+            <div class="field">
+              <label for="chart-images">Chart image(s)</label>
+              <input
+                id="chart-images"
+                name="chart-images"
+                type="file"
+                accept="image/*"
+                multiple
+              />
+              <p class="field-hint">
+                Images stay local to this device. Keep each file under 2 MB.
+              </p>
+              <div id="image-preview" class="image-preview"></div>
+            </div>
+
+            <div id="form-message" class="form-message" aria-live="polite"></div>
+
+            <div class="button-row">
+              <button id="save-button" type="submit">Save note</button>
+              <button id="clear-button" type="button" class="ghost">
+                Clear
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel notes-panel">
+          <header class="panel-header">
+            <h2>Saved notes</h2>
+            <p class="muted">Search and filter your trade library.</p>
+          </header>
+
+          <div class="list-controls">
+            <input
+              id="search-input"
+              type="search"
+              placeholder="Search headlines, symbols, or tags"
+            />
+            <select id="filter-category">
+              <option value="All">All categories</option>
+              <option value="Daily reminder">Daily reminder</option>
+              <option value="Target">Target</option>
+              <option value="Trade review">Trade review</option>
+              <option value="Idea">Idea</option>
+              <option value="Checklist">Checklist</option>
+              <option value="Research">Research</option>
+              <option value="Other">Other</option>
+            </select>
+            <select id="sort-select">
+              <option value="recent">Newest updates</option>
+              <option value="oldest">Oldest updates</option>
+              <option value="headline">Headline A-Z</option>
+            </select>
+          </div>
+
+          <div class="notes-content">
+            <div id="notes-list" class="notes-list"></div>
+            <article id="note-detail" class="note-detail">
+              <div class="empty-state">
+                Select a note to review the full trade, images, and notes.
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
