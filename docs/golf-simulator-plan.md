@@ -6,6 +6,22 @@
 - Operating schedule: open 30 days per month, 12:00-22:00 Sun-Thu and 12:00-00:00 Fri-Sat.
 - Fixed costs months 1-12: GBP 6,080 per month (rent + simulator financing), then GBP 2,080 per month plus other recurring costs.
 
+## Investment opportunity (draft)
+- Funding request: TBD (amount, structure, and terms).
+- Use of funds: fit-out, equipment, deposits, opening inventory, marketing, and working capital (TBD allocation).
+- Timeline to launch: TBD.
+- Investor return target: TBD.
+
+## Business overview
+- Multi-activity indoor venue centered on golf simulators with complementary social gaming and events.
+- Revenue streams across hourly bays, per-person gaming, and room hire, plus football viewing nights.
+- Open year-round with extended weekend hours.
+
+## Market and competition (draft)
+- Target segments: groups, corporate bookings, leagues, and social nights.
+- Local competitors: TBD (to be mapped by area and price).
+- Differentiators: multiple activities under one roof, late opening on weekends, private poker room.
+
 ## Concept and customer experience
 - Bookable bays for golf and darts, plus walk-in options for pool and console gaming.
 - Group-friendly environment with live sports (Sky Sports) and private poker room hire.
@@ -35,6 +51,12 @@
 - Friday and Saturday: 12:00 to 00:00 (12 hours).
 - Weekly open hours: 5 * 10 + 2 * 12 = 74 hours.
 - Monthly hours can be estimated by scaling weekly hours to 30 days.
+
+## Projection assumptions (draft)
+- Monthly open hours (estimated): 74 / 7 * 30 = 317 hours.
+- Utilization rate per activity: TBD (used in revenue formulas).
+- Average guests for football viewing: TBD.
+- Staff wages and other overheads: TBD.
 
 ## Capacity summary (current)
 - Golf simulator bays: 2.
@@ -109,6 +131,48 @@
 - Licenses/permits and business rates.
 - Sky Sports subscription for football viewing.
 
+## Financial projections (investor-ready template)
+### Monthly revenue projection model (formulas)
+| Line item | Formula | Notes |
+| --- | --- | --- |
+| Golf simulators | 2 * price_per_hour * monthly_open_hours * utilization_rate | Price per hour TBD. |
+| Darts | 2 * 25 * monthly_open_hours * utilization_rate | GBP 25/hr fixed. |
+| Pool | 1 * 15 * monthly_open_hours * utilization_rate | GBP 15/hr fixed. |
+| PlayStation/racing | stations * 5 * monthly_open_hours * utilization_rate * avg_players_per_station | Price per person per hour fixed. |
+| Football viewing | (25 * guests_before_18 + 35 * guests_after_18) * days_open | Pricing fixed; guest counts TBD. |
+| Poker room | 100 * bookings_per_month | GBP 100 per night. |
+| Total revenue | Sum of above | |
+
+### Monthly operating expense model (formulas)
+| Line item | Amount | Notes |
+| --- | --- | --- |
+| Rent | 2,080 | Monthly. |
+| Golf sim financing (months 1-12) | 4,000 | Months 1-12 only. |
+| Staffing (1 full-time, 1 part-time) | TBD | Monthly total needed. |
+| Utilities | TBD | Power, internet, etc. |
+| Insurance | TBD | Liability and equipment. |
+| Maintenance | TBD | Service contracts and repairs. |
+| Cleaning/consumables | TBD | |
+| Payment processing fees | TBD | % of revenue or fixed. |
+| Marketing | TBD | Monthly. |
+| Licenses/permits/business rates | TBD | |
+| Sky Sports subscription | TBD | Monthly. |
+| Total operating expenses | Sum of above | |
+
+### Monthly profit and break-even
+- Gross profit (if food/drink COGS apply): total revenue - COGS (TBD).
+- Operating profit (EBITDA): total revenue - total operating expenses.
+- Break-even revenue (months 1-12): total operating expenses + COGS (if any).
+- Break-even revenue (month 13+): operating expenses excluding simulator financing.
+
+### Year 1-3 summary (template)
+| Metric | Year 1 | Year 2 | Year 3 |
+| --- | --- | --- | --- |
+| Total revenue | TBD | TBD | TBD |
+| Operating expenses | TBD | TBD | TBD |
+| EBITDA | TBD | TBD | TBD |
+| Net profit | TBD | TBD | TBD |
+
 ## Staffing plan (draft)
 - Headcount: 1 full-time, 1 part-time.
 - Coverage: align shifts to 74 weekly operating hours (rota TBD).
@@ -142,3 +206,4 @@
 - One-time buildout or equipment costs not yet listed.
 - Utilities, insurance, maintenance, and Sky Sports subscription costs.
 - Food and drink pricing and gross margins (if applicable).
+- Funding request amount and intended use of funds.
