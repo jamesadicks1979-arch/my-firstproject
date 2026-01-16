@@ -71,7 +71,7 @@
   - rental_price * bookings_per_month
 
 ## Other recurring costs to confirm
-- Staffing wages, taxes, and benefits.
+- Staffing wages, taxes, and benefits (2 staff) - TBD monthly total.
 - Utilities (power, internet).
 - Insurance and liability coverage.
 - Maintenance/service contracts for sims.
