@@ -1,4 +1,15 @@
-# Golf Simulator Business Draft
+# Golf Simulator Business Plan (Draft)
+
+## Executive summary
+- Entertainment venue combining golf simulators, darts, pool, console gaming, racing sims, and a football viewing drinks area.
+- Core pricing: darts GBP 25/hr, pool GBP 15/hr, PlayStation GBP 5 per person per hour, poker room GBP 100 per night, football viewing GBP 25 before 18:00 and GBP 35 after.
+- Operating schedule: open 30 days per month, 12:00-22:00 Sun-Thu and 12:00-00:00 Fri-Sat.
+- Fixed costs months 1-12: GBP 6,080 per month (rent + simulator financing), then GBP 2,080 per month plus other recurring costs.
+
+## Concept and customer experience
+- Bookable bays for golf and darts, plus walk-in options for pool and console gaming.
+- Group-friendly environment with live sports (Sky Sports) and private poker room hire.
+- Focus on social sessions, leagues, parties, and corporate bookings (TBD).
 
 ## Known inputs (from current notes)
 - Rent: GBP 2,080 per month.
@@ -25,7 +36,24 @@
 - Weekly open hours: 5 * 10 + 2 * 12 = 74 hours.
 - Monthly hours can be estimated by scaling weekly hours to 30 days.
 
+## Capacity summary (current)
+- Golf simulator bays: 2.
+- Dart bays: 2.
+- Pool tables: 1.
+- PlayStation/racing stations: TBD.
+- Poker room: 1.
+- Drinks area seating capacity: TBD.
+
 ## Revenue model placeholders
+### Golf simulator bays
+- Count: 2
+- Price per hour: TBD
+- Hours open per day: 10 (Sun-Thu) / 12 (Fri-Sat)
+- Days open per month: 30
+- Utilization rate: TBD
+- Monthly revenue formula:
+  - 2 * price_per_hour * hours_per_day * days_per_month * utilization_rate
+
 ### Dart bays
 - Count: 2
 - Price per hour: GBP 25
@@ -81,9 +109,36 @@
 - Licenses/permits and business rates.
 - Sky Sports subscription for football viewing.
 
+## Staffing plan (draft)
+- Headcount: 1 full-time, 1 part-time.
+- Coverage: align shifts to 74 weekly operating hours (rota TBD).
+- Responsibilities (TBD): check-in, bookings, safety, equipment resets, and basic troubleshooting.
+
+## Marketing and sales (draft)
+- Launch offers and introductory packages to build initial bookings.
+- Local partnerships (sports clubs, schools, companies) for group events.
+- Leagues and tournaments for golf and darts to drive repeat visits.
+- Social media content around live matches and special events.
+
+## Risks and mitigations (draft)
+- Seasonality and demand swings: use leagues, events, and memberships to stabilize bookings.
+- Equipment downtime: plan maintenance windows and keep spares.
+- Staffing coverage gaps: cross-train staff and maintain on-call support.
+- Compliance for live sports viewing: ensure correct Sky Sports licensing.
+
+## Milestones (draft)
+- Site setup and fit-out plan finalized (TBD).
+- Equipment delivery and installation (TBD).
+- Staff training and soft launch (TBD).
+- Full launch with marketing push (TBD).
+
 ## Next details needed
-- Pricing for each revenue area.
-- Expected opening hours and days per month.
-- Expected utilization or booking rates.
-- Staffing plan and monthly payroll estimate.
+- Golf simulator pricing and booking model (hourly or session).
+- Number of PlayStation/racing stations and any separate pricing.
+- Expected utilization or booking rates for each area.
+- Poker room bookings per month.
+- Average guests before and after 18:00 for football viewing.
+- Staffing payroll estimates for full-time and part-time roles.
 - One-time buildout or equipment costs not yet listed.
+- Utilities, insurance, maintenance, and Sky Sports subscription costs.
+- Food and drink pricing and gross margins (if applicable).
