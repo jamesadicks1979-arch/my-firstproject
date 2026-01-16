@@ -65,7 +65,7 @@
   - (price_before_6pm * guests_before_6pm + price_after_6pm * guests_after_6pm) * days_per_month
 
 ### Poker room rental
-- Rental price (per hour or per session): TBD
+- Rental price (per night): GBP 100
 - Average bookings per month: TBD
 - Monthly revenue formula:
   - rental_price * bookings_per_month
