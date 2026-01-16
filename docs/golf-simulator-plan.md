@@ -18,12 +18,19 @@
 | Total fixed (months 1-12) | GBP 6,080 | 12 months | Rent + simulator financing. |
 | Total fixed (month 13+) | GBP 2,080 | Ongoing | Rent only, assuming no other fixed costs. |
 
+## Operating schedule (for revenue modeling)
+- Open 30 days per month.
+- Sunday to Thursday: 12:00 to 22:00 (10 hours).
+- Friday and Saturday: 12:00 to 00:00 (12 hours).
+- Weekly open hours: 5 * 10 + 2 * 12 = 74 hours.
+- Monthly hours can be estimated by scaling weekly hours to 30 days.
+
 ## Revenue model placeholders
 ### Dart bays
 - Count: 2
 - Price per hour: GBP 25
-- Hours open per day: TBD
-- Days open per month: TBD
+- Hours open per day: 10 (Sun-Thu) / 12 (Fri-Sat)
+- Days open per month: 30
 - Utilization rate: TBD
 - Monthly revenue formula:
   - 2 * price_per_hour * hours_per_day * days_per_month * utilization_rate
@@ -32,8 +39,8 @@
 - Pricing model: Hourly per person
 - Price per person per hour: GBP 5
 - Seats/stations: TBD
-- Hours open per day: TBD
-- Days open per month: TBD
+- Hours open per day: 10 (Sun-Thu) / 12 (Fri-Sat)
+- Days open per month: 30
 - Utilization rate: TBD
 - Monthly revenue formula (if hourly):
   - stations * price_per_person_per_hour * hours_per_day * days_per_month * utilization_rate
@@ -41,8 +48,8 @@
 ### Pool table
 - Count: 1
 - Price per hour: GBP 15
-- Hours open per day: TBD
-- Days open per month: TBD
+- Hours open per day: 10 (Sun-Thu) / 12 (Fri-Sat)
+- Days open per month: 30
 - Utilization rate: TBD
 - Monthly revenue formula:
   - price_per_hour * hours_per_day * days_per_month * utilization_rate
@@ -53,7 +60,7 @@
 - Price after 6pm: GBP 35 per person
 - Average guests before 6pm: TBD
 - Average guests after 6pm: TBD
-- Days open per month: TBD
+- Days open per month: 30
 - Monthly revenue formula:
   - (price_before_6pm * guests_before_6pm + price_after_6pm * guests_after_6pm) * days_per_month
 
