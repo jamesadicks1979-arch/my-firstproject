@@ -7,6 +7,8 @@
   - 2 dart bays (charged out).
   - PlayStation area and racing driving sims.
   - Poker room available for rental.
+  - Drinks area to watch football (Sky Sports).
+  - Pool table (charged out).
 
 ## Fixed costs (based on current notes)
 | Item | Monthly cost | Duration | Notes |
@@ -19,7 +21,7 @@
 ## Revenue model placeholders
 ### Dart bays
 - Count: 2
-- Price per hour: TBD
+- Price per hour: GBP 25
 - Hours open per day: TBD
 - Days open per month: TBD
 - Utilization rate: TBD
@@ -27,13 +29,33 @@
   - 2 * price_per_hour * hours_per_day * days_per_month * utilization_rate
 
 ### PlayStation + racing sims area
-- Pricing model: TBD (hourly, session-based, or membership)
+- Pricing model: Hourly per person
+- Price per person per hour: GBP 5
 - Seats/stations: TBD
 - Hours open per day: TBD
 - Days open per month: TBD
 - Utilization rate: TBD
 - Monthly revenue formula (if hourly):
-  - stations * price_per_hour * hours_per_day * days_per_month * utilization_rate
+  - stations * price_per_person_per_hour * hours_per_day * days_per_month * utilization_rate
+
+### Pool table
+- Count: 1
+- Price per hour: GBP 15
+- Hours open per day: TBD
+- Days open per month: TBD
+- Utilization rate: TBD
+- Monthly revenue formula:
+  - price_per_hour * hours_per_day * days_per_month * utilization_rate
+
+### Drinks area (football viewing)
+- Pricing model: Entry fee
+- Price before 6pm: GBP 25 per person
+- Price after 6pm: GBP 35 per person
+- Average guests before 6pm: TBD
+- Average guests after 6pm: TBD
+- Days open per month: TBD
+- Monthly revenue formula:
+  - (price_before_6pm * guests_before_6pm + price_after_6pm * guests_after_6pm) * days_per_month
 
 ### Poker room rental
 - Rental price (per hour or per session): TBD
@@ -50,6 +72,7 @@
 - Payment processing fees.
 - Marketing and advertising.
 - Licenses/permits and business rates.
+- Sky Sports subscription for football viewing.
 
 ## Next details needed
 - Pricing for each revenue area.
