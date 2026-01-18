@@ -18,6 +18,9 @@ len200 = input.int(200, "200 Length", group=grp_chart)
 grp_daily = "Daily Timeframe SMAs (Locked)"
 show_daily = input.bool(true, "Show Daily SMAs?", group=grp_daily)
 
+grp_weekly = "Weekly Timeframe SMAs"
+show_weekly = input.bool(false, "Show Weekly SMAs?", group=grp_weekly)
+
 grp_sell = "Sell Signal Logic"
 sell_cluster_pips = input.float(50.0, "Cluster Threshold (Pips)", group=grp_sell, tooltip="Max distance between 21, 50, and 100 SMAs to consider them clustered.")
 sell_ext_pips = input.float(400.0, "Extension Threshold (Pips)", group=grp_sell, tooltip="Min distance between 100 and 200 SMAs to consider trend extended.")
@@ -126,6 +129,23 @@ dp200 = plot(show_daily ? d_s200 : na, color=color.red, title="Daily 200 SMA", l
 // Daily Fills
 fill(dp100, dp200, color=show_daily ? d_col100 : na, title="Daily 100/200 Fill")
 fill(dp21, dp50, color=show_daily ? d_col21 : na, title="Daily 21/50 Fill")
+
+// ==========================================
+// 2B. WEEKLY TIMEFRAME LOGIC (TOGGLE)
+// ==========================================
+calc_weekly() =>
+    w21 = ta.sma(close, len21)
+    w50 = ta.sma(close, len50)
+    w100 = ta.sma(close, len100)
+    w200 = ta.sma(close, len200)
+    [w21, w50, w100, w200]
+
+[w_s21, w_s50, w_s100, w_s200] = request.security(syminfo.tickerid, "W", calc_weekly())
+
+plot(show_weekly ? w_s21 : na, color=color.green, title="Weekly 21 SMA", linewidth=2)
+plot(show_weekly ? w_s50 : na, color=color.blue, title="Weekly 50 SMA", linewidth=2)
+plot(show_weekly ? w_s100 : na, color=color.orange, title="Weekly 100 SMA", linewidth=2)
+plot(show_weekly ? w_s200 : na, color=color.red, title="Weekly 200 SMA", linewidth=2)
 
 // ==========================================
 // 3. SELL SIGNAL (Mean Reversion / Collapse)
