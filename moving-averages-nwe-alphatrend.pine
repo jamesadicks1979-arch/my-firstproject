@@ -34,10 +34,6 @@ grp_nwe_style = "NWE Style"
 nwe_up_color = input.color(color.teal, "Up Color", inline="nwec", group=grp_nwe_style)
 nwe_down_color = input.color(color.red, "Down Color", inline="nwec", group=grp_nwe_style)
 
-grp_nwe_hull = "NWE Hull MA"
-nwe_hull_length = input.int(9, "Hull Length", minval=1, group=grp_nwe_hull)
-nwe_hull_src = input(close, "Hull Source", group=grp_nwe_hull)
-
 grp_at = "AlphaTrend Settings"
 at_mult = input.float(1.0, "Multiplier", step=0.1, group=grp_at)
 at_period = input.int(14, "Common Period", group=grp_at)
@@ -218,15 +214,6 @@ nwe_lower = nwe_out - nwe_mae
 // Crossing marks
 plotshape(nwe_show_signals and ta.crossunder(low, nwe_out - nwe_mae) ? low : na, title="NWE Crossunder", style=shape.labelup, location=location.absolute, color=na, text="^", textcolor=nwe_up_color, size=size.tiny)
 plotshape(nwe_show_signals and ta.crossover(high, nwe_out + nwe_mae) ? high : na, title="NWE Crossover", style=shape.labeldown, location=location.absolute, color=na, text="v", textcolor=nwe_down_color, size=size.tiny)
-
-// Hull MA (used by optional sell signal)
-nwe_hull_half = int(math.max(1.0, math.round(nwe_hull_length / 2.0)))
-nwe_hull_sqrt = int(math.max(1.0, math.round(math.sqrt(nwe_hull_length))))
-nwe_hullma = ta.wma(2 * ta.wma(nwe_hull_src, nwe_hull_half) - ta.wma(nwe_hull_src, nwe_hull_length), nwe_hull_sqrt)
-plot(nwe_hullma, title="NWE Hull MA")
-
-nwe_sell_signal = close < nwe_hullma
-plotshape(nwe_show_signals and nwe_sell_signal, title="Hull MA Sell", location=location.abovebar, style=shape.labeldown, text="SELL", color=color.red, textcolor=color.white, size=size.small)
 
 // Compute and display NWE
 float nwe_y2 = na
