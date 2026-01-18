@@ -138,14 +138,40 @@ calc_weekly() =>
     w50 = ta.sma(close, len50)
     w100 = ta.sma(close, len100)
     w200 = ta.sma(close, len200)
-    [w21, w50, w100, w200]
 
-[w_s21, w_s50, w_s100, w_s200] = request.security(syminfo.tickerid, "W", calc_weekly())
+    pv = syminfo.mintick * 10
 
-plot(show_weekly ? w_s21 : na, color=color.green, title="Weekly 21 SMA", linewidth=2)
-plot(show_weekly ? w_s50 : na, color=color.blue, title="Weekly 50 SMA", linewidth=2)
-plot(show_weekly ? w_s100 : na, color=color.orange, title="Weekly 100 SMA", linewidth=2)
-plot(show_weekly ? w_s200 : na, color=color.red, title="Weekly 200 SMA", linewidth=2)
+    // 100/200
+    wt_100_long = w200 + (8 * pv)
+    wt_100_short = w200 - (8 * pv)
+    wc_100 = if w100 >= wt_100_long and w21 >= w100
+        color.new(color.green, 80)
+    else if w100 <= wt_100_short and w21 <= w100
+        color.new(color.red, 80)
+    else
+        na
+
+    // 21/50
+    wt_21_long = w50 + (3 * pv)
+    wt_21_short = w50 - (3 * pv)
+    wc_21 = if w21 >= wt_21_long
+        color.new(color.green, 80)
+    else if w21 <= wt_21_short
+        color.new(color.red, 80)
+    else
+        na
+
+    [w21, w50, w100, w200, wc_100, wc_21]
+
+[w_s21, w_s50, w_s100, w_s200, w_col100, w_col21] = request.security(syminfo.tickerid, "W", calc_weekly())
+
+wp21 = plot(show_weekly ? w_s21 : na, color=color.aqua, title="Weekly 21 SMA", linewidth=2)
+wp50 = plot(show_weekly ? w_s50 : na, color=color.purple, title="Weekly 50 SMA", linewidth=2)
+wp100 = plot(show_weekly ? w_s100 : na, color=color.yellow, title="Weekly 100 SMA", linewidth=2)
+wp200 = plot(show_weekly ? w_s200 : na, color=color.fuchsia, title="Weekly 200 SMA", linewidth=2)
+
+fill(wp100, wp200, color=show_weekly ? w_col100 : na, title="Weekly 100/200 Fill")
+fill(wp21, wp50, color=show_weekly ? w_col21 : na, title="Weekly 21/50 Fill")
 
 // ==========================================
 // 3. SELL SIGNAL (Mean Reversion / Collapse)
