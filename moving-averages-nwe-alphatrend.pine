@@ -284,11 +284,16 @@ O2 = ta.barssince(sell_signalk[1])
 daily_bull = d_s100 > d_s200
 daily_bear = d_s100 < d_s200
 
-buy_label_text = daily_bull ? "Longterm buy" : daily_bear ? "Buy to sell" : "BUY"
-sell_label_text = daily_bull ? "Sell to buy" : daily_bear ? "Longterm sell" : "SELL"
+buy_cond = buy_signalk and at_show_signals and O1 > K2
+sell_cond = sell_signalk and at_show_signals and O2 > K1
 
-plotshape(buy_signalk and at_show_signals and O1 > K2 ? alpha_trend[2] * 0.9999 : na, title="AlphaTrend BUY", text=buy_label_text, location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
-plotshape(sell_signalk and at_show_signals and O2 > K1 ? alpha_trend[2] * 1.0001 : na, title="AlphaTrend SELL", text=sell_label_text, location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
+plotshape(buy_cond and daily_bull ? alpha_trend[2] * 0.9999 : na, title="AlphaTrend BUY (Longterm)", text="Longterm buy", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
+plotshape(buy_cond and daily_bear ? alpha_trend[2] * 0.9999 : na, title="AlphaTrend BUY (Short Bias)", text="Buy to sell", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
+plotshape(buy_cond and not daily_bull and not daily_bear ? alpha_trend[2] * 0.9999 : na, title="AlphaTrend BUY", text="BUY", location=location.absolute, style=shape.labelup, size=size.tiny, color=color.new(#0022FC, 0), textcolor=color.new(color.white, 0))
+
+plotshape(sell_cond and daily_bull ? alpha_trend[2] * 1.0001 : na, title="AlphaTrend SELL (Bullish)", text="Sell to buy", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
+plotshape(sell_cond and daily_bear ? alpha_trend[2] * 1.0001 : na, title="AlphaTrend SELL (Longterm)", text="Longterm sell", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
+plotshape(sell_cond and not daily_bull and not daily_bear ? alpha_trend[2] * 1.0001 : na, title="AlphaTrend SELL", text="SELL", location=location.absolute, style=shape.labeldown, size=size.tiny, color=color.new(color.maroon, 0), textcolor=color.new(color.white, 0))
 
 alertcondition(buy_signalk and O1 > K2, title="Potential BUY Alarm", message="BUY SIGNAL!")
 alertcondition(sell_signalk and O2 > K1, title="Potential SELL Alarm", message="SELL SIGNAL!")
