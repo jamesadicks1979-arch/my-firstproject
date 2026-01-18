@@ -22,7 +22,6 @@ grp_sell = "Sell Signal Logic"
 sell_cluster_pips = input.float(50.0, "Cluster Threshold (Pips)", group=grp_sell, tooltip="Max distance between 21, 50, and 100 SMAs to consider them clustered.")
 sell_ext_pips = input.float(400.0, "Extension Threshold (Pips)", group=grp_sell, tooltip="Min distance between 100 and 200 SMAs to consider trend extended.")
 show_sell_debug = input.bool(false, "Show Sell Signal Debug Labels?", group=grp_sell)
-show_missed = input.bool(true, "Show Missed Sell Reasons?", group=grp_sell, tooltip="Plots a small label on 21/100 crossunders that did not trigger a sell, explaining why.")
 
 grp_nwe = "NWE Settings"
 nwe_bandwidth = input.float(8.0, "Bandwidth", minval=0, group=grp_nwe)
@@ -155,15 +154,6 @@ plotshape(sell_signal, title="Sell Signal", style=shape.triangledown, location=l
 if barstate.isconfirmed and cond_cross
     if sell_signal
         na
-    else if show_missed
-        // Failed. Why?
-        fail_reason = ""
-        if not cond_clustered
-            fail_reason := fail_reason + "Cluster: " + str.tostring(cluster_range / pip_val, "#.0") + " > " + str.tostring(sell_cluster_pips) + "\n"
-        if not cond_extended
-            fail_reason := fail_reason + "Ext: " + str.tostring(trend_extension / pip_val, "#.0") + " < " + str.tostring(sell_ext_pips) + "\n"
-
-        label.new(bar_index, high, text="Missed Sell:\n" + fail_reason, color=color.gray, textcolor=color.white, style=label.style_label_down, size=size.small)
 
 if show_sell_debug and barstate.islast
     debug_txt = "SELL SIGNAL DEBUG\n" +
