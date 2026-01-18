@@ -301,22 +301,12 @@ plotshape(sell_signalk and at_show_signals and O2 > K1 ? alpha_trend[2] * 1.0001
 // 7. TREND CONTEXT LABELS
 // ==========================================
 chart_bull_fill = show_chart and c_s100 >= c_thresh_100_long and c_s21 >= c_s100
-chart_bear_fill = show_chart and c_s100 <= c_thresh_100_short and c_s21 <= c_s100
 
-daily_bull = d_s100 > d_s200 and d_s21 > d_s50
-daily_bear = d_s100 < d_s200 and d_s21 < d_s50
+long_to_buy = chart_bull_fill and buy_signalk
+sell_to_buy = chart_bull_fill and sell_signalk
 
-long_term_buy = chart_bull_fill and buy_signalk
-long_term_sell = chart_bear_fill and sell_signalk
-
-dip_to_buy = sell_signalk and daily_bull
-rally_to_sell = buy_signalk and daily_bear
-
-plotshape(at_show_signals and long_term_buy, title="Long Term Buy", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), text="Long term buy", textcolor=color.white, size=size.small)
-plotshape(at_show_signals and long_term_sell, title="Long Term Sell", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), text="Long term sell", textcolor=color.white, size=size.small)
-
-plotshape(at_show_signals and dip_to_buy, title="Dip To Buy", style=shape.labeldown, location=location.abovebar, color=color.new(color.green, 0), text="Dip to buy", textcolor=color.white, size=size.small)
-plotshape(at_show_signals and rally_to_sell, title="Rally To Sell", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), text="Rally to sell", textcolor=color.white, size=size.small)
+plotshape(at_show_signals and long_to_buy, title="Long To Buy", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), text="Long to buy", textcolor=color.white, size=size.small)
+plotshape(at_show_signals and sell_to_buy, title="Sell To Buy", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), text="Sell to buy", textcolor=color.white, size=size.small)
 
 alertcondition(buy_signalk and O1 > K2, title="Potential BUY Alarm", message="BUY SIGNAL!")
 alertcondition(sell_signalk and O2 > K1, title="Potential SELL Alarm", message="SELL SIGNAL!")
