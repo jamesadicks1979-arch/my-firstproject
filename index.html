@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Astra Glass Works | Custom Glass Solutions</title>
+    <title>Astra Glass Works | Glass Partitions & Doors</title>
     <meta
       name="description"
-      content="Astra Glass Works designs and installs custom glass systems for offices, retail spaces, and modern homes."
+      content="Astra Glass Works provides glass partitions, walls, doors, and custom office glazing with fast estimates and expert installation."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -17,10 +17,21 @@
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+    <section class="utility-bar">
+      <div class="container utility-shell">
+        <div class="utility-phones">
+          <a href="tel:+441143830999">0114 38 30 999</a>
+          <span>OR</span>
+          <a href="tel:+442081234628">0208 123 46 28</a>
+        </div>
+        <a href="#contact" class="whatsapp-btn">Chat on WhatsApp</a>
+      </div>
+    </section>
+
     <header class="site-header" id="top">
-      <div class="container nav-shell glass-panel">
+      <div class="container nav-shell">
         <a href="#top" class="brand" aria-label="Astra home">
-          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-mark" aria-hidden="true">AT</span>
           <span class="brand-text">Astra Glass Works</span>
         </a>
         <button
@@ -33,53 +44,232 @@
           <span></span><span></span><span></span>
         </button>
         <nav id="siteNav" class="site-nav" aria-label="Primary">
+          <a href="#quote">Quote Tool</a>
           <a href="#services">Services</a>
           <a href="#projects">Projects</a>
-          <a href="#process">Process</a>
           <a href="#testimonials">Testimonials</a>
-          <a href="#about">About</a>
+          <a href="#process">Process</a>
           <a href="#contact" class="btn btn-nav">Get a Quote</a>
         </nav>
       </div>
     </header>
 
     <main>
-      <section class="hero section">
-        <div class="container hero-grid">
-          <div class="hero-content">
-            <p class="eyebrow">Built for modern workspaces</p>
-            <h1>
-              Precision glass design for
-              <span>offices, retail, and hospitality.</span>
-            </h1>
-            <p class="hero-text">
-              Astra Glass Works delivers partitions, storefronts, and feature
-              installations with clean design, precise fabrication, and
-              dependable project timelines.
+      <section class="snapshot-row">
+        <div class="container snapshot-grid">
+          <article class="snapshot-card">
+            <h2>GLASS PARTITIONS</h2>
+            <p>Glass Walls & Doors</p>
+          </article>
+          <article class="snapshot-card">
+            <h2>REVIEWS <span class="stars">*****</span></h2>
+            <p>Rated 5/5 From 1301</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="photo-strip">
+        <div class="container">
+          <a href="#projects">[PHOTO] 10,009 RECENT PROJECT PHOTOS >></a>
+        </div>
+      </section>
+
+      <section class="hero-preview">
+        <div class="container">
+          <div class="hero-preview-panel">
+            <p class="hero-headline">THE UK #1 FOR GLASS OFFICE PARTITIONING</p>
+            <p class="hero-sub">
+              Glazed partitions for office, retail, commercial or home
             </p>
-            <div class="hero-actions">
-              <a href="#contact" class="btn btn-primary">Start Your Project</a>
-              <a href="#projects" class="btn btn-secondary">See Projects</a>
+            <div class="hero-preview-gallery">
+              <div
+                class="hero-image hero-image-1"
+                role="img"
+                aria-label="Office glass partition installation"
+              ></div>
+              <div
+                class="hero-image hero-image-2"
+                role="img"
+                aria-label="Meeting room with frameless glass walls"
+              ></div>
+              <div
+                class="hero-image hero-image-3"
+                role="img"
+                aria-label="Colored office partition detail"
+              ></div>
             </div>
-            <ul class="hero-stats" aria-label="Key business metrics">
-              <li><strong>250+</strong><span>Completed installs</span></li>
-              <li><strong>12 yrs</strong><span>Industry experience</span></li>
-              <li><strong>98%</strong><span>On-time delivery rate</span></li>
-            </ul>
+            <div class="hero-preview-dots" aria-hidden="true">
+              <span class="dot is-active"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+            </div>
           </div>
-          <div class="hero-card glass-panel">
-            <h2>Office Glass Package</h2>
-            <p>
-              Move-ready interior glass setup for small and mid-sized teams.
-            </p>
-            <ul>
-              <li>Frameless meeting rooms</li>
-              <li>Acoustic laminated glass</li>
-              <li>Hardware + installation included</li>
-            </ul>
-            <a href="#contact" class="btn btn-primary btn-full"
-              >Request Pricing</a
+        </div>
+      </section>
+
+      <section class="section quote-builder" id="quote">
+        <div class="container">
+          <div class="section-heading">
+            <p class="eyebrow">Instant estimator</p>
+            <h1>Build your partition package in minutes</h1>
+          </div>
+
+          <div class="quote-tabs" role="tablist" aria-label="Glass type">
+            <button
+              class="quote-tab is-active"
+              data-quote-tab="single"
+              type="button"
             >
+              Single Glazed
+            </button>
+            <button class="quote-tab" data-quote-tab="acoustic" type="button">
+              Acoustic
+            </button>
+            <button class="quote-tab" data-quote-tab="double" type="button">
+              Double Glazed
+            </button>
+            <button class="quote-tab" data-quote-tab="tbar" type="button">
+              T-Bar
+            </button>
+          </div>
+
+          <div class="quote-price-block">
+            <div>
+              <p class="quote-price" id="quotePrice">£2,342.03</p>
+              <p class="quote-vat" id="quoteVat">£2,810.44 inc VAT</p>
+            </div>
+            <button id="quoteGoBtn" class="quote-go-btn" type="button">
+              Go
+            </button>
+          </div>
+          <p class="quote-callout">
+            We take our own measurements <strong>BEFORE</strong> manufacture!
+          </p>
+
+          <div class="quote-config glass-panel">
+            <p class="quote-seller">
+              OUR BEST SELLER! THE LOW COST WAY TO GET QUALITY...
+            </p>
+            <div class="quote-config-layout">
+              <div class="quote-preview-column">
+                <div class="preview-large"></div>
+                <div class="preview-small"></div>
+              </div>
+              <div class="quote-controls-column">
+                <div class="config-icons" id="layoutPicker">
+                  <button
+                    class="config-icon is-selected"
+                    data-layout="inline"
+                    type="button"
+                    aria-label="Inline wall layout"
+                  >
+                    <span>IN</span>
+                  </button>
+                  <button
+                    class="config-icon"
+                    data-layout="offset"
+                    type="button"
+                    aria-label="Offset wall layout"
+                  >
+                    <span>OF</span>
+                  </button>
+                  <button
+                    class="config-icon"
+                    data-layout="corner"
+                    type="button"
+                    aria-label="Corner layout"
+                  >
+                    <span>CR</span>
+                  </button>
+                  <button
+                    class="config-icon"
+                    data-layout="tshape"
+                    type="button"
+                    aria-label="T-shape layout"
+                  >
+                    <span>TS</span>
+                  </button>
+                  <button
+                    class="config-icon"
+                    data-layout="u-shape"
+                    type="button"
+                    aria-label="U-shape layout"
+                  >
+                    <span>US</span>
+                  </button>
+                  <button
+                    class="config-icon"
+                    data-layout="zigzag"
+                    type="button"
+                    aria-label="Zig zag layout"
+                  >
+                    <span>ZG</span>
+                  </button>
+                  <button
+                    class="config-icon"
+                    data-layout="double-room"
+                    type="button"
+                    aria-label="Double room layout"
+                  >
+                    <span>DB</span>
+                  </button>
+                  <button
+                    class="config-icon"
+                    data-layout="lobby"
+                    type="button"
+                    aria-label="Lobby layout"
+                  >
+                    <span>LB</span>
+                  </button>
+                </div>
+
+                <label class="control-label" for="partitionType"
+                  >Partition style</label
+                >
+                <select id="partitionType" name="partitionType">
+                  <option value="inline">Inline Wall/Partition</option>
+                  <option value="corner">Corner Partition</option>
+                  <option value="three-sided">Three Sided Meeting Pod</option>
+                  <option value="full-room">Full Room Enclosure</option>
+                  <option value="switchable">Switchable Privacy Glass</option>
+                </select>
+
+                <div class="dimensions">
+                  <label for="heightInput">
+                    Height (h)
+                    <div class="dimension-input">
+                      <input
+                        id="heightInput"
+                        type="number"
+                        value="2400"
+                        min="1200"
+                        max="3500"
+                        step="50"
+                      />
+                      <span>mm</span>
+                    </div>
+                  </label>
+                  <label for="widthInput">
+                    Width (w)
+                    <div class="dimension-input">
+                      <input
+                        id="widthInput"
+                        type="number"
+                        value="3200"
+                        min="1000"
+                        max="9000"
+                        step="50"
+                      />
+                      <span>mm</span>
+                    </div>
+                  </label>
+                </div>
+                <a href="#contact" class="btn btn-primary btn-full"
+                  >Request Final Quote</a
+                >
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -283,6 +473,14 @@
         </div>
       </section>
     </main>
+
+    <div class="chat-widget" aria-hidden="true">
+      <div class="chat-message">
+        <p>Leave a message</p>
+        <small>We usually reply in 10 minutes.</small>
+      </div>
+      <button class="chat-avatar" type="button">AG</button>
+    </div>
 
     <footer class="site-footer">
       <div class="container footer-shell">
