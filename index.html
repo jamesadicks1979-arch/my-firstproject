@@ -239,6 +239,15 @@
                   <label for="heightInput">
                     Height (h)
                     <div class="dimension-input">
+                      <button
+                        class="dimension-step"
+                        type="button"
+                        data-step-target="heightInput"
+                        data-step-value="-50"
+                        aria-label="Decrease height"
+                      >
+                        -
+                      </button>
                       <input
                         id="heightInput"
                         type="number"
@@ -247,12 +256,30 @@
                         max="3500"
                         step="50"
                       />
+                      <button
+                        class="dimension-step"
+                        type="button"
+                        data-step-target="heightInput"
+                        data-step-value="50"
+                        aria-label="Increase height"
+                      >
+                        +
+                      </button>
                       <span>mm</span>
                     </div>
                   </label>
                   <label for="widthInput">
                     Width (w)
                     <div class="dimension-input">
+                      <button
+                        class="dimension-step"
+                        type="button"
+                        data-step-target="widthInput"
+                        data-step-value="-50"
+                        aria-label="Decrease width"
+                      >
+                        -
+                      </button>
                       <input
                         id="widthInput"
                         type="number"
@@ -261,6 +288,15 @@
                         max="9000"
                         step="50"
                       />
+                      <button
+                        class="dimension-step"
+                        type="button"
+                        data-step-target="widthInput"
+                        data-step-value="50"
+                        aria-label="Increase width"
+                      >
+                        +
+                      </button>
                       <span>mm</span>
                     </div>
                   </label>

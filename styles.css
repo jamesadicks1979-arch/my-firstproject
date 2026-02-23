@@ -600,10 +600,30 @@ select {
 
 .dimension-input {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   border: 1px solid #c9d7e2;
   border-radius: 0.34rem;
   overflow: hidden;
+}
+
+.dimension-step {
+  border: 0;
+  background: #f4f8fb;
+  color: #35516a;
+  min-width: 2rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-right: 1px solid #d4dee8;
+}
+
+.dimension-step[data-step-value="50"] {
+  border-right: 0;
+  border-left: 1px solid #d4dee8;
+}
+
+.dimension-step:hover {
+  background: #e8f0f7;
 }
 
 .dimension-input input {
@@ -616,7 +636,7 @@ select {
 }
 
 .dimension-input span {
-  min-width: 2.65rem;
+  min-width: 2.9rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;

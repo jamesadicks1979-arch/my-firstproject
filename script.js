@@ -15,6 +15,9 @@ const partitionTypeEl = document.getElementById("partitionType");
 const heightInputEl = document.getElementById("heightInput");
 const widthInputEl = document.getElementById("widthInput");
 const layoutButtons = Array.from(document.querySelectorAll(".config-icon"));
+const dimensionStepButtons = Array.from(
+  document.querySelectorAll("[data-step-target]")
+);
 
 const quoteBasePrices = {
   single: 2342.03,
@@ -66,6 +69,12 @@ function clamp(value, min, max, fallback) {
   return Math.min(Math.max(value, min), max);
 }
 
+function parseDimensionValue(rawValue, fallback) {
+  const cleaned = String(rawValue).replace(/,/g, "").trim();
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function currentSelectedLayout() {
   const selected = layoutButtons.find((button) =>
     button.classList.contains("is-selected")
@@ -80,12 +89,17 @@ function updateQuotePrice() {
 
   const basePrice = quoteBasePrices[activeQuoteTab] || quoteBasePrices.single;
   const height = clamp(
-    Number(heightInputEl?.value),
+    parseDimensionValue(heightInputEl?.value, 2400),
     1200,
     3500,
     2400
   );
-  const width = clamp(Number(widthInputEl?.value), 1000, 9000, 3200);
+  const width = clamp(
+    parseDimensionValue(widthInputEl?.value, 3200),
+    1000,
+    9000,
+    3200
+  );
   const areaMultiplier = (height * width) / (2400 * 3200);
   const partitionMultiplier =
     partitionTypeMultipliers[partitionTypeEl?.value] || 1;
@@ -166,11 +180,33 @@ if (partitionTypeEl) {
   partitionTypeEl.addEventListener("change", updateQuotePrice);
 }
 if (heightInputEl) {
-  heightInputEl.addEventListener("input", updateQuotePrice);
+  ["input", "change", "keyup", "blur"].forEach((eventName) => {
+    heightInputEl.addEventListener(eventName, updateQuotePrice);
+  });
 }
 if (widthInputEl) {
-  widthInputEl.addEventListener("input", updateQuotePrice);
+  ["input", "change", "keyup", "blur"].forEach((eventName) => {
+    widthInputEl.addEventListener(eventName, updateQuotePrice);
+  });
 }
+
+dimensionStepButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const targetId = button.getAttribute("data-step-target");
+    const stepValue = Number(button.getAttribute("data-step-value"));
+    const targetInput = targetId ? document.getElementById(targetId) : null;
+    if (!targetInput || !Number.isFinite(stepValue)) {
+      return;
+    }
+
+    const currentValue = parseDimensionValue(targetInput.value, Number(targetInput.min) || 0);
+    const min = Number(targetInput.min) || currentValue;
+    const max = Number(targetInput.max) || currentValue;
+    const nextValue = clamp(currentValue + stepValue, min, max, currentValue);
+    targetInput.value = String(nextValue);
+    updateQuotePrice();
+  });
+});
 if (quoteGoBtn) {
   quoteGoBtn.addEventListener("click", () => {
     document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
