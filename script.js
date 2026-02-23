@@ -24,6 +24,21 @@ if (menuToggle && siteNav) {
       siteNav.classList.remove("open");
     });
   });
+
+  document.addEventListener("click", (event) => {
+    const clickedInside = siteNav.contains(event.target) || menuToggle.contains(event.target);
+    if (!clickedInside) {
+      menuToggle.setAttribute("aria-expanded", "false");
+      siteNav.classList.remove("open");
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      menuToggle.setAttribute("aria-expanded", "false");
+      siteNav.classList.remove("open");
+    }
+  });
 }
 
 const sectionIds = navLinks

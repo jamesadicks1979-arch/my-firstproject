@@ -1,6 +1,6 @@
-# ClearRise Glass Studio Website
+# Astra Glass Works Website
 
-This repository contains a responsive one-page company website for **ClearRise Glass Studio**.
+This repository contains a responsive one-page company website for **Astra Glass Works**.
 
 ## Files
 

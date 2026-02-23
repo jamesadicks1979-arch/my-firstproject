@@ -1,14 +1,14 @@
 :root {
-  --bg: #071322;
-  --bg-soft: #0e2238;
-  --card: rgba(255, 255, 255, 0.08);
-  --card-border: rgba(255, 255, 255, 0.2);
+  --bg: #061221;
+  --bg-soft: #0f2741;
+  --card: rgba(255, 255, 255, 0.09);
+  --card-border: rgba(255, 255, 255, 0.24);
   --text: #ebf3ff;
   --text-muted: #b6c8dc;
   --primary: #4ec0ff;
   --primary-dark: #1a8bcc;
   --max-width: 1120px;
-  --shadow: 0 12px 32px rgba(5, 14, 30, 0.35);
+  --shadow: 0 14px 34px rgba(4, 12, 28, 0.36);
 }
 
 *,
@@ -25,9 +25,9 @@ body {
   margin: 0;
   font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   color: var(--text);
-  background: radial-gradient(1200px 700px at 8% -10%, #1d4d75, transparent),
-    radial-gradient(900px 700px at 95% 8%, #20455f, transparent),
-    linear-gradient(160deg, var(--bg), #08172b 45%, #0b1930 100%);
+  background: radial-gradient(1200px 700px at 8% -10%, #215781, transparent),
+    radial-gradient(900px 700px at 95% 8%, #24506e, transparent),
+    linear-gradient(160deg, var(--bg), #08192f 45%, #0b1e39 100%);
   line-height: 1.55;
 }
 
@@ -56,6 +56,19 @@ a {
   -webkit-backdrop-filter: blur(14px);
   border-radius: 1rem;
   box-shadow: var(--shadow);
+}
+
+.service-card,
+.project-card,
+.steps li {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.service-card:hover,
+.project-card:hover,
+.steps li:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 34px rgba(6, 16, 33, 0.42);
 }
 
 .eyebrow {
@@ -218,6 +231,7 @@ p {
 
 .hero {
   padding-top: 5.5rem;
+  padding-bottom: 2rem;
 }
 
 .hero-grid {
@@ -280,6 +294,38 @@ p {
 
 .hero-card li + li {
   margin-top: 0.45rem;
+}
+
+.trust-strip {
+  padding: 0.8rem 0 1.4rem;
+}
+
+.trust-shell {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 0.9rem 0.1rem;
+}
+
+.trust-label {
+  color: #c8ddf1;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.trust-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.4rem;
+  margin: 0;
+  padding: 0;
+  color: #dff0ff;
+  font-weight: 600;
+  font-size: 0.92rem;
 }
 
 .card-grid,
@@ -446,6 +492,11 @@ p {
   .steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .trust-shell {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 @media (max-width: 760px) {
@@ -485,6 +536,10 @@ p {
 
   .site-nav a:hover {
     background: rgba(255, 255, 255, 0.08);
+  }
+
+  .trust-label {
+    white-space: normal;
   }
 
   .hero-actions {
