@@ -1,6 +1,6 @@
-# Astra Glass Works Website
+# OpenSpace Glass Website
 
-This repository contains a responsive one-page company website for **Astra Glass Works**.
+This repository contains a responsive one-page company website for **OpenSpace Glass**.
 
 ## Files
 
