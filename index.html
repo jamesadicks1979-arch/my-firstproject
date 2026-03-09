@@ -9,7 +9,7 @@
 <body>
   <header class="hero">
     <h1>Pocket Caddy</h1>
-    <p>Your player profile + smart yardage helper</p>
+    <p>Wentworth West caddie mode: profile + hole-by-hole strategy</p>
   </header>
 
   <main class="container">
@@ -54,37 +54,11 @@
     </section>
 
     <section class="card" aria-labelledby="course-title">
-      <h2 id="course-title">Course Yardage Chart</h2>
-
-      <form id="courseForm" novalidate>
-        <div class="grid three-col">
-          <label>
-            Course Name
-            <input id="courseName" name="courseName" type="text" placeholder="e.g. Pine Ridge Golf Club" required />
-          </label>
-
-          <label>
-            Tee Color
-            <input id="teeColor" name="teeColor" type="text" placeholder="e.g. White" required />
-          </label>
-
-          <label>
-            Holes
-            <select id="holeCount" name="holeCount">
-              <option value="9">9</option>
-              <option value="18" selected>18</option>
-            </select>
-          </label>
-        </div>
-
-        <h3>Hole Yardages</h3>
-        <p class="hint">Enter total yardage from tee to green for each hole.</p>
-        <div id="holeGrid" class="grid hole-grid" aria-live="polite"></div>
-
-        <button type="submit" class="primary-button">Build Yardage Chart</button>
-        <p id="courseMessage" class="message" role="status" aria-live="polite"></p>
-      </form>
-
+      <h2 id="course-title">Wentworth West (West Course)</h2>
+      <p class="hint">
+        Baseline strategy notes for each hole, including where to miss fairways and greens.
+      </p>
+      <p id="courseSummary" class="course-summary"></p>
       <div class="result-wrap">
         <h3>Recommended Club by Remaining Yardage</h3>
         <label>
@@ -93,28 +67,69 @@
         </label>
         <p id="clubRecommendation" class="recommendation">Enter remaining yardage to see your best club.</p>
       </div>
+    </section>
 
+    <section class="card hole-page-wrap" aria-labelledby="hole-guide-title">
+      <div class="card-header">
+        <h2 id="hole-guide-title">Hole-by-Hole Caddie Page</h2>
+        <div class="pager">
+          <button id="prevHoleBtn" type="button" class="ghost-button">Previous</button>
+          <span id="holePosition" aria-live="polite">Hole 1 of 18</span>
+          <button id="nextHoleBtn" type="button" class="ghost-button">Next</button>
+        </div>
+      </div>
+
+      <article id="holePage" class="hole-page">
+        <h3 id="holeTitle">Hole 1</h3>
+        <p id="holeSummary"></p>
+
+        <div class="strategy-grid">
+          <div class="strategy-card">
+            <h4>Best Fairway Miss</h4>
+            <p id="fairwayMissTip"></p>
+          </div>
+          <div class="strategy-card">
+            <h4>Best Green Miss</h4>
+            <p id="greenMissTip"></p>
+          </div>
+          <div class="strategy-card">
+            <h4>Tee Shot Club</h4>
+            <p id="teeClubTip"></p>
+          </div>
+          <div class="strategy-card">
+            <h4>Approach Club</h4>
+            <p id="approachClubTip"></p>
+          </div>
+        </div>
+
+        <p id="holeNote" class="hole-note"></p>
+      </article>
+    </section>
+
+    <section class="card" aria-labelledby="table-title">
+      <h2 id="table-title">Wentworth West Strategy Chart</h2>
       <div class="table-wrap">
         <table id="yardageTable">
           <thead>
             <tr>
               <th>Hole</th>
+              <th>Par</th>
               <th>Yardage</th>
-              <th>Suggested Club for Approach*</th>
+              <th>Best Fairway Miss</th>
+              <th>Best Green Miss</th>
+              <th>Approach Club*</th>
             </tr>
           </thead>
           <tbody></tbody>
           <tfoot>
             <tr>
               <td>Total</td>
-              <td id="totalYardage">0</td>
               <td>-</td>
+              <td id="totalYardage">0</td>
+              <td colspan="3">*Based on your saved club distances.</td>
             </tr>
           </tfoot>
         </table>
-        <p class="hint">
-          *Suggested club is based on your saved profile distances.
-        </p>
       </div>
     </section>
   </main>

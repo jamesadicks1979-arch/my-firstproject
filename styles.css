@@ -40,7 +40,7 @@ body {
 }
 
 .container {
-  max-width: 1100px;
+  max-width: 1200px;
   margin: 1.5rem auto 2rem;
   padding: 0 1rem;
   display: grid;
@@ -191,9 +191,64 @@ tfoot td {
   font-weight: 700;
 }
 
-@media (min-width: 980px) {
-  .container {
-    grid-template-columns: 1fr 1fr;
-    align-items: start;
-  }
+.course-summary {
+  margin: 0.2rem 0 0;
+  font-weight: 700;
+}
+
+.hole-page-wrap {
+  width: 100%;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.hole-page {
+  margin-top: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  min-height: 68vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.hole-page h3 {
+  margin-top: 0;
+  margin-bottom: 0.2rem;
+  font-size: 1.45rem;
+}
+
+.strategy-grid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.strategy-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem;
+  background: #fcfefe;
+}
+
+.strategy-card h4 {
+  margin: 0 0 0.35rem;
+}
+
+.strategy-card p {
+  margin: 0;
+}
+
+.hole-note {
+  margin-top: 1rem;
+  padding: 0.7rem;
+  border-left: 4px solid var(--accent);
+  background: #f7fffd;
 }

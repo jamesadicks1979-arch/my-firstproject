@@ -1,6 +1,6 @@
-# Pocket Caddy (Web MVP)
+# Pocket Caddy (Wentworth West Web App)
 
-Pocket Caddy is a first web version of a golf caddy app.
+Pocket Caddy is a web version of a golf caddy app focused on one famous course first: **Wentworth West**.
 
 ## What it does
 
@@ -10,11 +10,13 @@ Pocket Caddy is a first web version of a golf caddy app.
   - Strengths
   - Weaknesses
   - Club-by-club distances (yards)
-- Lets the player enter course details:
-  - Course name
-  - Tee color
-  - Hole yardages (9 or 18 holes)
-- Builds a yardage chart table and gives club suggestions from saved distances.
+- Includes a dedicated 18-hole Wentworth West strategy guide.
+- Shows each hole like a full caddie page with:
+  - Best side to miss the fairway
+  - Best side/length to miss the green (short/long/left/right)
+  - Hole notes for safer scoring decisions
+- Includes a strategy chart table for all 18 holes.
+- Gives club suggestions from the player profile distances.
 
 ## Run it locally
 
@@ -30,6 +32,6 @@ No build tools are needed.
 
 ## Files
 
-- `index.html` - app layout
-- `styles.css` - styling
-- `script.js` - app logic and local storage
+- `index.html` - profile + Wentworth West hole pages
+- `styles.css` - styling for caddie layout
+- `script.js` - player profile logic, hole strategy data, and club recommendations
