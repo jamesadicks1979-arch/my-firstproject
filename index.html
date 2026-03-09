@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pocket Caddy</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <h1>Pocket Caddy</h1>
+    <p>Your player profile + smart yardage helper</p>
+  </header>
+
+  <main class="container">
+    <section class="card" aria-labelledby="profile-title">
+      <div class="card-header">
+        <h2 id="profile-title">Player Profile</h2>
+        <button id="clearProfileBtn" type="button" class="ghost-button">Clear Profile</button>
+      </div>
+
+      <form id="profileForm" novalidate>
+        <div class="grid two-col">
+          <label>
+            Name
+            <input id="playerName" name="playerName" type="text" placeholder="e.g. Alex Morgan" required />
+          </label>
+
+          <label>
+            Handicap
+            <input id="handicap" name="handicap" type="number" min="0" max="54" step="0.1" placeholder="e.g. 12.4" required />
+          </label>
+        </div>
+
+        <div class="grid two-col">
+          <label>
+            Strengths
+            <textarea id="strengths" name="strengths" rows="3" placeholder="e.g. Strong with wedges, good putting" required></textarea>
+          </label>
+
+          <label>
+            Weaknesses
+            <textarea id="weaknesses" name="weaknesses" rows="3" placeholder="e.g. Long irons, bunker shots" required></textarea>
+          </label>
+        </div>
+
+        <h3>Club Distances (yards)</h3>
+        <p class="hint">Enter carry distance for each club in the bag.</p>
+        <div id="clubDistanceGrid" class="grid club-grid" aria-live="polite"></div>
+
+        <button type="submit" class="primary-button">Save Profile</button>
+        <p id="profileMessage" class="message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="course-title">
+      <h2 id="course-title">Course Yardage Chart</h2>
+
+      <form id="courseForm" novalidate>
+        <div class="grid three-col">
+          <label>
+            Course Name
+            <input id="courseName" name="courseName" type="text" placeholder="e.g. Pine Ridge Golf Club" required />
+          </label>
+
+          <label>
+            Tee Color
+            <input id="teeColor" name="teeColor" type="text" placeholder="e.g. White" required />
+          </label>
+
+          <label>
+            Holes
+            <select id="holeCount" name="holeCount">
+              <option value="9">9</option>
+              <option value="18" selected>18</option>
+            </select>
+          </label>
+        </div>
+
+        <h3>Hole Yardages</h3>
+        <p class="hint">Enter total yardage from tee to green for each hole.</p>
+        <div id="holeGrid" class="grid hole-grid" aria-live="polite"></div>
+
+        <button type="submit" class="primary-button">Build Yardage Chart</button>
+        <p id="courseMessage" class="message" role="status" aria-live="polite"></p>
+      </form>
+
+      <div class="result-wrap">
+        <h3>Recommended Club by Remaining Yardage</h3>
+        <label>
+          Remaining Yardage
+          <input id="remainingYardage" type="number" min="1" placeholder="e.g. 145" />
+        </label>
+        <p id="clubRecommendation" class="recommendation">Enter remaining yardage to see your best club.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table id="yardageTable">
+          <thead>
+            <tr>
+              <th>Hole</th>
+              <th>Yardage</th>
+              <th>Suggested Club for Approach*</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td id="totalYardage">0</td>
+              <td>-</td>
+            </tr>
+          </tfoot>
+        </table>
+        <p class="hint">
+          *Suggested club is based on your saved profile distances.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
