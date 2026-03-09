@@ -209,19 +209,23 @@ tfoot td {
 
 .hole-page {
   margin-top: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 1rem;
+  border: 0;
+  border-radius: 18px;
+  padding: 1.1rem;
   min-height: 68vh;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
+  background: linear-gradient(165deg, #ec876e, #d65b43);
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(123, 45, 30, 0.22);
 }
 
 .hole-page h3 {
   margin-top: 0;
   margin-bottom: 0.2rem;
   font-size: 1.45rem;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
 }
 
 .strategy-grid {
@@ -232,10 +236,11 @@ tfoot td {
 }
 
 .strategy-card {
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 12px;
   padding: 0.7rem;
-  background: #fcfefe;
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(2px);
 }
 
 .strategy-card h4 {
@@ -249,20 +254,32 @@ tfoot td {
 .hole-note {
   margin-top: 1rem;
   padding: 0.7rem;
-  border-left: 4px solid var(--accent);
-  background: #f7fffd;
+  border-left: 4px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
 }
 
 .shot-planner {
   margin-top: 0.9rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 0;
+  border-radius: 14px;
   padding: 0.8rem;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .shot-planner h4 {
   margin: 0 0 0.3rem;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.planner-subtitle {
+  margin: 0 0 0.5rem;
+  font-size: 1.9rem;
+  line-height: 1.05;
+  font-weight: 300;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 .plan-summary {
@@ -273,9 +290,37 @@ tfoot td {
 #shotMap {
   width: 100%;
   height: auto;
-  border: 1px solid #cfe3d0;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #f8fff4, #eef9e4);
+  border: 7px solid #191b1c;
+  border-radius: 26px;
+  background: #153726;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.miss-legend {
+  margin-top: 0.55rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  font-size: 0.9rem;
+}
+
+.dot {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+  transform: translateY(1px);
+}
+
+.dot-green {
+  background: #11aa55;
+  border: 1px solid #0c7f40;
+}
+
+.dot-red {
+  background: #d92d20;
+  border: 1px solid #a12318;
 }
 
 .plan-buttons {
@@ -283,6 +328,7 @@ tfoot td {
   padding-top: 0.9rem;
   display: flex;
   gap: 0.6rem;
+  flex-wrap: wrap;
 }
 
 .plan-button-active {
@@ -293,10 +339,10 @@ tfoot td {
 
 .hole-story-panel {
   margin-top: 0.8rem;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: 8px;
   padding: 0.8rem;
-  background: #fffdfa;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .hole-story-panel h4 {

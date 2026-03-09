@@ -103,12 +103,17 @@
         </div>
 
         <section class="shot-planner" aria-labelledby="planner-title">
-          <h4 id="planner-title">Shot Planner</h4>
+          <h4 id="planner-title">PLAN</h4>
+          <p class="planner-subtitle">Aggressive or conservative?</p>
           <p id="planSummary" class="plan-summary"></p>
           <svg id="shotMap" viewBox="0 0 640 220" role="img" aria-label="Shot path map for selected plan">
             <rect x="20" y="20" width="600" height="180" rx="14" ry="14" fill="#e4f5da"></rect>
             <rect x="540" y="75" width="80" height="70" rx="30" ry="30" fill="#b6e2b9"></rect>
           </svg>
+          <div class="miss-legend">
+            <span><i class="dot dot-green"></i> Best miss zone</span>
+            <span><i class="dot dot-red"></i> No-go miss zone</span>
+          </div>
         </section>
 
         <p id="holeNote" class="hole-note"></p>

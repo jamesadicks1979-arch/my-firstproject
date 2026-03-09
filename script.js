@@ -326,7 +326,9 @@ function renderShotMap(hole, plan) {
   const landingRatio = hole.par === 3 ? 1 : clamp(plan.landingDistance / hole.yardage, 0.12, 0.95);
   const landingX = Math.round(teeX + (greenX - teeX) * landingRatio);
   const landingY = hole.par === 3 ? greenY : teeY + fairwayOffset;
-  const lineColor = selectedPlan === "aggressive" ? "#b42318" : "#0f766e";
+  const lineColor = selectedPlan === "aggressive" ? "#ffffff" : "#b8f6d4";
+  const fairwaySide = getFairwaySide(hole.fairwayMiss);
+  const missMarkers = getMissMarkers(fairwaySide, hole, teeX, teeY, greenX, greenY);
 
   const firstLabelY = landingY - 14;
   const secondLabelY = greenY - 14;
@@ -334,18 +336,25 @@ function renderShotMap(hole, plan) {
     ? ""
     : `<line x1="${landingX}" y1="${landingY}" x2="${greenX}" y2="${greenY}" stroke="${lineColor}" stroke-width="4" />
        <circle cx="${landingX}" cy="${landingY}" r="7" fill="${lineColor}" />
-       <text x="${landingX - 36}" y="${firstLabelY}" fill="#132a3a" font-size="13">${escapeXml(plan.teeClubLabel)}</text>`;
+       <text x="${landingX - 36}" y="${firstLabelY}" fill="#ffffff" font-size="13">${escapeXml(plan.teeClubLabel)}</text>`;
 
   shotMapEl.innerHTML = `
-    <rect x="20" y="20" width="600" height="180" rx="14" ry="14" fill="#e4f5da"></rect>
-    <rect x="540" y="75" width="80" height="70" rx="30" ry="30" fill="#b6e2b9"></rect>
+    <rect x="20" y="20" width="600" height="180" rx="16" ry="16" fill="#1c5e43"></rect>
+    <path d="M35 35 L285 35 L330 185 L35 185 Z" fill="#1f8db7" opacity="0.7"></path>
+    <path d="M80 170 C180 105, 270 125, 360 120 C455 115, 520 100, 595 95" stroke="#8dd08d" stroke-width="60" fill="none" stroke-linecap="round"></path>
+    <path d="M80 170 C180 105, 270 125, 360 120 C455 115, 520 100, 595 95" stroke="#b7e9ae" stroke-width="34" fill="none" stroke-linecap="round"></path>
+    <circle cx="${missMarkers.bestX}" cy="${missMarkers.bestY}" r="10" fill="#11aa55" stroke="#0e7b3f" stroke-width="3"></circle>
+    <circle cx="${missMarkers.noGoX}" cy="${missMarkers.noGoY}" r="10" fill="#d92d20" stroke="#a12318" stroke-width="3"></circle>
+    <text x="${missMarkers.bestX + 12}" y="${missMarkers.bestY + 4}" fill="#f8fff8" font-size="12">Best miss</text>
+    <text x="${missMarkers.noGoX + 12}" y="${missMarkers.noGoY + 4}" fill="#ffe9e6" font-size="12">No-go</text>
+    <rect x="545" y="70" width="68" height="50" rx="20" ry="20" fill="#7fcf87"></rect>
     <line x1="${teeX}" y1="${teeY}" x2="${hole.par === 3 ? greenX : landingX}" y2="${hole.par === 3 ? greenY : landingY}" stroke="${lineColor}" stroke-width="4" />
     ${secondSegment}
     <circle cx="${teeX}" cy="${teeY}" r="7" fill="#132a3a" />
     <circle cx="${greenX}" cy="${greenY}" r="8" fill="#027a48" />
-    <text x="${teeX - 18}" y="${teeY - 14}" fill="#132a3a" font-size="13">Tee</text>
-    <text x="${greenX - 20}" y="${secondLabelY}" fill="#132a3a" font-size="13">${escapeXml(plan.approachClubLabel)}</text>
-    <text x="24" y="208" fill="#132a3a" font-size="12">${selectedPlan === "aggressive" ? "Aggressive line" : "Safe line"} for Hole ${hole.hole}</text>
+    <text x="${teeX - 18}" y="${teeY - 14}" fill="#ffffff" font-size="13">Tee</text>
+    <text x="${greenX - 20}" y="${secondLabelY}" fill="#ffffff" font-size="13">${escapeXml(plan.approachClubLabel)}</text>
+    <text x="24" y="208" fill="#ffffff" font-size="12">${selectedPlan === "aggressive" ? "Aggressive line" : "Safe line"} for Hole ${hole.hole}</text>
   `;
 }
 
@@ -357,6 +366,54 @@ function parseFairwayOffset(fairwayMissText, mode) {
     return mode === "aggressive" ? 22 : 10;
   }
   return mode === "aggressive" ? -14 : 14;
+}
+
+function getFairwaySide(fairwayMissText) {
+  const text = fairwayMissText.toLowerCase();
+  if (text.includes("right")) {
+    return "right";
+  }
+  if (text.includes("left")) {
+    return "left";
+  }
+  return "center";
+}
+
+function getMissMarkers(fairwaySide, hole, teeX, teeY, greenX, greenY) {
+  const markerX = hole.par === 3 ? greenX - 48 : teeX + Math.round((greenX - teeX) * 0.54);
+  if (fairwaySide === "right") {
+    return {
+      bestX: markerX,
+      bestY: teeY - 26,
+      noGoX: markerX - 12,
+      noGoY: teeY + 28,
+    };
+  }
+
+  if (fairwaySide === "left") {
+    return {
+      bestX: markerX - 12,
+      bestY: teeY + 28,
+      noGoX: markerX,
+      noGoY: teeY - 26,
+    };
+  }
+
+  if (hole.par === 3) {
+    return {
+      bestX: markerX - 10,
+      bestY: greenY + 28,
+      noGoX: markerX,
+      noGoY: greenY - 28,
+    };
+  }
+
+  return {
+    bestX: markerX - 8,
+    bestY: teeY - 12,
+    noGoX: markerX + 8,
+    noGoY: teeY + 30,
+  };
 }
 
 function updatePlanButtons() {
