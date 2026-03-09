@@ -345,8 +345,10 @@ function renderShotMap(hole, plan) {
     <path d="M80 170 C180 105, 270 125, 360 120 C455 115, 520 100, 595 95" stroke="#b7e9ae" stroke-width="34" fill="none" stroke-linecap="round"></path>
     <circle cx="${missMarkers.bestX}" cy="${missMarkers.bestY}" r="10" fill="#11aa55" stroke="#0e7b3f" stroke-width="3"></circle>
     <circle cx="${missMarkers.noGoX}" cy="${missMarkers.noGoY}" r="10" fill="#d92d20" stroke="#a12318" stroke-width="3"></circle>
-    <text x="${missMarkers.bestX + 12}" y="${missMarkers.bestY + 4}" fill="#f8fff8" font-size="12">Best miss</text>
-    <text x="${missMarkers.noGoX + 12}" y="${missMarkers.noGoY + 4}" fill="#ffe9e6" font-size="12">No-go</text>
+    <rect x="${missMarkers.bestX + 12}" y="${missMarkers.bestY - 11}" width="84" height="18" rx="8" fill="#0e7b3f" opacity="0.9"></rect>
+    <text x="${missMarkers.bestX + 18}" y="${missMarkers.bestY + 2}" fill="#f8fff8" font-size="11" font-weight="700">SAFE AREA</text>
+    <rect x="${missMarkers.noGoX + 12}" y="${missMarkers.noGoY - 11}" width="58" height="18" rx="8" fill="#a12318" opacity="0.9"></rect>
+    <text x="${missMarkers.noGoX + 18}" y="${missMarkers.noGoY + 2}" fill="#ffe9e6" font-size="11" font-weight="700">NO GO</text>
     <rect x="545" y="70" width="68" height="50" rx="20" ry="20" fill="#7fcf87"></rect>
     <line x1="${teeX}" y1="${teeY}" x2="${hole.par === 3 ? greenX : landingX}" y2="${hole.par === 3 ? greenY : landingY}" stroke="${lineColor}" stroke-width="4" />
     ${secondSegment}
