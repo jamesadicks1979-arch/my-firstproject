@@ -35,7 +35,7 @@ const DEFAULT_DISTANCES = {
 const WENTWORTH_WEST = {
   name: "Wentworth West Course",
   holes: [
-    { hole: 1, par: 4, yardage: 421, fairwayMiss: "Favor right-center miss.", greenMiss: "Short-right is safest for up-and-down.", note: "Strong opener with bunkers left; keep tee ball on the right half." },
+    { hole: 1, par: 4, yardage: 473, fairwayMiss: "Favor right-center miss.", greenMiss: "Short-right is safest for up-and-down.", note: "Strong opener with bunkers left; keep tee ball on the right half." },
     { hole: 2, par: 4, yardage: 430, fairwayMiss: "Miss slightly left to avoid right trouble.", greenMiss: "Short is better than long here.", note: "Play for center of green and trust a two-putt par." },
     { hole: 3, par: 4, yardage: 442, fairwayMiss: "Right miss leaves a clearer angle.", greenMiss: "Right of green leaves a simpler chip.", note: "Long approach; commit to your line and avoid front bunkers." },
     { hole: 4, par: 5, yardage: 561, fairwayMiss: "Left-center miss keeps second shot open.", greenMiss: "Short-left gives best chance to save par.", note: "Three-shot hole for most players; position over power." },
@@ -431,51 +431,59 @@ function renderHoleStory(hole, plan) {
 
 function getHoleStoryMarkup(hole, plan) {
   if (hole.hole === 1) {
+    const profilePlan = getHoleOneProfileStrategy(hole.yardage);
     return `
-      <p><strong>Wentworth Club West Course - Hole 1 Yardage-Chart Style View</strong></p>
+      <p><strong>Wentworth Club West Course - Hole 1 Yardage-Book Style View</strong></p>
       <p class="story-title">Hole 1 Overview</p>
       <ul>
         <li><strong>Par:</strong> 4 (Tour) / often Par 5 for members</li>
-        <li><strong>Yardage:</strong> about 473-474 yards (433 m) from championship tees</li>
-        <li><strong>Handicap index:</strong> around 16 on the card (one of the easier holes but still demanding)</li>
+        <li><strong>Length:</strong> about 473 yards (433 m) from championship tees</li>
+        <li><strong>Stroke index:</strong> around 16 on the card</li>
       </ul>
 
       <p class="story-title">Yardage Book Style Breakdown</p>
       <p class="story-title">Tee Shot</p>
       <ul>
         <li>Elevated tee looking down the fairway</li>
-        <li>Fairway slopes left to right</li>
-        <li>Right fairway bunker around 285 yards from the tee</li>
-        <li><strong>Safe play:</strong> 3-wood to 280-290 yards leaving a mid-iron in</li>
+        <li>Fairway moves slightly left to right</li>
+        <li>Right fairway bunker around 280-290 yards from the back tee</li>
+        <li>Most tour players hit 3-wood or controlled driver to stay short of the bunker</li>
       </ul>
 
-      <p class="story-title">Landing Area</p>
+      <p class="story-title">Typical landing numbers</p>
       <ul>
-        <li>Narrow driving zone with trees both sides</li>
-        <li>Right rough is common because the fairway kicks balls that direction</li>
+        <li><strong>250y</strong> - start of fairway narrowing</li>
+        <li><strong>280y</strong> - bunker carry area</li>
+        <li><strong>300y</strong> - slope can kick ball right toward rough</li>
       </ul>
 
-      <p class="story-title">Approach Shot</p>
+      <p class="story-title">Second Shot</p>
       <ul>
-        <li>Uphill / slightly elevated green</li>
-        <li>Usually 5-iron or mid-iron from the lay-up distance</li>
+        <li>Uphill approach into a slightly raised green</li>
+        <li>Often mid-iron (5-7 iron) for tour players</li>
+        <li>Lies can be uneven due to the fairway slope</li>
+      </ul>
+
+      <p class="story-title">Green Complex</p>
+      <ul>
         <li>Four bunkers guard the green complex making long approaches risky</li>
-      </ul>
-
-      <p class="story-title">Green</p>
-      <ul>
-        <li>Slightly raised surface</li>
-        <li>Bunkers front-left, front-right, and back</li>
+        <li>Slightly elevated surface</li>
         <li>Missing short often leaves a tricky bunker shot</li>
       </ul>
 
       <p class="story-title">Typical Tour Strategy</p>
       <ol>
-        <li>3-wood to top of hill (~285y)</li>
-        <li>5-iron approach to middle of green</li>
-        <li>Take par and move on - it averages over par in tournaments</li>
+        <li>3-wood to around 275-285y</li>
+        <li>Mid-iron approach to center of green</li>
+        <li>Avoid short-side bunkers and take par</li>
       </ol>
 
+      <p class="story-title">Your Profile Caddie Call</p>
+      <ul>
+        <li>${escapeXml(profilePlan.driverCall)}</li>
+        <li>${escapeXml(profilePlan.layupCall)}</li>
+        <li>${escapeXml(profilePlan.thirdShotCall)}</li>
+      </ul>
       <p><strong>Current selected plan:</strong> ${escapeXml(selectedPlan)} | Tee: ${escapeXml(plan.teeClubLabel)} | Approach: ${escapeXml(plan.approachClubLabel)}</p>
     `;
   }
@@ -509,6 +517,25 @@ function getHoleStoryMarkup(hole, plan) {
     <p>Current ${escapeXml(selectedPlan)} plan: ${escapeXml(plan.teeClubLabel)} from tee, then ${escapeXml(plan.approachClubLabel)} from ${plan.remainingDistance}y.</p>
     <p>If the number is awkward, take one less and leave a simple chip or putt rather than chasing a perfect shot.</p>
   `;
+}
+
+function getHoleOneProfileStrategy(holeYardage) {
+  const driver = Math.round(getClubDistanceValue("Driver"));
+  const fiveWood = Math.round(getClubDistanceValue("5 Wood"));
+  const sixIron = Math.round(getClubDistanceValue("6 Iron"));
+  const twoShotTotal = driver + fiveWood;
+  const canReachInTwo = twoShotTotal >= holeYardage;
+  const layupRemainder = Math.max(holeYardage - (fiveWood + sixIron), 0);
+
+  const driverCall = canReachInTwo
+    ? `Driver ${driver}y gives you a realistic two-shot chance, but only if the tee ball is in the right side of fairway.`
+    : `Driver ${driver}y means this is usually not a reliable two-shot hole for your profile.`;
+
+  const layupCall = `Safer pattern: 5-wood ${fiveWood}y then 6-iron ${sixIron}y to position the ball short-right.`;
+
+  const thirdShotCall = `That leaves about ${layupRemainder}y for a controlled third shot (example target is around 89y when 5-wood is 220y and 6-iron is 165y).`;
+
+  return { driverCall, layupCall, thirdShotCall };
 }
 
 function clamp(value, min, max) {
