@@ -15,6 +15,23 @@ const CLUBS = [
   "Lob Wedge",
 ];
 
+const DEFAULT_DISTANCES = {
+  Driver: 240,
+  "3 Wood": 220,
+  "5 Wood": 205,
+  "3 Hybrid": 195,
+  "4 Iron": 185,
+  "5 Iron": 175,
+  "6 Iron": 165,
+  "7 Iron": 155,
+  "8 Iron": 145,
+  "9 Iron": 135,
+  "Pitching Wedge": 120,
+  "Gap Wedge": 105,
+  "Sand Wedge": 90,
+  "Lob Wedge": 75,
+};
+
 const WENTWORTH_WEST = {
   name: "Wentworth West Course",
   holes: [
@@ -62,9 +79,14 @@ const greenMissTipEl = document.getElementById("greenMissTip");
 const teeClubTipEl = document.getElementById("teeClubTip");
 const approachClubTipEl = document.getElementById("approachClubTip");
 const holeNoteEl = document.getElementById("holeNote");
+const aggressiveBtn = document.getElementById("aggressiveBtn");
+const safeBtn = document.getElementById("safeBtn");
+const planSummaryEl = document.getElementById("planSummary");
+const shotMapEl = document.getElementById("shotMap");
 
 let savedProfile = null;
 let currentHoleIndex = 0;
+let selectedPlan = "aggressive";
 
 buildClubInputs();
 loadSavedProfile();
@@ -130,6 +152,16 @@ nextHoleBtn.addEventListener("click", () => {
   renderHolePage();
 });
 
+aggressiveBtn.addEventListener("click", () => {
+  selectedPlan = "aggressive";
+  renderHolePage();
+});
+
+safeBtn.addEventListener("click", () => {
+  selectedPlan = "safe";
+  renderHolePage();
+});
+
 function buildClubInputs() {
   clubDistanceGrid.innerHTML = "";
   CLUBS.forEach((club) => {
@@ -170,8 +202,7 @@ function renderYardageTable() {
 
   WENTWORTH_WEST.holes.forEach((hole) => {
     const row = document.createElement("tr");
-    const approachDistance = getApproachDistance(hole);
-    const approachClub = getBestClubForYardage(approachDistance);
+    const aggressivePlan = getPlanForHole(hole, "aggressive");
 
     row.innerHTML = `
       <td>${hole.hole}</td>
@@ -179,7 +210,7 @@ function renderYardageTable() {
       <td>${hole.yardage}</td>
       <td>${hole.fairwayMiss}</td>
       <td>${hole.greenMiss}</td>
-      <td>${approachClub}</td>
+      <td>${aggressivePlan.approachClubLabel}</td>
     `;
     tableBody.appendChild(row);
   });
@@ -187,59 +218,33 @@ function renderYardageTable() {
 
 function renderHolePage() {
   const hole = WENTWORTH_WEST.holes[currentHoleIndex];
-  const teeClub = getTeeShotClub(hole);
-  const approachClub = getBestClubForYardage(getApproachDistance(hole));
+  const plan = getPlanForHole(hole, selectedPlan);
+  const planName = selectedPlan === "aggressive" ? "Aggressive" : "Safe";
 
   holePositionEl.textContent = `Hole ${hole.hole} of ${WENTWORTH_WEST.holes.length}`;
   holeTitleEl.textContent = `Hole ${hole.hole}`;
   holeSummaryEl.textContent = `Par ${hole.par} | ${hole.yardage} yards`;
   fairwayMissTipEl.textContent = hole.fairwayMiss;
   greenMissTipEl.textContent = hole.greenMiss;
-  teeClubTipEl.textContent = teeClub;
-  approachClubTipEl.textContent = approachClub;
+  teeClubTipEl.textContent = `${planName}: ${plan.teeClubLabel} to ${plan.landingDistance}y`;
+  approachClubTipEl.textContent = `${plan.approachClubLabel} from ${plan.remainingDistance}y`;
+  planSummaryEl.textContent = `${planName} line: ${plan.teeClubLabel} to ${plan.landingDistance}y, then ${plan.approachClubLabel} into the green.`;
   holeNoteEl.textContent = hole.note;
-}
-
-function getTeeShotClub(hole) {
-  if (hole.par === 3) {
-    return getBestClubForYardage(hole.yardage);
-  }
-
-  if (hole.par === 5) {
-    return `Primary: ${getBestClubForYardage(240)} (aim to set up a layup)`;
-  }
-
-  const targetTeeDistance = Math.max(190, hole.yardage - 155);
-  return `Primary: ${getBestClubForYardage(targetTeeDistance)}`;
-}
-
-function getApproachDistance(hole) {
-  if (hole.par === 3) {
-    return hole.yardage;
-  }
-  if (hole.par === 5) {
-    return 100;
-  }
-  return 150;
+  renderShotMap(hole, plan);
+  updatePlanButtons();
 }
 
 function getBestClubForYardage(targetYardage) {
-  if (!savedProfile) {
-    return "Save profile first";
-  }
-
   const bestEntry = getBestClubEntry(targetYardage);
   if (!bestEntry) {
     return "No club distances set";
   }
-  return `${bestEntry.club} (${bestEntry.distance}y)`;
+  const estimateLabel = savedProfile ? "" : " est.";
+  return `${bestEntry.club} (${bestEntry.distance}y${estimateLabel})`;
 }
 
 function getBestClubEntry(targetYardage) {
-  if (!savedProfile || !savedProfile.distances) {
-    return null;
-  }
-  const entries = Object.entries(savedProfile.distances).filter(([, value]) => value > 0);
+  const entries = getDistanceEntries();
   if (!entries.length) {
     return null;
   }
@@ -256,6 +261,111 @@ function getBestClubEntry(targetYardage) {
   });
 
   return best;
+}
+
+function getPlanForHole(hole, mode) {
+  if (hole.par === 3) {
+    const par3Target = mode === "safe" ? hole.yardage + 8 : hole.yardage;
+    const par3Club = getBestClubForYardage(par3Target);
+    return {
+      teeClubLabel: par3Club,
+      approachClubLabel: "No approach shot (par 3)",
+      landingDistance: hole.yardage,
+      remainingDistance: 0,
+    };
+  }
+
+  const teeClubName = mode === "safe" ? "4 Iron" : "Driver";
+  const teeDistanceRaw = getClubDistanceValue(teeClubName);
+  const minimumLeave = hole.par === 5 ? 70 : 20;
+  const landingDistance = Math.round(clamp(teeDistanceRaw, 90, hole.yardage - minimumLeave));
+  const remainingDistance = Math.max(hole.yardage - landingDistance, 0);
+  const approachClubLabel = getBestClubForYardage(remainingDistance);
+
+  return {
+    teeClubLabel: `${teeClubName} (${Math.round(teeDistanceRaw)}y${savedProfile ? "" : " est."})`,
+    approachClubLabel,
+    landingDistance,
+    remainingDistance: Math.round(remainingDistance),
+  };
+}
+
+function getClubDistanceValue(clubName) {
+  if (savedProfile && savedProfile.distances && savedProfile.distances[clubName] > 0) {
+    return savedProfile.distances[clubName];
+  }
+  return DEFAULT_DISTANCES[clubName] || 0;
+}
+
+function getDistanceEntries() {
+  if (savedProfile && savedProfile.distances) {
+    const userEntries = Object.entries(savedProfile.distances).filter(([, value]) => value > 0);
+    if (userEntries.length) {
+      return userEntries;
+    }
+  }
+  return Object.entries(DEFAULT_DISTANCES);
+}
+
+function renderShotMap(hole, plan) {
+  const teeX = 70;
+  const teeY = 110;
+  const greenX = 580;
+  const greenY = 110;
+  const fairwayOffset = parseFairwayOffset(hole.fairwayMiss, selectedPlan);
+  const landingRatio = hole.par === 3 ? 1 : clamp(plan.landingDistance / hole.yardage, 0.12, 0.95);
+  const landingX = Math.round(teeX + (greenX - teeX) * landingRatio);
+  const landingY = hole.par === 3 ? greenY : teeY + fairwayOffset;
+  const lineColor = selectedPlan === "aggressive" ? "#b42318" : "#0f766e";
+
+  const firstLabelY = landingY - 14;
+  const secondLabelY = greenY - 14;
+  const secondSegment = hole.par === 3
+    ? ""
+    : `<line x1="${landingX}" y1="${landingY}" x2="${greenX}" y2="${greenY}" stroke="${lineColor}" stroke-width="4" />
+       <circle cx="${landingX}" cy="${landingY}" r="7" fill="${lineColor}" />
+       <text x="${landingX - 36}" y="${firstLabelY}" fill="#132a3a" font-size="13">${escapeXml(plan.teeClubLabel)}</text>`;
+
+  shotMapEl.innerHTML = `
+    <rect x="20" y="20" width="600" height="180" rx="14" ry="14" fill="#e4f5da"></rect>
+    <rect x="540" y="75" width="80" height="70" rx="30" ry="30" fill="#b6e2b9"></rect>
+    <line x1="${teeX}" y1="${teeY}" x2="${hole.par === 3 ? greenX : landingX}" y2="${hole.par === 3 ? greenY : landingY}" stroke="${lineColor}" stroke-width="4" />
+    ${secondSegment}
+    <circle cx="${teeX}" cy="${teeY}" r="7" fill="#132a3a" />
+    <circle cx="${greenX}" cy="${greenY}" r="8" fill="#027a48" />
+    <text x="${teeX - 18}" y="${teeY - 14}" fill="#132a3a" font-size="13">Tee</text>
+    <text x="${greenX - 20}" y="${secondLabelY}" fill="#132a3a" font-size="13">${escapeXml(plan.approachClubLabel)}</text>
+    <text x="24" y="208" fill="#132a3a" font-size="12">${selectedPlan === "aggressive" ? "Aggressive line" : "Safe line"} for Hole ${hole.hole}</text>
+  `;
+}
+
+function parseFairwayOffset(fairwayMissText, mode) {
+  if (fairwayMissText.toLowerCase().includes("right")) {
+    return mode === "aggressive" ? -22 : -10;
+  }
+  if (fairwayMissText.toLowerCase().includes("left")) {
+    return mode === "aggressive" ? 22 : 10;
+  }
+  return mode === "aggressive" ? -14 : 14;
+}
+
+function updatePlanButtons() {
+  const isAggressive = selectedPlan === "aggressive";
+  aggressiveBtn.classList.toggle("plan-button-active", isAggressive);
+  safeBtn.classList.toggle("plan-button-active", !isAggressive);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(value, max));
+}
+
+function escapeXml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
 }
 
 function refreshRecommendation() {

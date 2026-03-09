@@ -15,6 +15,10 @@ Pocket Caddy is a web version of a golf caddy app focused on one famous course f
   - Best side to miss the fairway
   - Best side/length to miss the green (short/long/left/right)
   - Hole notes for safer scoring decisions
+- Adds two shot-plan buttons on each hole page:
+  - **Aggressive**: driver line + approach club into green
+  - **Safe**: 4-iron line + approach club into green
+  - Visual shot map with dots and line (tee -> landing -> green)
 - Includes a strategy chart table for all 18 holes.
 - Gives club suggestions from the player profile distances.
 
