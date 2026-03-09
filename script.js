@@ -423,42 +423,92 @@ function updatePlanButtons() {
 }
 
 function renderHoleStory(hole, plan) {
-  holeStoryText.textContent = getHoleStoryText(hole, plan);
+  holeStoryText.innerHTML = getHoleStoryMarkup(hole, plan);
   holeStoryPanel.classList.toggle("is-hidden", !isStoryOpen);
   holeStoryBtn.textContent = isStoryOpen ? "Hide Hole Story" : "Show Hole Story";
   holeStoryBtn.classList.toggle("plan-button-active", isStoryOpen);
 }
 
-function getHoleStoryText(hole, plan) {
+function getHoleStoryMarkup(hole, plan) {
+  if (hole.hole === 1) {
+    return `
+      <p><strong>Wentworth Club West Course - Hole 1 Yardage-Chart Style View</strong></p>
+      <p class="story-title">Hole 1 Overview</p>
+      <ul>
+        <li><strong>Par:</strong> 4 (Tour) / often Par 5 for members</li>
+        <li><strong>Yardage:</strong> about 473-474 yards (433 m) from championship tees</li>
+        <li><strong>Handicap index:</strong> around 16 on the card (one of the easier holes but still demanding)</li>
+      </ul>
+
+      <p class="story-title">Yardage Book Style Breakdown</p>
+      <p class="story-title">Tee Shot</p>
+      <ul>
+        <li>Elevated tee looking down the fairway</li>
+        <li>Fairway slopes left to right</li>
+        <li>Right fairway bunker around 285 yards from the tee</li>
+        <li><strong>Safe play:</strong> 3-wood to 280-290 yards leaving a mid-iron in</li>
+      </ul>
+
+      <p class="story-title">Landing Area</p>
+      <ul>
+        <li>Narrow driving zone with trees both sides</li>
+        <li>Right rough is common because the fairway kicks balls that direction</li>
+      </ul>
+
+      <p class="story-title">Approach Shot</p>
+      <ul>
+        <li>Uphill / slightly elevated green</li>
+        <li>Usually 5-iron or mid-iron from the lay-up distance</li>
+        <li>Four bunkers guard the green complex making long approaches risky</li>
+      </ul>
+
+      <p class="story-title">Green</p>
+      <ul>
+        <li>Slightly raised surface</li>
+        <li>Bunkers front-left, front-right, and back</li>
+        <li>Missing short often leaves a tricky bunker shot</li>
+      </ul>
+
+      <p class="story-title">Typical Tour Strategy</p>
+      <ol>
+        <li>3-wood to top of hill (~285y)</li>
+        <li>5-iron approach to middle of green</li>
+        <li>Take par and move on - it averages over par in tournaments</li>
+      </ol>
+
+      <p><strong>Current selected plan:</strong> ${escapeXml(selectedPlan)} | Tee: ${escapeXml(plan.teeClubLabel)} | Approach: ${escapeXml(plan.approachClubLabel)}</p>
+    `;
+  }
+
   if (hole.par === 4 && hole.yardage >= 450) {
-    return [
-      "Long par 4. Most of the trouble is down the left.",
-      "If you miss short-right from the tee, you still have a shot into the green.",
-      "You need a drive up the right side to give yourself the best chance to hit this green.",
-      `With the ${selectedPlan} plan, take ${plan.teeClubLabel} from the tee.`,
-      `For the approach, use ${plan.approachClubLabel}, or one club less to miss short-right and leave an uphill chip or putt.`,
-      "Long is a hard up-and-down.",
-      "Par is a very good score on this hole, so take it and move on.",
-      "Bogey is not too bad because the next few holes can give you a chance to win the shot back.",
-      "This hole can catch you out - do not get greedy.",
-    ].join("\n");
+    return `
+      <p>Long par 4. Most of the trouble is down the left.</p>
+      <p>If you miss short-right from the tee, you still have a shot into the green.</p>
+      <p>You need a drive up the right side to give yourself the best chance to hit this green.</p>
+      <p>With the ${escapeXml(selectedPlan)} plan, take ${escapeXml(plan.teeClubLabel)} from the tee.</p>
+      <p>For the approach, use ${escapeXml(plan.approachClubLabel)}, or one club less to miss short-right and leave an uphill chip or putt.</p>
+      <p>Long is a hard up-and-down.</p>
+      <p>Par is a very good score on this hole, so take it and move on.</p>
+      <p>Bogey is not too bad because the next few holes can give you a chance to win the shot back.</p>
+      <p>This hole can catch you out - do not get greedy.</p>
+    `;
   }
 
   if (hole.par === 3) {
-    return [
-      `Par 3 strategy: ${hole.greenMiss}`,
-      `Commit to ${plan.teeClubLabel} and favor the center of the green if pin is tucked.`,
-      "Par is always a strong result here. Avoid short-siding yourself.",
-    ].join("\n");
+    return `
+      <p>Par 3 strategy: ${escapeXml(hole.greenMiss)}</p>
+      <p>Commit to ${escapeXml(plan.teeClubLabel)} and favor the center of the green if pin is tucked.</p>
+      <p>Par is always a strong result here. Avoid short-siding yourself.</p>
+    `;
   }
 
-  return [
-    `${hole.note}`,
-    `Trouble pattern: ${hole.fairwayMiss}`,
-    `Recovery pattern: ${hole.greenMiss}`,
-    `Current ${selectedPlan} plan: ${plan.teeClubLabel} from tee, then ${plan.approachClubLabel} from ${plan.remainingDistance}y.`,
-    "If the number is awkward, take one less and leave a simple chip or putt rather than chasing a perfect shot.",
-  ].join("\n");
+  return `
+    <p>${escapeXml(hole.note)}</p>
+    <p>Trouble pattern: ${escapeXml(hole.fairwayMiss)}</p>
+    <p>Recovery pattern: ${escapeXml(hole.greenMiss)}</p>
+    <p>Current ${escapeXml(selectedPlan)} plan: ${escapeXml(plan.teeClubLabel)} from tee, then ${escapeXml(plan.approachClubLabel)} from ${plan.remainingDistance}y.</p>
+    <p>If the number is awkward, take one less and leave a simple chip or putt rather than chasing a perfect shot.</p>
+  `;
 }
 
 function clamp(value, min, max) {

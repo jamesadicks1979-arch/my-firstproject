@@ -354,6 +354,21 @@ tfoot td {
   white-space: pre-line;
 }
 
+.hole-story-panel ul,
+.hole-story-panel ol {
+  margin: 0.3rem 0 0.6rem 1.1rem;
+  padding: 0;
+}
+
+.hole-story-panel li {
+  margin: 0.18rem 0;
+}
+
+.hole-story-panel .story-title {
+  margin: 0.35rem 0 0.15rem;
+  font-weight: 700;
+}
+
 .is-hidden {
   display: none;
 }
