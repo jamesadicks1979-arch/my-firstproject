@@ -318,45 +318,59 @@ function getDistanceEntries() {
 }
 
 function renderShotMap(hole, plan) {
-  const teeX = 70;
-  const teeY = 110;
-  const greenX = 580;
-  const greenY = 110;
-  const fairwayOffset = parseFairwayOffset(hole.fairwayMiss, selectedPlan);
-  const landingRatio = hole.par === 3 ? 1 : clamp(plan.landingDistance / hole.yardage, 0.12, 0.95);
+  const teeX = 332;
+  const teeY = 676;
+  const greenX = 208;
+  const greenY = 95;
+  const landingRatio = hole.par === 3 ? 0.98 : clamp(plan.landingDistance / hole.yardage, 0.25, 0.9);
   const landingX = Math.round(teeX + (greenX - teeX) * landingRatio);
-  const landingY = hole.par === 3 ? greenY : teeY + fairwayOffset;
-  const lineColor = selectedPlan === "aggressive" ? "#ffffff" : "#b8f6d4";
+  const landingY = Math.round(teeY + (greenY - teeY) * landingRatio);
+  const lineColor = selectedPlan === "aggressive" ? "#2c6bf2" : "#3f88ff";
   const fairwaySide = getFairwaySide(hole.fairwayMiss);
-  const missMarkers = getMissMarkers(fairwaySide, hole, teeX, teeY, greenX, greenY);
+  const missMarkers = getMissMarkers(fairwaySide, hole, {
+    teeX,
+    teeY,
+    greenX,
+    greenY,
+    landingX,
+    landingY,
+  });
+  const treeMarkup = getTreeMarkup();
 
-  const firstLabelY = landingY - 14;
-  const secondLabelY = greenY - 14;
+  const firstLabelY = landingY - 16;
+  const secondLabelY = greenY - 16;
   const secondSegment = hole.par === 3
     ? ""
-    : `<line x1="${landingX}" y1="${landingY}" x2="${greenX}" y2="${greenY}" stroke="${lineColor}" stroke-width="4" />
+    : `<line x1="${landingX}" y1="${landingY}" x2="${greenX}" y2="${greenY}" stroke="${lineColor}" stroke-width="5" />
        <circle cx="${landingX}" cy="${landingY}" r="7" fill="${lineColor}" />
-       <text x="${landingX - 36}" y="${firstLabelY}" fill="#ffffff" font-size="13">${escapeXml(plan.teeClubLabel)}</text>`;
+       <text x="${landingX - 42}" y="${firstLabelY}" fill="#214987" font-size="12" font-weight="700">${escapeXml(plan.teeClubLabel)}</text>`;
 
   shotMapEl.innerHTML = `
-    <rect x="20" y="20" width="600" height="180" rx="16" ry="16" fill="#1c5e43"></rect>
-    <path d="M35 35 L285 35 L330 185 L35 185 Z" fill="#1f8db7" opacity="0.7"></path>
-    <path d="M80 170 C180 105, 270 125, 360 120 C455 115, 520 100, 595 95" stroke="#8dd08d" stroke-width="60" fill="none" stroke-linecap="round"></path>
-    <path d="M80 170 C180 105, 270 125, 360 120 C455 115, 520 100, 595 95" stroke="#b7e9ae" stroke-width="34" fill="none" stroke-linecap="round"></path>
-    <circle cx="${missMarkers.bestX}" cy="${missMarkers.bestY}" r="10" fill="#11aa55" stroke="#0e7b3f" stroke-width="3"></circle>
-    <circle cx="${missMarkers.noGoX}" cy="${missMarkers.noGoY}" r="10" fill="#d92d20" stroke="#a12318" stroke-width="3"></circle>
-    <rect x="${missMarkers.bestX + 12}" y="${missMarkers.bestY - 11}" width="84" height="18" rx="8" fill="#0e7b3f" opacity="0.9"></rect>
-    <text x="${missMarkers.bestX + 18}" y="${missMarkers.bestY + 2}" fill="#f8fff8" font-size="11" font-weight="700">SAFE AREA</text>
-    <rect x="${missMarkers.noGoX + 12}" y="${missMarkers.noGoY - 11}" width="58" height="18" rx="8" fill="#a12318" opacity="0.9"></rect>
-    <text x="${missMarkers.noGoX + 18}" y="${missMarkers.noGoY + 2}" fill="#ffe9e6" font-size="11" font-weight="700">NO GO</text>
-    <rect x="545" y="70" width="68" height="50" rx="20" ry="20" fill="#7fcf87"></rect>
-    <line x1="${teeX}" y1="${teeY}" x2="${hole.par === 3 ? greenX : landingX}" y2="${hole.par === 3 ? greenY : landingY}" stroke="${lineColor}" stroke-width="4" />
+    <rect x="0" y="0" width="420" height="760" fill="#ededed"></rect>
+    <path d="M335 690 C310 615, 262 490, 238 370 C214 248, 208 176, 206 98" stroke="#688749" stroke-width="148" fill="none" stroke-linecap="round"></path>
+    <path d="M332 686 C305 610, 260 486, 236 368 C214 253, 210 180, 208 102" stroke="#8fb86a" stroke-width="118" fill="none" stroke-linecap="round"></path>
+    <path d="M327 680 C303 610, 258 487, 236 368 C216 256, 212 184, 210 108" stroke="#bfdc95" stroke-width="80" fill="none" stroke-linecap="round"></path>
+    <ellipse cx="${greenX}" cy="${greenY}" rx="48" ry="38" fill="#c9e7a9" stroke="#87a868" stroke-width="2"></ellipse>
+    <ellipse cx="${greenX}" cy="${greenY}" rx="22" ry="15" fill="#b7d88e" stroke="#88a768" stroke-width="1.5"></ellipse>
+    <ellipse cx="162" cy="110" rx="13" ry="28" fill="#e8ddc7" stroke="#ccbea5" stroke-width="2"></ellipse>
+    <ellipse cx="258" cy="114" rx="13" ry="28" fill="#e8ddc7" stroke="#ccbea5" stroke-width="2"></ellipse>
+    <ellipse cx="278" cy="338" rx="20" ry="10" fill="#e8ddc7" stroke="#ccbea5" stroke-width="2"></ellipse>
+    <ellipse cx="152" cy="554" rx="10" ry="14" fill="#e8ddc7" stroke="#ccbea5" stroke-width="2"></ellipse>
+    <ellipse cx="177" cy="523" rx="9" ry="12" fill="#e8ddc7" stroke="#ccbea5" stroke-width="2"></ellipse>
+    ${treeMarkup}
+    <circle cx="${missMarkers.bestX}" cy="${missMarkers.bestY}" r="11" fill="#11aa55" stroke="#0e7b3f" stroke-width="3"></circle>
+    <circle cx="${missMarkers.noGoX}" cy="${missMarkers.noGoY}" r="11" fill="#d92d20" stroke="#a12318" stroke-width="3"></circle>
+    <rect x="${missMarkers.bestX + 12}" y="${missMarkers.bestY - 12}" width="84" height="20" rx="8" fill="#0e7b3f" opacity="0.95"></rect>
+    <text x="${missMarkers.bestX + 18}" y="${missMarkers.bestY + 3}" fill="#f8fff8" font-size="11" font-weight="700">SAFE AREA</text>
+    <rect x="${missMarkers.noGoX + 12}" y="${missMarkers.noGoY - 12}" width="58" height="20" rx="8" fill="#a12318" opacity="0.95"></rect>
+    <text x="${missMarkers.noGoX + 18}" y="${missMarkers.noGoY + 3}" fill="#ffe9e6" font-size="11" font-weight="700">NO GO</text>
+    <line x1="${teeX}" y1="${teeY}" x2="${hole.par === 3 ? greenX : landingX}" y2="${hole.par === 3 ? greenY : landingY}" stroke="${lineColor}" stroke-width="5" />
     ${secondSegment}
-    <circle cx="${teeX}" cy="${teeY}" r="7" fill="#132a3a" />
-    <circle cx="${greenX}" cy="${greenY}" r="8" fill="#027a48" />
-    <text x="${teeX - 18}" y="${teeY - 14}" fill="#ffffff" font-size="13">Tee</text>
-    <text x="${greenX - 20}" y="${secondLabelY}" fill="#ffffff" font-size="13">${escapeXml(plan.approachClubLabel)}</text>
-    <text x="24" y="208" fill="#ffffff" font-size="12">${selectedPlan === "aggressive" ? "Aggressive line" : "Safe line"} for Hole ${hole.hole}</text>
+    <circle cx="${teeX}" cy="${teeY}" r="8" fill="#143b77" />
+    <circle cx="${greenX}" cy="${greenY}" r="8" fill="#2f7f3d" />
+    <text x="${teeX - 18}" y="${teeY + 23}" fill="#143b77" font-size="13" font-weight="700">TEE</text>
+    <text x="${greenX - 25}" y="${secondLabelY}" fill="#244f37" font-size="12" font-weight="700">${escapeXml(plan.approachClubLabel)}</text>
+    <text x="22" y="736" fill="#3a3a3a" font-size="12">${selectedPlan === "aggressive" ? "Aggressive line" : "Safe line"} for Hole ${hole.hole}</text>
   `;
 }
 
@@ -381,41 +395,44 @@ function getFairwaySide(fairwayMissText) {
   return "center";
 }
 
-function getMissMarkers(fairwaySide, hole, teeX, teeY, greenX, greenY) {
-  const markerX = hole.par === 3 ? greenX - 48 : teeX + Math.round((greenX - teeX) * 0.54);
-  if (fairwaySide === "right") {
-    return {
-      bestX: markerX,
-      bestY: teeY - 26,
-      noGoX: markerX - 12,
-      noGoY: teeY + 28,
-    };
-  }
+function getMissMarkers(fairwaySide, hole, points) {
+  const { teeX, teeY, greenX, greenY, landingX, landingY } = points;
+  const dirX = greenX - teeX;
+  const dirY = greenY - teeY;
+  const length = Math.hypot(dirX, dirY) || 1;
+  const rightPerpX = dirY / length;
+  const rightPerpY = -dirX / length;
+  const baseX = hole.par === 3 ? Math.round(greenX - dirX * 0.14) : landingX;
+  const baseY = hole.par === 3 ? Math.round(greenY - dirY * 0.14) : landingY;
 
+  let bestSign = 1;
   if (fairwaySide === "left") {
-    return {
-      bestX: markerX - 12,
-      bestY: teeY + 28,
-      noGoX: markerX,
-      noGoY: teeY - 26,
-    };
+    bestSign = -1;
+  } else if (fairwaySide === "center") {
+    bestSign = selectedPlan === "safe" ? 1 : -1;
   }
 
-  if (hole.par === 3) {
-    return {
-      bestX: markerX - 10,
-      bestY: greenY + 28,
-      noGoX: markerX,
-      noGoY: greenY - 28,
-    };
-  }
+  const bestX = clamp(Math.round(baseX + rightPerpX * 34 * bestSign), 24, 386);
+  const bestY = clamp(Math.round(baseY + rightPerpY * 34 * bestSign), 50, 720);
+  const noGoX = clamp(Math.round(baseX - rightPerpX * 34 * bestSign), 24, 386);
+  const noGoY = clamp(Math.round(baseY - rightPerpY * 34 * bestSign), 50, 720);
 
-  return {
-    bestX: markerX - 8,
-    bestY: teeY - 12,
-    noGoX: markerX + 8,
-    noGoY: teeY + 30,
-  };
+  return { bestX, bestY, noGoX, noGoY };
+}
+
+function getTreeMarkup() {
+  const trees = [
+    [105, 648, 17], [86, 620, 12], [86, 588, 12], [118, 560, 14], [94, 526, 12],
+    [130, 500, 13], [106, 462, 12], [132, 430, 13], [114, 395, 12], [146, 364, 12],
+    [132, 322, 12], [158, 292, 11], [146, 254, 12], [169, 222, 12], [165, 184, 14],
+    [174, 150, 16], [158, 116, 14], [248, 122, 15], [274, 154, 16], [292, 186, 14],
+    [302, 218, 12], [318, 250, 14], [306, 286, 12], [324, 326, 14], [316, 365, 12],
+    [334, 402, 13], [318, 446, 13], [338, 486, 14], [324, 530, 12], [342, 570, 14],
+    [328, 606, 12], [338, 644, 12],
+  ];
+  return trees
+    .map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#4c6f37" opacity="0.95"></circle>`)
+    .join("");
 }
 
 function updatePlanButtons() {

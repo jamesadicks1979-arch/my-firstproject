@@ -289,11 +289,13 @@ tfoot td {
 
 #shotMap {
   width: 100%;
+  max-width: 430px;
   height: auto;
-  border: 7px solid #191b1c;
-  border-radius: 26px;
-  background: #153726;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  margin: 0 auto;
+  border: 5px solid #171819;
+  border-radius: 18px;
+  background: #ececec;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
 }
 
 .miss-legend {
