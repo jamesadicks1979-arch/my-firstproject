@@ -290,3 +290,24 @@ tfoot td {
   color: #fff;
   border-color: var(--accent-2);
 }
+
+.hole-story-panel {
+  margin-top: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.8rem;
+  background: #fffdfa;
+}
+
+.hole-story-panel h4 {
+  margin: 0 0 0.4rem;
+}
+
+.hole-story-panel p {
+  margin: 0;
+  white-space: pre-line;
+}
+
+.is-hidden {
+  display: none;
+}

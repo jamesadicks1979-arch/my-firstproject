@@ -81,12 +81,16 @@ const approachClubTipEl = document.getElementById("approachClubTip");
 const holeNoteEl = document.getElementById("holeNote");
 const aggressiveBtn = document.getElementById("aggressiveBtn");
 const safeBtn = document.getElementById("safeBtn");
+const holeStoryBtn = document.getElementById("holeStoryBtn");
+const holeStoryPanel = document.getElementById("holeStoryPanel");
+const holeStoryText = document.getElementById("holeStoryText");
 const planSummaryEl = document.getElementById("planSummary");
 const shotMapEl = document.getElementById("shotMap");
 
 let savedProfile = null;
 let currentHoleIndex = 0;
 let selectedPlan = "aggressive";
+let isStoryOpen = false;
 
 buildClubInputs();
 loadSavedProfile();
@@ -162,6 +166,11 @@ safeBtn.addEventListener("click", () => {
   renderHolePage();
 });
 
+holeStoryBtn.addEventListener("click", () => {
+  isStoryOpen = !isStoryOpen;
+  renderHolePage();
+});
+
 function buildClubInputs() {
   clubDistanceGrid.innerHTML = "";
   CLUBS.forEach((club) => {
@@ -232,6 +241,7 @@ function renderHolePage() {
   holeNoteEl.textContent = hole.note;
   renderShotMap(hole, plan);
   updatePlanButtons();
+  renderHoleStory(hole, plan);
 }
 
 function getBestClubForYardage(targetYardage) {
@@ -353,6 +363,45 @@ function updatePlanButtons() {
   const isAggressive = selectedPlan === "aggressive";
   aggressiveBtn.classList.toggle("plan-button-active", isAggressive);
   safeBtn.classList.toggle("plan-button-active", !isAggressive);
+}
+
+function renderHoleStory(hole, plan) {
+  holeStoryText.textContent = getHoleStoryText(hole, plan);
+  holeStoryPanel.classList.toggle("is-hidden", !isStoryOpen);
+  holeStoryBtn.textContent = isStoryOpen ? "Hide Hole Story" : "Show Hole Story";
+  holeStoryBtn.classList.toggle("plan-button-active", isStoryOpen);
+}
+
+function getHoleStoryText(hole, plan) {
+  if (hole.par === 4 && hole.yardage >= 450) {
+    return [
+      "Long par 4. Most of the trouble is down the left.",
+      "If you miss short-right from the tee, you still have a shot into the green.",
+      "You need a drive up the right side to give yourself the best chance to hit this green.",
+      `With the ${selectedPlan} plan, take ${plan.teeClubLabel} from the tee.`,
+      `For the approach, use ${plan.approachClubLabel}, or one club less to miss short-right and leave an uphill chip or putt.`,
+      "Long is a hard up-and-down.",
+      "Par is a very good score on this hole, so take it and move on.",
+      "Bogey is not too bad because the next few holes can give you a chance to win the shot back.",
+      "This hole can catch you out - do not get greedy.",
+    ].join("\n");
+  }
+
+  if (hole.par === 3) {
+    return [
+      `Par 3 strategy: ${hole.greenMiss}`,
+      `Commit to ${plan.teeClubLabel} and favor the center of the green if pin is tucked.`,
+      "Par is always a strong result here. Avoid short-siding yourself.",
+    ].join("\n");
+  }
+
+  return [
+    `${hole.note}`,
+    `Trouble pattern: ${hole.fairwayMiss}`,
+    `Recovery pattern: ${hole.greenMiss}`,
+    `Current ${selectedPlan} plan: ${plan.teeClubLabel} from tee, then ${plan.approachClubLabel} from ${plan.remainingDistance}y.`,
+    "If the number is awkward, take one less and leave a simple chip or putt rather than chasing a perfect shot.",
+  ].join("\n");
 }
 
 function clamp(value, min, max) {
