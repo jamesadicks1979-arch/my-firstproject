@@ -46,6 +46,7 @@ function init() {
   copyPreviewBtn.addEventListener("click", copyPreviewLink);
   printBtn.addEventListener("click", () => window.print());
   copyAdBtn.addEventListener("click", copyAdText);
+  runPresetIfRequested();
 }
 
 function buildScheduleTable() {
@@ -511,6 +512,48 @@ function copyPreviewLink() {
     .catch(() => {
       generationStatus.textContent = "Could not copy preview link automatically.";
     });
+}
+
+function runPresetIfRequested() {
+  const params = new URLSearchParams(window.location.search);
+  const preset = params.get("preview");
+  if (preset !== "u15-tue-thu-sun0930") return;
+
+  const presetAccount = {
+    parentName: "Preview Parent",
+    childName: "Demo Player",
+    childAge: 15,
+    email: "preview@example.com",
+    password: "preview123",
+    createdAt: new Date().toISOString(),
+  };
+
+  activeAccount = presetAccount;
+  document.getElementById("parentName").value = presetAccount.parentName;
+  document.getElementById("childName").value = presetAccount.childName;
+  document.getElementById("childAge").value = String(presetAccount.childAge);
+  document.getElementById("email").value = presetAccount.email;
+  document.getElementById("password").value = presetAccount.password;
+  accountStatus.textContent = "Loaded preset preview account (U15 example).";
+
+  setScheduleInput("Tuesday", "trainingStart", "18:00");
+  setScheduleInput("Tuesday", "trainingEnd", "19:30");
+  setScheduleInput("Thursday", "trainingStart", "18:00");
+  setScheduleInput("Thursday", "trainingEnd", "19:30");
+  setScheduleInput("Sunday", "matchTime", "09:30");
+
+  paintRow("Tuesday");
+  paintRow("Thursday");
+  paintRow("Sunday");
+  generateEbook();
+}
+
+function setScheduleInput(day, type, value) {
+  const row = scheduleTableBody.querySelector(`tr[data-day="${day}"]`);
+  if (!row) return;
+  const input = row.querySelector(`input[data-type="${type}"]`);
+  if (!input) return;
+  input.value = value;
 }
 
 init();
