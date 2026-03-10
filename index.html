@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pocket Caddy</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <h1>Pocket Caddy</h1>
+    <p>Wentworth West caddie mode: profile + hole-by-hole strategy</p>
+  </header>
+
+  <main class="container">
+    <section class="card" aria-labelledby="profile-title">
+      <div class="card-header">
+        <h2 id="profile-title">Player Profile</h2>
+        <button id="clearProfileBtn" type="button" class="ghost-button">Clear Profile</button>
+      </div>
+
+      <form id="profileForm" novalidate>
+        <div class="grid two-col">
+          <label>
+            Name
+            <input id="playerName" name="playerName" type="text" placeholder="e.g. Alex Morgan" required />
+          </label>
+
+          <label>
+            Handicap
+            <input id="handicap" name="handicap" type="number" min="0" max="54" step="0.1" placeholder="e.g. 12.4" required />
+          </label>
+        </div>
+
+        <div class="grid two-col">
+          <label>
+            Strengths
+            <textarea id="strengths" name="strengths" rows="3" placeholder="e.g. Strong with wedges, good putting" required></textarea>
+          </label>
+
+          <label>
+            Weaknesses
+            <textarea id="weaknesses" name="weaknesses" rows="3" placeholder="e.g. Long irons, bunker shots" required></textarea>
+          </label>
+        </div>
+
+        <h3>Club Distances (yards)</h3>
+        <p class="hint">Enter carry distance for each club in the bag.</p>
+        <div id="clubDistanceGrid" class="grid club-grid" aria-live="polite"></div>
+
+        <button type="submit" class="primary-button">Save Profile</button>
+        <p id="profileMessage" class="message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="course-title">
+      <h2 id="course-title">Wentworth West (West Course)</h2>
+      <p class="hint">
+        Baseline strategy notes for each hole, including where to miss fairways and greens.
+      </p>
+      <p id="courseSummary" class="course-summary"></p>
+      <div class="result-wrap">
+        <h3>Recommended Club by Remaining Yardage</h3>
+        <label>
+          Remaining Yardage
+          <input id="remainingYardage" type="number" min="1" placeholder="e.g. 145" />
+        </label>
+        <p id="clubRecommendation" class="recommendation">Enter remaining yardage to see your best club.</p>
+      </div>
+    </section>
+
+    <section class="card hole-page-wrap" aria-labelledby="hole-guide-title">
+      <div class="card-header">
+        <h2 id="hole-guide-title">Hole-by-Hole Caddie Page</h2>
+        <div class="pager">
+          <button id="prevHoleBtn" type="button" class="ghost-button">Previous</button>
+          <span id="holePosition" aria-live="polite">Hole 1 of 18</span>
+          <button id="nextHoleBtn" type="button" class="ghost-button">Next</button>
+        </div>
+      </div>
+
+      <article id="holePage" class="hole-page">
+        <h3 id="holeTitle">Hole 1</h3>
+        <p id="holeSummary"></p>
+
+        <div class="strategy-grid">
+          <div class="strategy-card">
+            <h4>Best Fairway Miss</h4>
+            <p id="fairwayMissTip"></p>
+          </div>
+          <div class="strategy-card">
+            <h4>Best Green Miss</h4>
+            <p id="greenMissTip"></p>
+          </div>
+          <div class="strategy-card">
+            <h4>Tee Shot Club</h4>
+            <p id="teeClubTip"></p>
+          </div>
+          <div class="strategy-card">
+            <h4>Approach Club</h4>
+            <p id="approachClubTip"></p>
+          </div>
+        </div>
+
+        <section class="shot-planner" aria-labelledby="planner-title">
+          <h4 id="planner-title">PLAN</h4>
+          <p class="planner-subtitle">Aggressive or conservative?</p>
+          <p id="planSummary" class="plan-summary"></p>
+          <svg id="shotMap" viewBox="0 0 420 760" role="img" aria-label="Shot path map for selected plan">
+            <rect x="0" y="0" width="420" height="760" fill="#efefef"></rect>
+            <path d="M320 675 C295 610, 250 470, 230 360 C210 250, 205 170, 205 95" stroke="#8bb36a" stroke-width="140" fill="none" stroke-linecap="round"></path>
+            <path d="M320 675 C295 610, 250 470, 230 360 C210 250, 205 170, 205 95" stroke="#bad993" stroke-width="85" fill="none" stroke-linecap="round"></path>
+          </svg>
+          <div class="miss-legend">
+            <span><i class="dot dot-green"></i> SAFE AREA</span>
+            <span><i class="dot dot-red"></i> NO GO</span>
+          </div>
+        </section>
+
+        <p id="holeNote" class="hole-note"></p>
+
+        <div class="plan-buttons">
+          <button id="aggressiveBtn" type="button" class="primary-button">Aggressive</button>
+          <button id="safeBtn" type="button" class="ghost-button">Safe</button>
+          <button id="holeStoryBtn" type="button" class="ghost-button">Show Hole Story</button>
+        </div>
+
+        <section id="holeStoryPanel" class="hole-story-panel is-hidden" aria-live="polite">
+          <h4>Hole Story</h4>
+          <div id="holeStoryText"></div>
+        </section>
+      </article>
+    </section>
+
+    <section class="card" aria-labelledby="table-title">
+      <h2 id="table-title">Wentworth West Strategy Chart</h2>
+      <div class="table-wrap">
+        <table id="yardageTable">
+          <thead>
+            <tr>
+              <th>Hole</th>
+              <th>Par</th>
+              <th>Yardage</th>
+              <th>Best Fairway Miss</th>
+              <th>Best Green Miss</th>
+              <th>Approach Club*</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr>
+              <td>Total</td>
+              <td>-</td>
+              <td id="totalYardage">0</td>
+              <td colspan="3">*Based on your saved club distances.</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
