@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="description"
+    content="Football Fuel Pro: a professional youth football nutrition e-book and planner with account signup, schedule-based meal timing, and social media ready sharing."
+  />
+  <title>Football Fuel Pro | Youth Nutrition E-Book Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__overlay">
+      <p class="pill">Performance Nutrition for Youth Football</p>
+      <h1>Football Fuel Pro E-Book Builder</h1>
+      <p class="hero__subtext">
+        Create a professional, image-rich nutrition e-book personalized by your
+        son or daughter’s age, training times, and match schedule.
+      </p>
+      <a href="#account" class="cta">Build My Nutrition E-Book</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="social-ad" class="card">
+      <h2>Social Media Advertising Pack</h2>
+      <p>
+        Use this message on Facebook, Instagram, TikTok, LinkedIn, or WhatsApp:
+      </p>
+      <blockquote id="adCopy">
+        Help your young footballer perform better with a custom weekly meal
+        plan. Built from training and match times, this guide shows exactly
+        what to eat, when to eat, and why timing matters for energy, recovery,
+        and focus.
+      </blockquote>
+      <button id="copyAdBtn" class="btn-secondary">Copy Ad Text</button>
+      <div class="share-links">
+        <a id="shareX" target="_blank" rel="noopener noreferrer">Share on X</a>
+        <a id="shareFacebook" target="_blank" rel="noopener noreferrer">Share on Facebook</a>
+        <a id="shareLinkedIn" target="_blank" rel="noopener noreferrer">Share on LinkedIn</a>
+        <a id="shareWhatsApp" target="_blank" rel="noopener noreferrer">Share on WhatsApp</a>
+      </div>
+    </section>
+
+    <section id="account" class="card">
+      <h2>Create Parent Account</h2>
+      <form id="accountForm" class="grid-form">
+        <label>
+          Parent/Guardian Name
+          <input type="text" id="parentName" required />
+        </label>
+        <label>
+          Child Name
+          <input type="text" id="childName" required />
+        </label>
+        <label>
+          Child Age
+          <input type="number" id="childAge" min="6" max="18" required />
+        </label>
+        <label>
+          Email
+          <input type="email" id="email" required />
+        </label>
+        <label>
+          Password
+          <input type="password" id="password" minlength="6" required />
+        </label>
+        <button type="submit" class="btn-primary">Create Account</button>
+      </form>
+      <p id="accountStatus" class="status"></p>
+    </section>
+
+    <section id="schedule" class="card">
+      <h2>Weekly Football Schedule</h2>
+      <p>
+        Add training and match times. Match days are highlighted in
+        <span class="match-text">red</span> and training days in
+        <span class="training-text">blue</span>.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Training Start</th>
+              <th>Training End</th>
+              <th>Match Time</th>
+            </tr>
+          </thead>
+          <tbody id="scheduleTableBody"></tbody>
+        </table>
+      </div>
+      <button id="generateBtn" class="btn-primary">
+        Generate Personalized E-Book
+      </button>
+      <p id="generationStatus" class="status"></p>
+    </section>
+
+    <section id="weeklyHighlights" class="card hidden">
+      <h2>Weekly Priority Highlights</h2>
+      <div id="highlightsGrid" class="highlights-grid"></div>
+    </section>
+
+    <section id="ebook-preview" class="card hidden">
+      <h2>E-Book Preview</h2>
+      <p class="muted">
+        One page per meal with timing guidance, digestion notes, and hydration
+        strategy.
+      </p>
+      <div id="ebookPages"></div>
+
+      <div class="preview-footer">
+        <h3>Preview Link</h3>
+        <p>Share this link to jump directly to the preview section:</p>
+        <div class="preview-link-wrap">
+          <a id="previewLink" href="#ebook-preview"></a>
+          <button id="copyPreviewBtn" class="btn-secondary">Copy Link</button>
+        </div>
+        <button id="printBtn" class="btn-primary">Print / Save as PDF</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Evidence-Based Notes (Football Nutrition)</h2>
+      <ul>
+        <li>
+          UEFA Expert Group statement: nutrition timing and fuel strategies in
+          elite football.
+        </li>
+        <li>
+          Carbohydrate availability before training/match supports repeated
+          high-intensity performance.
+        </li>
+        <li>
+          Post-session carbs + protein in the first recovery window supports
+          glycogen restoration and muscle repair.
+        </li>
+        <li>
+          Hydration and electrolytes are crucial, especially around intense
+          sessions and match day.
+        </li>
+      </ul>
+      <p class="muted">
+        Sources:
+        <a
+          href="https://pubmed.ncbi.nlm.nih.gov/33097528/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >UEFA Expert Group Statement</a
+        >,
+        <a
+          href="https://jissn.biomedcentral.com/articles/10.1186/s12970-017-0193-8"
+          target="_blank"
+          rel="noopener noreferrer"
+          >JISSN Recovery Strategies in Soccer</a
+        >.
+      </p>
+      <p class="disclaimer">
+        This planner is educational and not medical advice. For allergies,
+        medical conditions, or specialist performance goals, consult a
+        registered sports dietitian.
+      </p>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Football Fuel Pro | Nutrition E-Book Builder</title>
+  <meta
+    name="description"
+    content="Create a professional football nutrition e-book with player age, training schedule, matchday fueling, and social media-ready promotion copy."
+  />
+  <meta property="og:title" content="Football Fuel Pro | Nutrition E-Book Builder" />
+  <meta
+    property="og:description"
+    content="Build a personalized youth football nutrition e-book with meal timing, hydration strategy, and shareable preview links."
+  />
+  <meta property="og:type" content="website" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__content">
+      <p class="eyebrow">Professional Youth Football Nutrition</p>
+      <h1>Football Fuel Pro E-Book Builder</h1>
+      <p>
+        Build a complete, social-ready nutrition e-book for parents and players:
+        account signup, child age input, training and match schedule, and timed meal plans for performance.
+      </p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel auth-panel">
+      <div class="panel__header">
+        <h2>Create Account / Sign In</h2>
+        <p>Parents can create an account and securely access personalized nutrition pages.</p>
+      </div>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="signup">Sign Up</button>
+        <button class="tab" data-tab="login">Login</button>
+      </div>
+
+      <form id="signup-form" class="auth-form">
+        <label>
+          Parent Full Name
+          <input type="text" id="signup-name" required />
+        </label>
+        <label>
+          Email
+          <input type="email" id="signup-email" required />
+        </label>
+        <label>
+          Password
+          <input type="password" id="signup-password" minlength="6" required />
+        </label>
+        <button type="submit" class="btn btn--primary">Create Account</button>
+      </form>
+
+      <form id="login-form" class="auth-form hidden">
+        <label>
+          Email
+          <input type="email" id="login-email" required />
+        </label>
+        <label>
+          Password
+          <input type="password" id="login-password" minlength="6" required />
+        </label>
+        <button type="submit" class="btn btn--primary">Login</button>
+      </form>
+
+      <div class="status-row">
+        <p id="auth-status">Not signed in.</p>
+        <button id="logout-btn" class="btn btn--ghost hidden" type="button">Logout</button>
+      </div>
+    </section>
+
+    <section class="panel planner-panel" id="planner-panel">
+      <div class="panel__header">
+        <h2>Player & Weekly Schedule</h2>
+        <p>
+          Enter your son or daughter’s age, then set training and match times.
+          Training days and match days are highlighted in different colors for importance.
+        </p>
+      </div>
+
+      <form id="planner-form">
+        <div class="grid grid--3">
+          <label>
+            Child Name
+            <input type="text" id="child-name" placeholder="e.g. Jamie" required />
+          </label>
+          <label>
+            Child Age
+            <input type="number" id="child-age" min="6" max="19" placeholder="e.g. 12" required />
+          </label>
+          <label>
+            Position (optional)
+            <input type="text" id="child-position" placeholder="e.g. Midfielder" />
+          </label>
+        </div>
+
+        <h3>Weekly Training & Match Calendar</h3>
+        <p class="legend">
+          <span class="legend__item legend__item--training">Training day</span>
+          <span class="legend__item legend__item--match">Match day</span>
+          <span class="legend__item legend__item--rest">Rest day</span>
+        </p>
+
+        <div class="schedule-wrapper">
+          <table class="schedule-table" id="schedule-table">
+            <thead>
+              <tr>
+                <th>Day</th>
+                <th>Type</th>
+                <th>Start Time</th>
+              </tr>
+            </thead>
+            <tbody id="schedule-body"></tbody>
+          </table>
+        </div>
+
+        <button type="submit" class="btn btn--primary btn--wide">Generate Professional E-Book</button>
+      </form>
+    </section>
+
+    <section class="panel hidden" id="social-kit">
+      <div class="panel__header">
+        <h2>Social Media Advertising Kit</h2>
+        <p>Use these ready-made captions to advertise your nutrition e-book across social platforms.</p>
+      </div>
+      <div class="grid grid--2">
+        <label>
+          Instagram / Facebook Caption
+          <textarea id="caption-meta" rows="6" readonly></textarea>
+          <button class="btn btn--ghost copy-btn" type="button" data-target="caption-meta">Copy</button>
+        </label>
+        <label>
+          X / TikTok Short Caption
+          <textarea id="caption-short" rows="6" readonly></textarea>
+          <button class="btn btn--ghost copy-btn" type="button" data-target="caption-short">Copy</button>
+        </label>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="ebook-preview">
+      <div class="panel__header">
+        <h2>E-Book Preview</h2>
+        <p>Every meal appears on its own page with an image, timing, and explanation.</p>
+      </div>
+
+      <div id="calendar-overview" class="calendar-overview"></div>
+      <div id="pages" class="pages"></div>
+
+      <div class="preview-link">
+        <h3>Shareable Preview Link</h3>
+        <p>Send this to parents so they can preview the generated e-book.</p>
+        <div class="preview-link__row">
+          <input type="text" id="preview-url" readonly />
+          <button id="copy-preview-link" class="btn btn--primary" type="button">Copy Link</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      Guidance is educational and does not replace medical advice.
+      For allergies, chronic conditions, or under-fueling concerns, consult a qualified sports dietitian.
+    </p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
