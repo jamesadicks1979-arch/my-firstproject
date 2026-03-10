@@ -214,6 +214,7 @@ function generateEbook() {
   const previewUrl = `${window.location.origin}${window.location.pathname}#ebook-preview`;
   previewLink.href = previewUrl;
   previewLink.textContent = previewUrl;
+  applyRecipePanelsFromQuery();
   window.location.hash = "ebook-preview";
 }
 
@@ -754,6 +755,17 @@ function handleRecipeLinkClick(event) {
   link.textContent = isOpen
     ? "Hide ingredients & cooking method"
     : "Open ingredients & cooking method";
+}
+
+function applyRecipePanelsFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("recipes") !== "open") return;
+  const panels = ebookPages.querySelectorAll(".recipe-panel");
+  panels.forEach((panel) => panel.classList.remove("hidden"));
+  const links = ebookPages.querySelectorAll(".recipe-link");
+  links.forEach((link) => {
+    link.textContent = "Hide ingredients & cooking method";
+  });
 }
 
 function copyPreviewLink() {
