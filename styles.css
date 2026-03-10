@@ -297,6 +297,44 @@ tr.day-match {
   padding-left: 1.05rem;
 }
 
+.main-meal-label {
+  display: inline-block;
+  margin: 0.2rem 0 0.6rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  background: #e9f5ff;
+  color: #114a93;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+
+.recipe-link {
+  display: inline-block;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.recipe-panel {
+  border: 1px solid #cfe0ff;
+  background: #f7faff;
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.65rem;
+}
+
+.recipe-panel h4 {
+  margin: 0.2rem 0 0.5rem;
+}
+
+.recipe-panel p {
+  margin: 0.4rem 0 0.2rem;
+}
+
+.recipe-panel ol,
+.recipe-panel ul {
+  margin-top: 0.3rem;
+}
+
 .why {
   background: #f3f7ff;
   border-left: 4px solid var(--primary);

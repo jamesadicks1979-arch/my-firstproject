@@ -43,6 +43,7 @@ function init() {
   accountForm.addEventListener("submit", handleAccountSubmit);
   scheduleTableBody.addEventListener("input", handleScheduleInput);
   generateBtn.addEventListener("click", generateEbook);
+  ebookPages.addEventListener("click", handleRecipeLinkClick);
   copyPreviewBtn.addEventListener("click", copyPreviewLink);
   printBtn.addEventListener("click", () => window.print());
   copyAdBtn.addEventListener("click", copyAdText);
@@ -246,14 +247,25 @@ function renderHighlights(schedule) {
 
 function renderMealPages(schedule, account) {
   const pages = [];
+  const sunday = schedule.find((entry) => entry.day === "Sunday");
+  const sundayMorningMatch = Boolean(
+    sunday?.matchTime && isMorningKickoff(sunday.matchTime)
+  );
+
   schedule.forEach((entry) => {
     const dayType = getDayType(entry);
     const sessionTime = entry.matchTime || entry.trainingStart || "";
-    const meals = buildMeals(dayType, sessionTime, account.childAge);
+    const meals = buildMeals(dayType, sessionTime, account.childAge, {
+      day: entry.day,
+      isSaturdayBeforeSundayMorningMatch:
+        entry.day === "Saturday" && sundayMorningMatch,
+      sundayMatchTime: sunday?.matchTime || "",
+    });
 
-    meals.forEach((meal) => {
+    meals.forEach((meal, mealIndex) => {
       const topTitle = buildTopTitle(entry.day, dayType);
       const subtitle = `${account.childName} (${account.childAge}) | ${meal.timeLabel}`;
+      const recipeId = slugify(`${entry.day}-${mealIndex}-${meal.title}`);
       pages.push(`
         <article class="meal-page">
           <header class="meal-page__top ${dayType}">
@@ -265,9 +277,30 @@ function renderMealPages(schedule, account) {
             <div class="meal-details">
               <h3>${meal.title}</h3>
               <p><strong>Eat at:</strong> ${meal.time}</p>
+              ${meal.isMainMeal ? '<p class="main-meal-label">Main Meal Priority</p>' : ""}
               <p><strong>What to eat/drink:</strong></p>
               <ul>${meal.items.map((item) => `<li>${item}</li>`).join("")}</ul>
               <p><strong>Quick prep:</strong> ${meal.prep}</p>
+              ${
+                meal.recipe
+                  ? `
+                    <p>
+                      <a href="#" class="recipe-link" data-recipe-id="${recipeId}">
+                        Open ingredients & cooking method
+                      </a>
+                    </p>
+                    <section id="${recipeId}" class="recipe-panel hidden">
+                      <h4>${meal.recipe.name}</h4>
+                      <p><strong>Ingredients</strong></p>
+                      <ul>${meal.recipe.ingredients
+                        .map((ingredient) => `<li>${ingredient}</li>`)
+                        .join("")}</ul>
+                      <p><strong>How to cook</strong></p>
+                      <ol>${meal.recipe.method.map((step) => `<li>${step}</li>`).join("")}</ol>
+                    </section>
+                  `
+                  : ""
+              }
               <div class="why">
                 <strong>Why this timing works:</strong>
                 <p>${meal.why}</p>
@@ -290,16 +323,116 @@ function buildTopTitle(day, dayType) {
   return `${day} REST & RECOVERY`;
 }
 
-function buildMeals(dayType, sessionTime, age) {
+function buildMeals(dayType, sessionTime, age, context = {}) {
   const portionGuide = getPortionGuide(age);
+  const matchIsEarly = isMorningKickoff(sessionTime);
+  const saturdayBigMeal = context.isSaturdayBeforeSundayMorningMatch;
 
   if (dayType === "match") {
+    if (matchIsEarly) {
+      return [
+        {
+          title: "Match-Day Breakfast (Light Main Meal)",
+          time: safeOffset(sessionTime, -150, "07:00"),
+          timeLabel: "Light main meal 2-3h before kick-off",
+          image: MEAL_IMAGES.pre,
+          isMainMeal: true,
+          recipe: {
+            name: "Overnight Oats + Banana + Yogurt Bowl",
+            ingredients: [
+              "60-80 g oats",
+              "200 ml milk",
+              "1 banana, sliced",
+              "150 g low-fat Greek yogurt",
+              "1 tsp honey",
+              "Small pinch of cinnamon",
+            ],
+            method: [
+              "Mix oats and milk in a bowl or jar and chill overnight.",
+              "In the morning, top with banana, yogurt, honey, and cinnamon.",
+              "Serve with 300-500 ml water.",
+            ],
+          },
+          items: [
+            "Oats + banana + low-fat yogurt",
+            "Small toast with honey if extra energy needed",
+            "300-500 ml water",
+          ],
+          prep:
+            "Prepare overnight oats the night before for a simple early match morning meal.",
+          why:
+            "For a 9:00-9:30 kick-off, this avoids a very early heavy meal while still providing digestible carbohydrates and some protein.",
+        },
+        {
+          title: "Pre-Match Top-Up Snack",
+          time: safeOffset(sessionTime, -45, "08:45"),
+          timeLabel: "Optional top-up 30-45 mins before",
+          image: MEAL_IMAGES.snack,
+          items: [
+            "Half banana, applesauce, or a few chews",
+            "150-250 ml water",
+          ],
+          prep: "Keep this very light and familiar.",
+          why:
+            "A small top-up close to kick-off can maintain blood glucose without causing stomach heaviness.",
+        },
+        {
+          title: "Post-Match Recovery Meal",
+          time: safeOffset(sessionTime, 60, "11:00"),
+          timeLabel: "Recovery window within 30-60 mins",
+          image: MEAL_IMAGES.recovery,
+          items: [
+            "Fruit smoothie + yogurt or milk",
+            "Bagel, wrap, or rice bowl",
+            "20-30 g protein target",
+            "Water + electrolytes",
+          ],
+          prep:
+            "Blend milk/yogurt, banana, berries, and oats. Add a simple wrap for extra carbohydrates.",
+          why:
+            "Early refueling helps restore glycogen and supports muscle repair after repeated sprinting and high-intensity effort.",
+        },
+        {
+          title: "Sunday Recovery Lunch / Dinner",
+          time: safeOffset(sessionTime, 210, "13:00"),
+          timeLabel: "Balanced main recovery meal",
+          image: MEAL_IMAGES.dinner,
+          items: [
+            "Lean protein (chicken, fish, or beans)",
+            "Large carb portion (rice, pasta, potatoes)",
+            "Vegetables + fruit",
+            "Water",
+          ],
+          prep: "Cook a full plate meal to complete recovery from the morning match.",
+          why:
+            "The biggest meal before this should be Saturday evening; this post-match meal continues refueling and recovery.",
+        },
+      ];
+    }
+
     return [
       {
         title: "Pre-Match Main Meal",
         time: safeOffset(sessionTime, -240, "11:00"),
         timeLabel: "Main fuel 3-4h before kick-off",
         image: MEAL_IMAGES.pre,
+        isMainMeal: true,
+        recipe: {
+          name: "Chicken Rice Performance Bowl",
+          ingredients: [
+            "120-150 g chicken breast (or tofu)",
+            "1.5 cups cooked rice",
+            "1 cup carrots/courgettes (cooked)",
+            "1 tbsp olive oil",
+            "Pinch of salt and pepper",
+          ],
+          method: [
+            "Cook rice until soft and fluffy.",
+            "Season and grill chicken (or pan-cook tofu) until done.",
+            "Steam or lightly saute vegetables.",
+            "Assemble bowl with rice, protein, vegetables, and olive oil.",
+          ],
+        },
         items: [
           `${portionGuide} of low-fiber carbs: rice, pasta, or potatoes`,
           "Lean protein: chicken, turkey, eggs, or tofu",
@@ -367,6 +500,23 @@ function buildMeals(dayType, sessionTime, age) {
         time: safeOffset(sessionTime, -180, "14:00"),
         timeLabel: "Main fuel 2-3h before training",
         image: MEAL_IMAGES.pre,
+        isMainMeal: true,
+        recipe: {
+          name: "Chicken Pasta Performance Plate",
+          ingredients: [
+            "100-140 g whole-wheat pasta (dry weight for older teens)",
+            "120 g chicken breast (or lentils/tofu)",
+            "1 cup tomato sauce",
+            "1 tsp olive oil",
+            "1 side fruit (banana or orange)",
+          ],
+          method: [
+            "Cook pasta and drain.",
+            "Pan-cook chicken (or plant protein) with olive oil.",
+            "Warm tomato sauce and combine with pasta.",
+            "Serve with fruit and water.",
+          ],
+        },
         items: [
           `${portionGuide} of carbohydrate-rich foods`,
           "Moderate lean protein",
@@ -405,24 +555,58 @@ function buildMeals(dayType, sessionTime, age) {
           "Early recovery feeding helps muscle repair and replenishes glycogen so the athlete can adapt and recover better.",
       },
       {
-        title: "Evening Performance Dinner",
+        title: saturdayBigMeal
+          ? "Saturday Big Pre-Match Dinner"
+          : "Evening Performance Dinner",
         time: safeOffset(sessionTime, 180, "21:00"),
-        timeLabel: "Balanced evening meal",
+        timeLabel: saturdayBigMeal
+          ? "Main pre-match fuel the evening before"
+          : "Balanced evening meal",
         image: MEAL_IMAGES.dinner,
+        isMainMeal: saturdayBigMeal,
+        recipe: saturdayBigMeal
+          ? {
+              name: "Saturday Carb-Loading Pasta Bowl",
+              ingredients: [
+                "150-180 g pasta (dry weight for older youth)",
+                "120-150 g lean chicken/turkey or tofu",
+                "1 cup light tomato sauce",
+                "1 bread roll",
+                "1 banana",
+                "500-700 ml water",
+              ],
+              method: [
+                "Cook pasta and keep sauce low-fat for easier digestion.",
+                "Cook protein source simply (grill, bake, or pan-cook).",
+                "Combine pasta, sauce, and protein.",
+                "Serve with bread roll and banana for added carbs.",
+              ],
+            }
+          : undefined,
         items: [
-          "Lean protein + whole-grain carbs + vegetables",
-          "Healthy fats from olive oil, nuts, or avocado",
-          "Water; milk can support additional protein/calcium",
+          saturdayBigMeal
+            ? "Higher-carb plate: pasta/rice/potatoes + bread"
+            : "Lean protein + whole-grain carbs + vegetables",
+          saturdayBigMeal
+            ? "Moderate lean protein (avoid very fatty/heavy foods)"
+            : "Healthy fats from olive oil, nuts, or avocado",
+          saturdayBigMeal
+            ? "Water + electrolytes if weather is warm"
+            : "Water; milk can support additional protein/calcium",
         ],
         prep:
-          "Build a plate: half vegetables, quarter protein, quarter carbohydrates.",
+          saturdayBigMeal
+            ? "Keep this the biggest carbohydrate meal before Sunday morning kick-off."
+            : "Build a plate: half vegetables, quarter protein, quarter carbohydrates.",
         why:
-          "A complete dinner closes remaining nutrient gaps and supports overnight restoration before the next day.",
+          saturdayBigMeal
+            ? "When Sunday kick-off is early, a substantial Saturday dinner is the key fuel window so the player does not need an unrealistic very-early breakfast."
+            : "A complete dinner closes remaining nutrient gaps and supports overnight restoration before the next day.",
       },
     ];
   }
 
-  return [
+  const restMeals = [
     {
       title: "Rest Day Breakfast",
       time: "08:00",
@@ -466,20 +650,56 @@ function buildMeals(dayType, sessionTime, age) {
         "A protein-carb snack supports growth and keeps appetite and mood stable between meals.",
     },
     {
-      title: "Rest Day Dinner",
+      title: saturdayBigMeal
+        ? "Saturday Big Pre-Match Dinner"
+        : "Rest Day Dinner",
       time: "19:00",
-      timeLabel: "Recovery-focused evening meal",
+      timeLabel: saturdayBigMeal
+        ? "Main pre-match fuel the evening before"
+        : "Recovery-focused evening meal",
       image: MEAL_IMAGES.dinner,
+      isMainMeal: saturdayBigMeal,
+      recipe: saturdayBigMeal
+        ? {
+            name: "Saturday Pre-Match Rice + Chicken Plate",
+            ingredients: [
+              "2 cups cooked rice",
+              "140 g chicken breast (or tofu)",
+              "1 small serving cooked vegetables",
+              "1 dinner roll",
+              "1 fruit yogurt",
+              "500-700 ml water",
+            ],
+            method: [
+              "Cook rice and lightly season.",
+              "Grill or bake chicken/tofu with minimal oil.",
+              "Steam vegetables until soft.",
+              "Serve rice with protein, vegetables, roll, and yogurt.",
+            ],
+          }
+        : undefined,
       items: [
-        "Fish/chicken/beans + potatoes/rice + vegetables",
-        "Fruit for dessert",
-        "Water and optional milk",
+        saturdayBigMeal
+          ? "Bigger portion of carbohydrates: rice, pasta, or potatoes"
+          : "Fish/chicken/beans + potatoes/rice + vegetables",
+        saturdayBigMeal
+          ? "Lean protein and low-fat cooking methods"
+          : "Fruit for dessert",
+        saturdayBigMeal
+          ? "Hydration focus: water in the evening"
+          : "Water and optional milk",
       ],
-      prep: "One-pan sheet meal with protein, potatoes, and vegetables.",
+      prep: saturdayBigMeal
+        ? "Make this the biggest meal before Sunday morning kick-off."
+        : "One-pan sheet meal with protein, potatoes, and vegetables.",
       why:
-        "Rest days still require quality nutrition to replenish nutrients and prepare the body for upcoming training.",
+        saturdayBigMeal
+          ? `A larger Saturday dinner helps fully top up energy stores before Sunday ${context.sundayMatchTime || "morning"} kick-off, so breakfast can stay light and digestible.`
+          : "Rest days still require quality nutrition to replenish nutrients and prepare the body for upcoming training.",
     },
   ];
+
+  return restMeals;
 }
 
 function getPortionGuide(age) {
@@ -499,6 +719,41 @@ function safeOffset(time, offsetMinutes, fallback) {
   const hh = String(Math.floor(wrapped / 60)).padStart(2, "0");
   const mm = String(wrapped % 60).padStart(2, "0");
   return `${hh}:${mm}`;
+}
+
+function parseTimeToMinutes(time) {
+  if (!time) return null;
+  const [hh, mm] = time.split(":").map(Number);
+  if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+  return hh * 60 + mm;
+}
+
+function isMorningKickoff(time) {
+  const minutes = parseTimeToMinutes(time);
+  if (minutes === null) return false;
+  return minutes <= 10 * 60;
+}
+
+function slugify(value) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function handleRecipeLinkClick(event) {
+  const link = event.target.closest(".recipe-link");
+  if (!link) return;
+  event.preventDefault();
+  const panelId = link.getAttribute("data-recipe-id");
+  if (!panelId) return;
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  panel.classList.toggle("hidden");
+  const isOpen = !panel.classList.contains("hidden");
+  link.textContent = isOpen
+    ? "Hide ingredients & cooking method"
+    : "Open ingredients & cooking method";
 }
 
 function copyPreviewLink() {
