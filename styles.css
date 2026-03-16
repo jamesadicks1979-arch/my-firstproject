@@ -127,12 +127,36 @@ h1 {
   background: linear-gradient(180deg, #fff, #fff8f8);
 }
 
+.guide-links-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.7rem;
+}
+
 .hero--guide {
   min-height: 40vh;
   background:
     linear-gradient(120deg, rgba(64, 5, 5, 0.66), rgba(185, 28, 28, 0.5)),
     url("https://images.unsplash.com/photo-1522778526097-ce0a22ceb253?auto=format&fit=crop&w=1600&q=80")
       center/cover no-repeat;
+}
+
+.hero--guide-lunch {
+  background:
+    linear-gradient(120deg, rgba(6, 40, 63, 0.66), rgba(14, 116, 144, 0.5)),
+    url("https://images.unsplash.com/photo-1575361204480-aadea25e6e68?auto=format&fit=crop&w=1600&q=80")
+      center/cover no-repeat;
+}
+
+.hero--guide-evening {
+  background:
+    linear-gradient(120deg, rgba(16, 24, 69, 0.7), rgba(49, 46, 129, 0.55)),
+    url("https://images.unsplash.com/photo-1608245449230-4ac19066d2d0?auto=format&fit=crop&w=1600&q=80")
+      center/cover no-repeat;
+}
+
+.sheet-header-card {
+  border-left: 5px solid #ef4444;
 }
 
 .options-grid {
@@ -155,6 +179,18 @@ h1 {
 
 .option-card p {
   margin: 0;
+}
+
+.recipe-guide-card {
+  border: 1px solid #dce6fa;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 0.8rem;
+  margin-bottom: 0.7rem;
+}
+
+.recipe-guide-card h3 {
+  margin: 0 0 0.4rem;
 }
 
 .guide-actions {
@@ -471,7 +507,8 @@ tr.day-match {
   .preview-footer,
   .disclaimer,
   .share-links,
-  #copyAdBtn {
+  #copyAdBtn,
+  .guide-actions {
     display: none !important;
   }
 

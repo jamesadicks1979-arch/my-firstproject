@@ -21,6 +21,11 @@ Professional youth football nutrition e-book generator with:
   - why large morning meals can hurt comfort/performance
   - 10 night-before meal options
   - exact morning eat/drink timing
+- Additional printable parent sheets:
+  - `lunchtime-kickoff-guide.html` for 12:00-14:30 kick-offs
+  - `evening-kickoff-guide.html` for evening kick-offs
+- Morning guide now includes links from each of the 10 options to
+  full ingredients + cooking method.
 
 ## Run
 
