@@ -81,6 +81,47 @@ h1 {
   padding: 1.2rem;
 }
 
+.quick-steps {
+  margin: 0.6rem 0 0.8rem;
+  padding-left: 1.2rem;
+}
+
+.quick-steps li {
+  margin: 0.45rem 0;
+  line-height: 1.5;
+}
+
+.fuel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.8rem;
+  margin-top: 0.8rem;
+}
+
+.fuel-tile {
+  border: 1px solid #dce6fa;
+  border-radius: 12px;
+  background: #f8fbff;
+  padding: 0.85rem;
+}
+
+.fuel-tile h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+}
+
+.fuel-tile p {
+  margin: 0.25rem 0;
+}
+
+.fuel-note {
+  margin-top: 0.85rem;
+  border-left: 4px solid #f59e0b;
+  background: #fff7e8;
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+}
+
 h2,
 h3 {
   margin-top: 0;
