@@ -122,6 +122,48 @@ h1 {
   padding: 0.75rem 0.85rem;
 }
 
+.match-guide-card {
+  border: 2px solid #fee2e2;
+  background: linear-gradient(180deg, #fff, #fff8f8);
+}
+
+.hero--guide {
+  min-height: 40vh;
+  background:
+    linear-gradient(120deg, rgba(64, 5, 5, 0.66), rgba(185, 28, 28, 0.5)),
+    url("https://images.unsplash.com/photo-1522778526097-ce0a22ceb253?auto=format&fit=crop&w=1600&q=80")
+      center/cover no-repeat;
+}
+
+.options-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.8rem;
+}
+
+.option-card {
+  border: 1px solid #e4ebfb;
+  border-radius: 12px;
+  padding: 0.8rem;
+  background: #f9fbff;
+}
+
+.option-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.98rem;
+}
+
+.option-card p {
+  margin: 0;
+}
+
+.guide-actions {
+  margin-top: 0.9rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 h2,
 h3 {
   margin-top: 0;

@@ -16,6 +16,11 @@ Professional youth football nutrition e-book generator with:
 - Saturday match banner (`SATURDAY MATCH DAY`) when applicable
 - Social media ad copy + quick share links
 - Preview link section and Print/PDF export support
+- Dedicated easy-flow page for parents:
+  - `morning-kickoff-guide.html` for 8:30-10:30 AM kick-offs
+  - why large morning meals can hurt comfort/performance
+  - 10 night-before meal options
+  - exact morning eat/drink timing
 
 ## Run
 
