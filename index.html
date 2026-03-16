@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="description"
+    content="Football Fuel Pro: a professional youth football nutrition e-book and planner with account signup, schedule-based meal timing, and social media-ready sharing."
+  />
+  <title>Football Fuel Pro | Youth Nutrition E-Book Builder</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__overlay">
+      <p class="pill">Performance Nutrition for Youth Football</p>
+      <h1>Football Fuel Pro E-Book Builder</h1>
+      <p class="hero__subtext">
+        Parent-friendly meal planning that turns training and match times into a
+        professional football nutrition e-book.
+      </p>
+      <a href="#quick-start" class="cta">Start in 3 Easy Steps</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="fuel-importance" class="card">
+      <h2>Front Page: Why the Right Fuel Timing Matters</h2>
+      <p>
+        Football performance is not just about what kids eat, but when they eat
+        it. If a large meal is still being digested at kick-off, the body is
+        working hard in the gut instead of fully supporting top running, focus,
+        and power output.
+      </p>
+      <div class="fuel-grid">
+        <article class="fuel-tile">
+          <h3>1) Big meal window</h3>
+          <p><strong>Allow around 3-4 hours</strong> before kick-off or training.</p>
+          <p class="muted">A heavy dinner can take roughly 4 hours to digest well.</p>
+        </article>
+        <article class="fuel-tile">
+          <h3>2) Final top-up</h3>
+          <p><strong>Small snack 60-90 minutes before</strong> (banana, toast, yogurt).</p>
+          <p class="muted">Keeps energy stable without a heavy stomach.</p>
+        </article>
+        <article class="fuel-tile">
+          <h3>3) Recovery window</h3>
+          <p><strong>Carbs + protein in 30-60 minutes after</strong> training/match.</p>
+          <p class="muted">Supports glycogen refill, muscle repair, and next-session readiness.</p>
+        </article>
+      </div>
+      <p class="fuel-note">
+        <strong>Parent example:</strong> If Sunday match is 9:30 AM, make Saturday
+        evening the main fueling meal, then keep Sunday breakfast light and easy
+        to digest.
+      </p>
+    </section>
+
+    <section id="quick-start" class="card">
+      <h2>Easy Parent Quick Start</h2>
+      <ol class="quick-steps">
+        <li>Create your parent account and enter your child age.</li>
+        <li>Add training and match times for each day.</li>
+        <li>
+          Press <strong>Generate Personalized E-Book</strong> to get complete
+          meal pages with images, timing, hydration, and recipe links.
+        </li>
+      </ol>
+      <p class="muted">
+        Training days are highlighted in <span class="training-text">blue</span>.
+        Match days are highlighted in <span class="match-text">red</span>.
+      </p>
+    </section>
+
+    <section id="morning-kickoff-link" class="card match-guide-card">
+      <h2>Saturday Morning Match? (8:30 AM - 10:30 AM)</h2>
+      <p>
+        Need a simple step-by-step page for parents? Open the quick guide for
+        early kick-offs: what to eat Friday night, why not to eat too much on
+        match morning, and exactly what to drink/eat by time.
+      </p>
+      <a class="btn-primary" href="./morning-kickoff-guide.html">
+        Open Saturday Morning Kick-Off Guide
+      </a>
+    </section>
+
+    <section id="all-kickoff-guides" class="card">
+      <h2>Printable Matchday Sheets</h2>
+      <p>
+        Pick the kick-off window and print a simple parent sheet for match day.
+      </p>
+      <div class="guide-links-grid">
+        <a class="btn-secondary" href="./morning-kickoff-guide.html">
+          Morning Kick-Off Sheet (8:30-10:30)
+        </a>
+        <a class="btn-secondary" href="./lunchtime-kickoff-guide.html">
+          Lunchtime Kick-Off Sheet (12:00-14:30)
+        </a>
+        <a class="btn-secondary" href="./evening-kickoff-guide.html">
+          Evening Kick-Off Sheet
+        </a>
+      </div>
+    </section>
+
+    <section id="social-ad" class="card">
+      <h2>Social Media Advertising Pack</h2>
+      <p>
+        Use this message on Facebook, Instagram, TikTok, LinkedIn, or WhatsApp:
+      </p>
+      <blockquote id="adCopy">
+        Help your young footballer perform better with a custom weekly meal
+        plan. Built from training and match times, this guide shows exactly
+        what to eat, when to eat, and why timing matters for energy, recovery,
+        and focus.
+      </blockquote>
+      <button id="copyAdBtn" class="btn-secondary">Copy Ad Text</button>
+      <div class="share-links">
+        <a id="shareX" target="_blank" rel="noopener noreferrer">Share on X</a>
+        <a id="shareFacebook" target="_blank" rel="noopener noreferrer">Share on Facebook</a>
+        <a id="shareLinkedIn" target="_blank" rel="noopener noreferrer">Share on LinkedIn</a>
+        <a id="shareWhatsApp" target="_blank" rel="noopener noreferrer">Share on WhatsApp</a>
+      </div>
+    </section>
+
+    <section id="account" class="card">
+      <h2>Create Parent Account</h2>
+      <form id="accountForm" class="grid-form">
+        <label>
+          Parent/Guardian Name
+          <input type="text" id="parentName" required />
+        </label>
+        <label>
+          Child Name
+          <input type="text" id="childName" required />
+        </label>
+        <label>
+          Child Age
+          <input type="number" id="childAge" min="6" max="18" required />
+        </label>
+        <label>
+          Email
+          <input type="email" id="email" required />
+        </label>
+        <label>
+          Password
+          <input type="password" id="password" minlength="6" required />
+        </label>
+        <button type="submit" class="btn-primary">Create Account</button>
+      </form>
+      <p id="accountStatus" class="status"></p>
+    </section>
+
+    <section id="schedule" class="card">
+      <h2>Weekly Football Schedule</h2>
+      <p>
+        Add training and match times. Match days are highlighted in
+        <span class="match-text">red</span> and training days in
+        <span class="training-text">blue</span>.
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Training Start</th>
+              <th>Training End</th>
+              <th>Match Time</th>
+            </tr>
+          </thead>
+          <tbody id="scheduleTableBody"></tbody>
+        </table>
+      </div>
+      <button id="generateBtn" class="btn-primary">
+        Generate Personalized E-Book
+      </button>
+      <p id="generationStatus" class="status"></p>
+    </section>
+
+    <section id="weeklyHighlights" class="card hidden">
+      <h2>Weekly Priority Highlights</h2>
+      <div id="highlightsGrid" class="highlights-grid"></div>
+    </section>
+
+    <section id="ebook-preview" class="card hidden">
+      <h2>E-Book Preview</h2>
+      <p class="muted">
+        One page per meal with timing guidance, digestion notes, hydration
+        strategy, plus recipe links for ingredients and how to cook.
+      </p>
+      <div id="ebookPages"></div>
+
+      <div class="preview-footer">
+        <h3>Preview Link</h3>
+        <p>Share this link to jump directly to the preview section:</p>
+        <div class="preview-link-wrap">
+          <a id="previewLink" href="#ebook-preview"></a>
+          <button id="copyPreviewBtn" class="btn-secondary">Copy Link</button>
+        </div>
+        <button id="printBtn" class="btn-primary">Print / Save as PDF</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Evidence-Based Notes (Football Nutrition)</h2>
+      <ul>
+        <li>
+          UEFA Expert Group statement: nutrition timing and fuel strategies in
+          elite football.
+        </li>
+        <li>
+          Carbohydrate availability before training/match supports repeated
+          high-intensity performance.
+        </li>
+        <li>
+          Post-session carbs + protein in the first recovery window supports
+          glycogen restoration and muscle repair.
+        </li>
+        <li>
+          Hydration and electrolytes are crucial, especially around intense
+          sessions and match day.
+        </li>
+      </ul>
+      <p class="muted">
+        Sources:
+        <a
+          href="https://pubmed.ncbi.nlm.nih.gov/33097528/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >UEFA Expert Group Statement</a
+        >,
+        <a
+          href="https://jissn.biomedcentral.com/articles/10.1186/s12970-017-0193-8"
+          target="_blank"
+          rel="noopener noreferrer"
+          >JISSN Recovery Strategies in Soccer</a
+        >.
+      </p>
+      <p class="disclaimer">
+        This planner is educational and not medical advice. For allergies,
+        medical conditions, or specialist performance goals, consult a
+        registered sports dietitian.
+      </p>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
