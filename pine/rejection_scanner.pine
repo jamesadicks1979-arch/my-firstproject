@@ -23,6 +23,9 @@ indicator("2D Rejection Scanner", "REJ SCAN", overlay = true)
 //   • None: every rejection candle
 // A-grade: 100-bar high/low or an outside bar (flagged in the alert; can be allowed
 // against the bias).
+// Outside reversal: outside bar at a strong high (highest of the last 100 bars) that
+// closes red → short, or at a strong low that closes green → long. It may close
+// anywhere (it does not need to close back inside the previous range).
 // ─────────────────────────────────────────────────────────────
 
 grpF = "Filters"
@@ -36,6 +39,9 @@ slowLen    = input.int(50, "Slow EMA", minval = 1, group = grpF)
 closeATR   = input.float(0.5, "MAs 'close' within (x ATR)", minval = 0, step = 0.1, group = grpF)
 pivLen     = input.int(3, "Swing strength (bars each side)", minval = 1, group = grpF)
 extLen     = input.int(100, "A-grade extreme lookback (bars)", minval = 5, group = grpF)
+useOutRev  = input.bool(true, "Include outside reversals at strong highs / lows", group = grpF)
+outLen     = input.int(100, "Strong high / low lookback for outside reversals", minval = 5, group = grpF)
+onlyOut    = input.bool(false, "Alert outside reversals only", group = grpF)
 
 grpT = "Table"
 showTable  = input.bool(true, "Show table", group = grpT)
@@ -95,6 +101,8 @@ scan() =>
     pl   = ta.pivotlow(low, pivLen, pivLen)
     hhX  = ta.highest(high, extLen)
     llX  = ta.lowest(low, extLen)
+    hhO  = ta.highest(high, outLen)
+    llO  = ta.lowest(low, outLen)
     var float lastH = na
     var float lastL = na
     var bool  bearS = false
@@ -123,17 +131,20 @@ scan() =>
     openIn  = open >= pL and open <= pH
     closeIn = close >= pL and close <= pH
     outside = high > pH and low < pL
-    bearB = openIn and high > pH and closeIn and close < open
-    bullB = openIn and low < pL and closeIn and close > open
+    bearO = useOutRev and outside and close < open and high >= hhO
+    bullO = useOutRev and outside and close > open and low <= llO
+    bearB = (openIn and high > pH and closeIn and close < open) or bearO
+    bullB = (openIn and low < pL and closeIn and close > open) or bullO
     bearA = bearB and (high >= hhX or outside)
     bullA = bullB and (low <= llX or outside)
     bearOk = bearB and sideMode != "Long only" and (bias == -1 or bias == 2 or (bearA and aIgnore))
     bullOk = bullB and sideMode != "Short only" and (bias == 1 or bias == 2 or (bullA and aIgnore))
     int   sig = bullOk ? 1 : bearOk ? -1 : 0
     bool  isA = sig == 1 ? bullA : sig == -1 ? bearA : false
+    bool  isO = sig == 1 ? bullO : sig == -1 ? bearO : false
     float stp = sig == 1 ? low : sig == -1 ? high : na
     // packed into one number to stay under TradingView's 127 returned-values limit
-    int code = (sig + 1) + 3 * (isA ? 1 : 0) + 6 * (bias + 1) + 30 * (maClose ? 1 : 0)
+    int code = (sig + 1) + 3 * (isA ? 1 : 0) + 6 * (bias + 1) + 30 * (maClose ? 1 : 0) + 60 * (isO ? 1 : 0)
     [code[1], stp[1], time[1]]
 
 // ── Per-market memory
@@ -142,6 +153,7 @@ var array<string> names  = array.new_string(40, "")
 var array<int>    lastT  = array.new_int(40, 0)
 var array<int>    sDir   = array.new_int(40, 0)
 var array<bool>   sA     = array.new_bool(40, false)
+var array<bool>   sO     = array.new_bool(40, false)
 var array<float>  sStop  = array.new_float(40, na)
 var array<int>    sTime  = array.new_int(40, 0)
 var array<int>    since  = array.new_int(40, 9999)
@@ -158,7 +170,8 @@ biasText(int b, bool mc) =>
 proc(int i, string sym, int code, float st, int t) =>
     array.set(names, i, shortName(sym))
     if not na(t) and not na(code)
-        mc = code >= 30
+        o  = code >= 60
+        mc = (code % 60) >= 30
         r  = code % 30
         b  = int(r / 6) - 1
         sg = (r % 6) % 3 - 1
@@ -168,13 +181,14 @@ proc(int i, string sym, int code, float st, int t) =>
         if t != array.get(lastT, i)
             array.set(lastT, i, t)
             array.set(since, i, array.get(since, i) + 1)
-            if sg != 0 and (not onlyA or a)
+            if sg != 0 and (not onlyA or a) and (not onlyOut or o)
                 array.set(sDir, i, sg)
                 array.set(sA, i, a)
+                array.set(sO, i, o)
                 array.set(sStop, i, st)
                 array.set(sTime, i, t)
                 array.set(since, i, 0)
-                msg = (a ? "A-GRADE " : "") + (sg == 1 ? "LONG" : "SHORT") + " rejection | " + sym + " | " + tf + " candle of " +
+                msg = (o ? "OUTSIDE REVERSAL " : a ? "A-GRADE " : "") + (sg == 1 ? "LONG" : "SHORT") + (o ? " at strong " + (sg == 1 ? "low" : "high") : " rejection") + " | " + sym + " | " + tf + " candle of " +
                      str.format_time(t, "yyyy-MM-dd", "UTC") + " closed" +
                      " | stop " + str.tostring(st, "#.#####") + " | bias " + biasText(b, mc) + " | entry: next open"
                 alert(msg, alert.freq_all)
@@ -287,7 +301,7 @@ if showTable and barstate.islast
             d = array.get(sDir, i)
             b = array.get(curB, i)
             cell(0, r, array.get(names, i), color.white)
-            cell(1, r, recent ? (array.get(sA, i) ? "A " : "") + (d == 1 ? "LONG" : "SHORT") : "—", recent ? (array.get(sA, i) ? color.yellow : d == 1 ? color.teal : color.red) : color.gray)
+            cell(1, r, recent ? (array.get(sO, i) ? "OUT " : array.get(sA, i) ? "A " : "") + (d == 1 ? "LONG" : "SHORT") : "—", recent ? (array.get(sA, i) ? color.yellow : d == 1 ? color.teal : color.red) : color.gray)
             cell(2, r, recent ? str.format_time(array.get(sTime, i), "dd MMM", "UTC") : "", color.white)
             cell(3, r, recent ? str.tostring(array.get(sStop, i), "#.#####") : "", color.white)
             cell(4, r, recent ? str.tostring(array.get(since, i)) : "", color.white)

@@ -223,3 +223,28 @@ The code is in `rejection_v3.py`. It covers 18 markets, with costs of 0.04% of p
 | Previous | +46 / +52 |
 
 The 4-year result has the same weakness: one silver trade is worth +140R, and without the top 1% of trades v3 longs only is about flat (+9 / −11R).
+
+## Outside reversals at strong highs and lows
+
+**The setup:**
+- An outside bar (it takes out both the previous bar's high and low).
+- For a long, it makes the lowest low of the last N bars and closes green.
+- For a short, it makes the highest high of the last N bars and closes red.
+- It may close anywhere, so this setup is not caught by the rejection rule's close-inside-the-range requirement.
+
+**Test conditions:** entry at the next open, stop at the bar's wick, costs of 0.04% of price per round trip, 18 markets. Each cell shows both 2D alignments as off0 / off1.
+
+### N = 100 bars
+
+| Exit | Longs at strong lows | Shorts at strong highs |
+|---|---|---|
+| 4R target | **+0.46 / +0.58R** (n≈130, t 2.3 / 2.9) | −0.36 / −0.34R (t −3.9 / −3.5) |
+| 1R trail after 2R | +0.28 / +0.45R | −0.20 / −0.03R |
+| 2 closes beyond 22 SMA | +0.06 / +0.44R | +0.07 / +0.04R |
+
+N = 50 gives about 60% more trades with similar results. Longs with the 4R target make +0.33 / +0.58R a trade.
+
+### Takeaway
+
+- **Outside reversal longs at strong lows are the most robust setup found so far.** They stay positive without their top 1% of trades, and they are positive on both alignments.
+- **Shorting outside reversals at strong highs reliably loses.** The 4R-target version has a t-stat of about −4. Strong highs in these markets tend to keep going.

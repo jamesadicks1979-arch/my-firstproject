@@ -20,6 +20,10 @@ strategy("2D Rejection Candle System", "REJ 2D", overlay = true,
 // A-grade setups (taken even against the bias, BE stop once 2R is tagged):
 //   • signal candle makes the highest high / lowest low of the last 100 bars, or
 //   • signal candle is an outside bar (takes out both the previous high and low)
+// Outside reversal at a strong high/low (always A-grade, marked "OUT"):
+//   • outside bar that makes the highest high of the last 100 bars and closes red → short
+//   • outside bar that makes the lowest low of the last 100 bars and closes green → long
+//   • it may close anywhere (usually beyond the previous range), stop at its wick
 // Entry : next candle open
 // Stop  : signal candle wick (or previous range high/low — toggle)
 // Exit  : 2 closes on the other side of the 22 SMA (exit at the next open)
@@ -44,6 +48,8 @@ grpA = "A-grade setups"
 useA      = input.bool(true, "Flag A-grade setups", group = grpA)
 extLen    = input.int(100, "Extreme lookback (bars)", minval = 5, group = grpA)
 useOutside = input.bool(true, "Outside bar counts as A-grade", group = grpA)
+useOutRev = input.bool(true, "Trade outside reversals at strong highs / lows", group = grpA)
+outLen    = input.int(100, "Strong high / low lookback for outside reversals (bars)", minval = 5, group = grpA)
 aIgnoreBias = input.bool(true, "A-grade can trade against the bias", group = grpA)
 aBeR      = input.float(2.0, "A-grade: stop to breakeven at (R)", minval = 0.5, step = 0.5, group = grpA)
 
@@ -136,8 +142,15 @@ bullBase = bullRaw and (not bearRaw or close > open)
 
 hhExt = ta.highest(high, extLen)   // computed every bar (not inside a condition)
 llExt = ta.lowest(low, extLen)
-bearA = useA and bearBase and (high >= hhExt or (useOutside and isOutside))
-bullA = useA and bullBase and (low <= llExt or (useOutside and isOutside))
+hhOut = ta.highest(high, outLen)
+llOut = ta.lowest(low, outLen)
+// outside reversal at a strong high / low: close can be anywhere
+bearOut = useOutRev and isOutside and close < open and high >= hhOut
+bullOut = useOutRev and isOutside and close > open and low <= llOut
+bearBase := bearBase or bearOut
+bullBase := bullBase or bullOut
+bearA = (useA and bearBase and (high >= hhExt or (useOutside and isOutside))) or bearOut
+bullA = (useA and bullBase and (low <= llExt or (useOutside and isOutside))) or bullOut
 
 bearSig = bearBase and sideMode != "Long only" and (bias == -1 or (bearA and aIgnoreBias))
 bullSig = bullBase and sideMode != "Short only" and (bias == 1 or (bullA and aIgnoreBias))
@@ -147,8 +160,13 @@ bullStop = stopMode == "Signal candle wick" ? low  : prevL
 
 plotshape(bearSig and not bearA, "Bear rejection", shape.triangledown, location.abovebar, colShort, size = size.small, text = "REJ")
 plotshape(bullSig and not bullA, "Bull rejection", shape.triangleup,   location.belowbar, colLong,  size = size.small, text = "REJ")
-plotshape(bearSig and bearA, "Bear A-grade", shape.triangledown, location.abovebar, colA, size = size.normal, text = "A")
-plotshape(bullSig and bullA, "Bull A-grade", shape.triangleup,   location.belowbar, colA, size = size.normal, text = "A")
+plotshape(bearSig and bearA and not bearOut, "Bear A-grade", shape.triangledown, location.abovebar, colA, size = size.normal, text = "A")
+plotshape(bullSig and bullA and not bullOut, "Bull A-grade", shape.triangleup,   location.belowbar, colA, size = size.normal, text = "A")
+plotshape(bearSig and bearOut, "Bear outside reversal", shape.triangledown, location.abovebar, colA, size = size.normal, text = "OUT")
+plotshape(bullSig and bullOut, "Bull outside reversal", shape.triangleup,   location.belowbar, colA, size = size.normal, text = "OUT")
+// every outside reversal at a strong high/low, even when not traded (e.g. already in a trade)
+plotshape(bearOut and not bearSig, "Outside reversal (not traded)", shape.xcross, location.abovebar, color.new(colA, 40), size = size.tiny)
+plotshape(bullOut and not bullSig, "Outside reversal (not traded) ", shape.xcross, location.belowbar, color.new(colA, 40), size = size.tiny)
 
 // ── State
 var int   tradeNo = 0
@@ -288,9 +306,9 @@ if strategy.position_size == 0 and pDir == 0 and tDir == 0 and (bullSig or bearS
 
 // ── Alerts (signals that pass the filters)
 if bullSig
-    alert((bullA ? "A-GRADE " : "") + "BULL rejection " + syminfo.ticker + " | buy next open | stop " + str.tostring(bullStop, format.mintick), alert.freq_once_per_bar_close)
+    alert((bullOut ? "OUTSIDE REVERSAL " : bullA ? "A-GRADE " : "") + "BULL rejection " + syminfo.ticker + " | buy next open | stop " + str.tostring(bullStop, format.mintick), alert.freq_once_per_bar_close)
 if bearSig
-    alert((bearA ? "A-GRADE " : "") + "BEAR rejection " + syminfo.ticker + " | sell next open | stop " + str.tostring(bearStop, format.mintick), alert.freq_once_per_bar_close)
+    alert((bearOut ? "OUTSIDE REVERSAL " : bearA ? "A-GRADE " : "") + "BEAR rejection " + syminfo.ticker + " | sell next open | stop " + str.tostring(bearStop, format.mintick), alert.freq_once_per_bar_close)
 
 // ── Stats table
 var table tb = table.new(position.top_right, 2, 11, bgcolor = color.new(color.black, 15), border_width = 1)
