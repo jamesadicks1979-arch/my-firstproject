@@ -1,0 +1,221 @@
+<meta name="dash-one-writer">
+<style>
+  .rj { display: flex; flex-direction: column; gap: var(--cds-gap-lg); font-family: var(--font-anthropic-sans); max-width: 72rem; margin-inline: auto; }
+  .rj h1 { font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); margin: 0; text-wrap: balance; }
+  .rj h2 { font-size: var(--cds-font-size-heading); font-weight: var(--cds-font-weight-medium); margin: 0; }
+  .rj p { margin: 0; max-width: 70ch; }
+  .rj .lede { font-size: var(--cds-font-size-body); color: var(--color-fg); }
+  .rj .note { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rj .num { font-variant-numeric: tabular-nums; }
+  .rj .lede b { font-weight: 600; }
+  .rj .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); gap: var(--cds-gap-md); }
+  .rj .card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-width: 0; }
+  .rj .chart { position: relative; min-height: 240px; }
+  .rj .bars { position: relative; min-height: 200px; }
+  .rj .legend { display: flex; gap: var(--cds-gap-md); flex-wrap: wrap; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
+  .rj .sw { display: inline-block; width: 0.75rem; height: 2px; vertical-align: middle; margin-right: 0.375rem; }
+  .rj .sw.orig { background: var(--cds-chart-muted); }
+  .rj .sw.impr { background: var(--rj-accent); }
+  .rj .tip { position: absolute; background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); padding: var(--cds-pad-xs) var(--cds-pad-sm); font-size: var(--cds-font-size-caption); pointer-events: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rj .tip .d { color: var(--cds-text-secondary); }
+  .rj .tablebox { overflow-x: auto; }
+  .rj table { border-collapse: collapse; width: 100%; font-size: var(--cds-font-size-body); font-variant-numeric: tabular-nums; }
+  .rj th, .rj td { text-align: right; padding: var(--cds-pad-xs) var(--cds-pad-sm); border-bottom: 1px solid var(--color-border-line); white-space: nowrap; }
+  .rj th:nth-child(-n+2), .rj td:nth-child(-n+2) { text-align: left; }
+  .rj th { font-weight: var(--cds-font-weight-medium); color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+  .rj td.pos { color: var(--color-ok); }
+  .rj td.neg { color: var(--color-bad); }
+  .rj ul { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: var(--cds-gap-xs); max-width: 75ch; }
+  .rj .fail { display: flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: inherit; color: var(--color-fg-muted); font-size: var(--cds-font-size-caption); }
+  .rj .fail::before { content: ""; width: 0.375rem; height: 0.375rem; border-radius: 50%; background: var(--color-bad); }
+  [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
+  [data-dash-source-state=empty] { color: transparent; }
+</style>
+
+<div class="rj">
+  <header style="display:flex;flex-direction:column;gap:var(--cds-gap-sm)">
+    <h1 id="top">2D rejection candle system on gold and Brent</h1>
+    <p class="lede">After costs, the original system made <b class="num" data-draw="exp" data-source="summary" data-field="exp_R" data-where="market=Gold&amp;system=Original">—</b>R a trade on gold and <b class="num" data-draw="exp" data-source="summary" data-field="exp_R" data-where="market=Brent&amp;system=Original">—</b>R on Brent. With a 50 EMA trend filter, longs only and no breakeven move, that rises to <b class="num" data-draw="exp" data-source="summary" data-field="exp_R" data-where="market=Gold&amp;system=Improved">—</b>R and <b class="num" data-draw="exp" data-source="summary" data-field="exp_R" data-where="market=Brent&amp;system=Improved">—</b>R.</p>
+    <p class="note">Yahoo daily futures (GC=F 2000–2026, BZ=F 2007–2026) paired into 2D bars. Results are in R: 1R is the distance from entry to the original stop. Costs are $0.40/oz on gold and $0.04/bbl on Brent per round trip.</p>
+  </header>
+
+  <section id="growth" style="display:flex;flex-direction:column;gap:var(--cds-gap-md)">
+    <h2>Running total of R, year by year</h2>
+    <div class="legend"><span><span class="sw orig"></span>Original (as coded)</span><span><span class="sw impr"></span>Improved (trend 50, longs only, no breakeven, 4R)</span></div>
+    <div class="grid">
+      <div class="card">
+        <h2>Gold</h2>
+        <p class="note">Ends year at this total, in R</p>
+        <div class="chart" data-draw="eq" data-market="Gold" data-source="equity"></div>
+      </div>
+      <div class="card">
+        <h2>Brent</h2>
+        <p class="note">Ends year at this total, in R</p>
+        <div class="chart" data-draw="eq" data-market="Brent" data-source="equity"></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card" id="sides">
+      <h2>Longs vs shorts, original system</h2>
+      <p class="note">Average R per trade before costs. Shorts lost on both markets.</p>
+      <div class="bars" data-draw="sides" data-source="sides"></div>
+    </section>
+    <section class="card" id="summary">
+      <h2>Side by side, after costs</h2>
+      <p class="note">Max drawdown is the largest peak-to-trough fall in R.</p>
+      <div class="tablebox">
+        <table data-source="summary" data-row-key="market,system">
+          <thead><tr>
+            <th data-field="market">Market</th><th data-field="system">System</th><th data-field="trades">Trades</th><th data-field="win_pct">Win %</th><th data-field="exp_R">R / trade</th><th data-field="total_R">Total R</th><th data-field="profit_factor">Profit factor</th><th data-field="max_dd_R">Max DD (R)</th>
+          </tr></thead>
+          <tbody data-draw="summaryRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" id="caveats">
+    <h2>Before you trade it</h2>
+    <ul class="note">
+      <li>Only about 10 trades a year per market. Even the best versions are only moderately convincing statistically (t-stats around 1 to 2.5).</li>
+      <li>Gold has been in a long bull market. Buying any random 2D open and holding for 5 bars made about +0.39R a trade, close to what the rejection longs made.</li>
+      <li>The results change a lot depending on which day 2D bars start on. TradingView's GC1! and UKOIL data will also differ from Yahoo's.</li>
+      <li>Forward-test the improved version, or add more markets, before trading it with real money.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+  for (const r of document.querySelectorAll('.rj')) r.style.setProperty('--rj-accent', dash.colors[0]);
+  const num = (v) => Number(v);
+  const fmtR = d3.format('+.2f');
+  const failLine = (el) => { const f = document.createElement('div'); f.className = 'fail'; f.textContent = 'Failed to load'; el.replaceChildren(f); };
+
+  dash.draw('exp', (el) => {
+    const s = dash.data('summary');
+    if (s.status !== 'ok') { el.textContent = '—'; return; }
+    const w = new URLSearchParams(el.dataset.where.replace(/&amp;/g, '&'));
+    const r = s.data.find((x) => x.market === w.get('market') && x.system === w.get('system'));
+    el.textContent = r ? fmtR(num(r.exp_R)) : '—';
+  });
+
+  dash.draw('summaryRows', (tb) => {
+    const s = dash.data('summary');
+    tb.replaceChildren();
+    if (s.status !== 'ok') return;
+    const f1 = d3.format('.1f'), f2 = d3.format('.2f');
+    for (const r of s.data) {
+      const tr = document.createElement('tr');
+      const cells = [
+        [r.market], [r.system], [d3.format(',')(num(r.trades))], [f1(num(r.win_pct))],
+        [fmtR(num(r.exp_R)), num(r.exp_R)], [fmtR(num(r.total_R)), num(r.total_R)],
+        [f2(num(r.profit_factor)), num(r.profit_factor) - 1], [f1(num(r.max_dd_R))]
+      ];
+      for (const [txt, sign] of cells) {
+        const td = document.createElement('td');
+        td.textContent = txt;
+        if (sign !== undefined) td.className = sign > 0 ? 'pos' : sign < 0 ? 'neg' : '';
+        tr.appendChild(td);
+      }
+      tb.appendChild(tr);
+    }
+  });
+
+  dash.draw('eq', (el) => {
+    const e = dash.data('equity');
+    el.replaceChildren();
+    if (e.status === 'error') { failLine(el); return; }
+    if (e.status !== 'ok') { el.textContent = '—'; return; }
+    const market = el.dataset.market;
+    const rows = e.data.filter((r) => r.market === market).map((r) => ({ system: r.system, year: num(r.year), cum: num(r.cumR), yr: num(r.yearR), n: num(r.trades) }));
+    const series = ['Original', 'Improved'].map((s) => ({ s, pts: rows.filter((r) => r.system === s).sort((a, b) => a.year - b.year) }));
+    const W = Math.max(280, el.clientWidth), H = 240;
+    const accent = dash.colors[0];
+    const color = { Original: 'var(--cds-chart-muted)', Improved: accent };
+    const years = d3.extent(rows, (r) => r.year);
+    const yExt = d3.extent([0, ...rows.map((r) => r.cum)]);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', `${market} running total of R by year`);
+    const y = d3.scaleLinear(yExt, [H - 24, 8]).nice();
+    // measure widest tick label for left margin
+    const probe = svg.append('text').attr('font-size', 11).text(d3.format('+d')(y.domain()[0]));
+    const probe2 = svg.append('text').attr('font-size', 11).text(d3.format('+d')(y.domain()[1]));
+    const left = Math.max(probe.node().getComputedTextLength(), probe2.node().getComputedTextLength()) + 10;
+    probe.remove(); probe2.remove();
+    const endLabelW = 52;
+    const x = d3.scaleLinear(years, [left, W - endLabelW]);
+    const g = svg.append('g');
+    g.selectAll('line.grid').data(y.ticks(5)).join('line').attr('x1', left).attr('x2', W - endLabelW).attr('y1', (d) => y(d)).attr('y2', (d) => y(d))
+      .attr('stroke', (d) => d === 0 ? 'var(--cds-chart-reference)' : 'var(--cds-chart-grid)').attr('stroke-width', 1).attr('stroke-dasharray', (d) => d === 0 ? '4 3' : null);
+    g.selectAll('text.yt').data(y.ticks(5)).join('text').attr('x', left - 6).attr('y', (d) => y(d)).attr('dy', '0.32em').attr('text-anchor', 'end')
+      .attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text((d) => d === 0 ? '0' : d3.format('+d')(d));
+    const xt = x.ticks(Math.max(2, Math.floor((W - left - endLabelW) / 70))).filter(Number.isInteger);
+    g.selectAll('text.xt').data(xt).join('text').attr('x', (d) => x(d)).attr('y', H - 6).attr('text-anchor', 'middle')
+      .attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text((d) => d);
+    const line = d3.line().x((d) => x(d.year)).y((d) => y(d.cum));
+    for (const ser of series) {
+      g.append('path').datum(ser.pts).attr('d', line).attr('fill', 'none').attr('stroke', color[ser.s])
+        .attr('stroke-width', ser.s === 'Improved' ? 2.5 : 2).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round');
+    }
+    // end labels, pushed apart if they collide
+    const ends = series.map((ser) => ({ s: ser.s, p: ser.pts[ser.pts.length - 1] })).filter((d) => d.p).map((d) => ({ ...d, ty: y(d.p.cum) }));
+    ends.sort((a, b) => a.ty - b.ty);
+    for (let i = 1; i < ends.length; i++) if (ends[i].ty - ends[i - 1].ty < 14) ends[i].ty = ends[i - 1].ty + 14;
+    g.selectAll('text.end').data(ends).join('text').attr('x', W - endLabelW + 6).attr('y', (d) => d.ty).attr('dy', '0.32em')
+      .attr('font-size', 11).attr('font-weight', 600).attr('fill', (d) => color[d.s]).text((d) => d3.format('+.1f')(d.p.cum));
+    // hover
+    const rule = g.append('line').attr('y1', 8).attr('y2', H - 24).attr('stroke', 'var(--cds-chart-axis)').attr('stroke-width', 1).style('opacity', 0);
+    const dots = g.selectAll('circle.hv').data(series).join('circle').attr('r', 3.5).attr('fill', (d) => color[d.s]).style('opacity', 0);
+    const tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; el.appendChild(tip);
+    svg.append('rect').attr('x', left).attr('y', 0).attr('width', W - endLabelW - left).attr('height', H).attr('fill', 'transparent')
+      .on('pointermove', (ev) => {
+        const [mx] = d3.pointer(ev);
+        const yr = Math.round(x.invert(mx));
+        const at = series.map((ser) => ({ s: ser.s, p: ser.pts.find((p) => p.year === yr) }));
+        if (!at.some((a) => a.p)) return;
+        rule.attr('x1', x(yr)).attr('x2', x(yr)).style('opacity', 1);
+        dots.attr('cx', x(yr)).attr('cy', (d, i) => at[i].p ? y(at[i].p.cum) : -10).style('opacity', 1);
+        tip.replaceChildren();
+        const hd = document.createElement('div'); hd.className = 'd'; hd.textContent = String(yr); tip.appendChild(hd);
+        for (const a of at) {
+          if (!a.p) continue;
+          const ln = document.createElement('div');
+          const sw = document.createElement('span'); sw.className = 'sw ' + (a.s === 'Original' ? 'orig' : 'impr');
+          ln.appendChild(sw);
+          ln.appendChild(document.createTextNode(`${a.s}: ${d3.format('+.1f')(a.p.cum)}R total (${d3.format('+.1f')(a.p.yr)}R, ${a.p.n} trades)`));
+          tip.appendChild(ln);
+        }
+        tip.hidden = false;
+        const bw = el.clientWidth / W;
+        const px = x(yr) * bw, tw = tip.offsetWidth;
+        tip.style.left = Math.min(Math.max(0, px + 10), el.clientWidth - tw) + 'px';
+        tip.style.top = '4px';
+      })
+      .on('pointerleave', () => { rule.style('opacity', 0); dots.style('opacity', 0); tip.hidden = true; });
+  });
+
+  dash.draw('sides', (el) => {
+    const s = dash.data('sides');
+    el.replaceChildren();
+    if (s.status === 'error') { failLine(el); return; }
+    if (s.status !== 'ok') { el.textContent = '—'; return; }
+    const rows = s.data.map((r) => ({ label: `${r.market} ${r.side.toLowerCase()}s`, v: num(r.exp_R), n: num(r.trades) }));
+    const W = Math.max(260, el.clientWidth), rowH = 40, H = rows.length * rowH + 20;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'Average R per trade by side');
+    const probe = svg.append('text').attr('font-size', 12).text(rows.reduce((a, r) => r.label.length > a.length ? r.label : a, ''));
+    const left = probe.node().getComputedTextLength() + 12; probe.remove();
+    const lim = Math.max(0.5, d3.max(rows, (r) => Math.abs(r.v)));
+    const x = d3.scaleLinear([-lim, lim], [left + 44, W - 44]);
+    const y = d3.scaleBand(rows.map((r) => r.label), [10, H - 10]).padding(0.35);
+    svg.append('line').attr('x1', x(0)).attr('x2', x(0)).attr('y1', 4).attr('y2', H - 4).attr('stroke', 'var(--cds-chart-reference)').attr('stroke-width', 1);
+    svg.selectAll('text.lb').data(rows).join('text').attr('x', 0).attr('y', (d) => y(d.label) + y.bandwidth() / 2).attr('dy', '0.32em')
+      .attr('font-size', 12).attr('fill', 'var(--color-fg)').text((d) => d.label);
+    svg.selectAll('rect').data(rows).join('rect').attr('x', (d) => Math.min(x(0), x(d.v))).attr('width', (d) => Math.abs(x(d.v) - x(0)))
+      .attr('y', (d) => y(d.label)).attr('height', Math.min(24, y.bandwidth())).attr('rx', 3)
+      .attr('fill', (d) => d.v >= 0 ? 'var(--color-ok)' : 'var(--cds-chart-status-critical)');
+    svg.selectAll('text.v').data(rows).join('text').attr('x', (d) => d.v >= 0 ? x(d.v) + 6 : x(d.v) - 6).attr('text-anchor', (d) => d.v >= 0 ? 'start' : 'end')
+      .attr('y', (d) => y(d.label) + Math.min(24, y.bandwidth()) / 2).attr('dy', '0.32em').attr('font-size', 11).attr('fill', 'var(--color-fg-muted)')
+      .text((d) => `${fmtR(d.v)}R`);
+  });
+</script>

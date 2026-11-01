@@ -1,0 +1,5 @@
+market,system,trades,win_pct,exp_R,total_R,profit_factor,max_dd_R
+Gold,Original,226,19.9,0.074,16.7,1.11,19.1
+Gold,Improved,90,30.0,0.512,46.1,1.76,12.3
+Brent,Original,220,14.5,-0.15,-33.0,0.8,53.7
+Brent,Improved,74,27.0,0.357,26.4,1.49,18.4
