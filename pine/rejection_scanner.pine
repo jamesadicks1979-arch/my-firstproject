@@ -1,0 +1,297 @@
+//@version=6
+indicator("2D Rejection Scanner", "REJ SCAN", overlay = true)
+
+// ─────────────────────────────────────────────────────────────
+// Scans up to 40 markets for the 2D rejection candle and fires ONE alert
+// per new signal, once the 2D candle has CLOSED (no repainting).
+//
+// Setup:
+//   1. Add to any chart. Best: a 24/7 market on a 1h chart (e.g. BINANCE:BTCUSDT 1h)
+//      so the script runs all the time and alerts arrive soon after each close.
+//   2. Create Alert → Condition: "REJ SCAN" → "Any alert() function call"
+//      → Expiration: open-ended → turn on app / email notifications.
+//   3. Swap any market in the settings ("Markets" group). Add the scanner a second
+//      time with a different list to watch 80 markets.
+//
+// Signal candle (same rules as the strategy):
+//   opens inside the previous range, sweeps the previous high (bear) / low (bull),
+//   closes back inside the previous range, opposite body colour.
+// Bias filter (choose in settings):
+//   • 22 SMA / 50 EMA + structure: SMA above EMA → longs, below → shorts; when the
+//     two are within 0.5 ATR, lower highs → shorts, higher lows → longs
+//   • Price vs 50 EMA: longs above, shorts below
+//   • None: every rejection candle
+// A-grade: 100-bar high/low or an outside bar (flagged in the alert; can be allowed
+// against the bias).
+// ─────────────────────────────────────────────────────────────
+
+grpF = "Filters"
+tf         = input.timeframe("2D", "Scan timeframe", group = grpF)
+sideMode   = input.string("Both", "Direction", options = ["Both", "Long only", "Short only"], group = grpF)
+biasMode   = input.string("22 SMA / 50 EMA + structure", "Bias filter", options = ["22 SMA / 50 EMA + structure", "Price vs 50 EMA", "None (all candles)"], group = grpF)
+onlyA      = input.bool(false, "Alert A-grade setups only", group = grpF)
+aIgnore    = input.bool(true, "A-grade can go against the bias", group = grpF)
+fastLen    = input.int(22, "Fast SMA", minval = 1, group = grpF)
+slowLen    = input.int(50, "Slow EMA", minval = 1, group = grpF)
+closeATR   = input.float(0.5, "MAs 'close' within (x ATR)", minval = 0, step = 0.1, group = grpF)
+pivLen     = input.int(3, "Swing strength (bars each side)", minval = 1, group = grpF)
+extLen     = input.int(100, "A-grade extreme lookback (bars)", minval = 5, group = grpF)
+
+grpT = "Table"
+showTable  = input.bool(true, "Show table", group = grpT)
+recentN    = input.int(3, "List signals from the last N bars", minval = 0, group = grpT)
+showAll    = input.bool(false, "List every market (with its bias)", group = grpT)
+tPos       = input.string("Top right", "Position", options = ["Top right", "Top left", "Bottom right", "Bottom left"], group = grpT)
+
+grpM = "Markets"
+s00 = input.symbol("OANDA:XAUUSD", "1", group = grpM)
+s01 = input.symbol("OANDA:XAGUSD", "2", group = grpM)
+s02 = input.symbol("OANDA:XPTUSD", "3", group = grpM)
+s03 = input.symbol("COMEX:HG1!", "4", group = grpM)
+s04 = input.symbol("TVC:UKOIL", "5", group = grpM)
+s05 = input.symbol("TVC:USOIL", "6", group = grpM)
+s06 = input.symbol("NYMEX:NG1!", "7", group = grpM)
+s07 = input.symbol("NYMEX:RB1!", "8", group = grpM)
+s08 = input.symbol("NYMEX:HO1!", "9", group = grpM)
+s09 = input.symbol("OANDA:SPX500USD", "10", group = grpM)
+s10 = input.symbol("OANDA:NAS100USD", "11", group = grpM)
+s11 = input.symbol("OANDA:US30USD", "12", group = grpM)
+s12 = input.symbol("OANDA:US2000USD", "13", group = grpM)
+s13 = input.symbol("OANDA:DE30EUR", "14", group = grpM)
+s14 = input.symbol("OANDA:UK100GBP", "15", group = grpM)
+s15 = input.symbol("OANDA:EU50EUR", "16", group = grpM)
+s16 = input.symbol("OANDA:JP225USD", "17", group = grpM)
+s17 = input.symbol("OANDA:AU200AUD", "18", group = grpM)
+s18 = input.symbol("OANDA:HK33HKD", "19", group = grpM)
+s19 = input.symbol("OANDA:EURUSD", "20", group = grpM)
+s20 = input.symbol("OANDA:GBPUSD", "21", group = grpM)
+s21 = input.symbol("OANDA:USDJPY", "22", group = grpM)
+s22 = input.symbol("OANDA:AUDUSD", "23", group = grpM)
+s23 = input.symbol("OANDA:USDCAD", "24", group = grpM)
+s24 = input.symbol("OANDA:USDCHF", "25", group = grpM)
+s25 = input.symbol("OANDA:NZDUSD", "26", group = grpM)
+s26 = input.symbol("OANDA:EURJPY", "27", group = grpM)
+s27 = input.symbol("OANDA:GBPJPY", "28", group = grpM)
+s28 = input.symbol("OANDA:EURGBP", "29", group = grpM)
+s29 = input.symbol("CBOT:ZN1!", "30", group = grpM)
+s30 = input.symbol("CBOT:ZB1!", "31", group = grpM)
+s31 = input.symbol("CBOT:ZC1!", "32", group = grpM)
+s32 = input.symbol("CBOT:ZS1!", "33", group = grpM)
+s33 = input.symbol("CBOT:ZW1!", "34", group = grpM)
+s34 = input.symbol("ICEUS:KC1!", "35", group = grpM)
+s35 = input.symbol("ICEUS:SB1!", "36", group = grpM)
+s36 = input.symbol("ICEUS:CC1!", "37", group = grpM)
+s37 = input.symbol("BINANCE:BTCUSDT", "38", group = grpM)
+s38 = input.symbol("BINANCE:ETHUSDT", "39", group = grpM)
+s39 = input.symbol("BINANCE:SOLUSDT", "40", group = grpM)
+
+// ── Runs inside each market on the scan timeframe. Values are taken from the
+//    last CLOSED bar ([1] with lookahead on) so nothing repaints.
+scan() =>
+    fast = ta.sma(close, fastLen)
+    slow = ta.ema(close, slowLen)
+    atr  = ta.atr(14)
+    ph   = ta.pivothigh(high, pivLen, pivLen)
+    pl   = ta.pivotlow(low, pivLen, pivLen)
+    hhX  = ta.highest(high, extLen)
+    llX  = ta.lowest(low, extLen)
+    var float lastH = na
+    var float lastL = na
+    var bool  bearS = false
+    var bool  bullS = false
+    if not na(ph)
+        if not na(lastH) and ph < lastH
+            bearS := true
+            bullS := false
+        lastH := ph
+    if not na(pl)
+        if not na(lastL) and pl > lastL
+            bullS := true
+            bearS := false
+        lastL := pl
+    if bearS and not na(lastH) and high > lastH
+        bearS := false
+    if bullS and not na(lastL) and low < lastL
+        bullS := false
+    maClose = math.abs(fast - slow) < closeATR * atr
+    int bias = switch biasMode
+        "22 SMA / 50 EMA + structure" => not maClose ? (fast > slow ? 1 : -1) : bearS ? -1 : bullS ? 1 : 0
+        "Price vs 50 EMA"             => close > slow ? 1 : -1
+        => 2   // no filter
+    pH = high[1]
+    pL = low[1]
+    openIn  = open >= pL and open <= pH
+    closeIn = close >= pL and close <= pH
+    outside = high > pH and low < pL
+    bearB = openIn and high > pH and closeIn and close < open
+    bullB = openIn and low < pL and closeIn and close > open
+    bearA = bearB and (high >= hhX or outside)
+    bullA = bullB and (low <= llX or outside)
+    bearOk = bearB and sideMode != "Long only" and (bias == -1 or bias == 2 or (bearA and aIgnore))
+    bullOk = bullB and sideMode != "Short only" and (bias == 1 or bias == 2 or (bullA and aIgnore))
+    int   sig = bullOk ? 1 : bearOk ? -1 : 0
+    bool  isA = sig == 1 ? bullA : sig == -1 ? bearA : false
+    float stp = sig == 1 ? low : sig == -1 ? high : na
+    // packed into one number to stay under TradingView's 127 returned-values limit
+    int code = (sig + 1) + 3 * (isA ? 1 : 0) + 6 * (bias + 1) + 30 * (maClose ? 1 : 0)
+    [code[1], stp[1], time[1]]
+
+// ── Per-market memory
+var int   N = 40
+var array<string> names  = array.new_string(40, "")
+var array<int>    lastT  = array.new_int(40, 0)
+var array<int>    sDir   = array.new_int(40, 0)
+var array<bool>   sA     = array.new_bool(40, false)
+var array<float>  sStop  = array.new_float(40, na)
+var array<int>    sTime  = array.new_int(40, 0)
+var array<int>    since  = array.new_int(40, 9999)
+var array<int>    curB   = array.new_int(40, 0)
+var array<bool>   curMC  = array.new_bool(40, false)
+
+shortName(string s) =>
+    parts = str.split(s, ":")
+    array.size(parts) > 1 ? array.get(parts, 1) : s
+
+biasText(int b, bool mc) =>
+    b == 2 ? "—" : b == 1 ? "Long" + (mc ? " (struct)" : "") : b == -1 ? "Short" + (mc ? " (struct)" : "") : "None"
+
+proc(int i, string sym, int code, float st, int t) =>
+    array.set(names, i, shortName(sym))
+    if not na(t) and not na(code)
+        mc = code >= 30
+        r  = code % 30
+        b  = int(r / 6) - 1
+        sg = (r % 6) % 3 - 1
+        a  = (r % 6) >= 3
+        array.set(curB, i, b)
+        array.set(curMC, i, mc)
+        if t != array.get(lastT, i)
+            array.set(lastT, i, t)
+            array.set(since, i, array.get(since, i) + 1)
+            if sg != 0 and (not onlyA or a)
+                array.set(sDir, i, sg)
+                array.set(sA, i, a)
+                array.set(sStop, i, st)
+                array.set(sTime, i, t)
+                array.set(since, i, 0)
+                msg = (a ? "A-GRADE " : "") + (sg == 1 ? "LONG" : "SHORT") + " rejection | " + sym + " | " + tf + " candle of " +
+                     str.format_time(t, "yyyy-MM-dd", "UTC") + " closed" +
+                     " | stop " + str.tostring(st, "#.#####") + " | bias " + biasText(b, mc) + " | entry: next open"
+                alert(msg, alert.freq_all)
+
+[g00c, g00st, g00t] = request.security(s00, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g01c, g01st, g01t] = request.security(s01, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g02c, g02st, g02t] = request.security(s02, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g03c, g03st, g03t] = request.security(s03, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g04c, g04st, g04t] = request.security(s04, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g05c, g05st, g05t] = request.security(s05, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g06c, g06st, g06t] = request.security(s06, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g07c, g07st, g07t] = request.security(s07, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g08c, g08st, g08t] = request.security(s08, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g09c, g09st, g09t] = request.security(s09, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g10c, g10st, g10t] = request.security(s10, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g11c, g11st, g11t] = request.security(s11, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g12c, g12st, g12t] = request.security(s12, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g13c, g13st, g13t] = request.security(s13, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g14c, g14st, g14t] = request.security(s14, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g15c, g15st, g15t] = request.security(s15, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g16c, g16st, g16t] = request.security(s16, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g17c, g17st, g17t] = request.security(s17, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g18c, g18st, g18t] = request.security(s18, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g19c, g19st, g19t] = request.security(s19, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g20c, g20st, g20t] = request.security(s20, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g21c, g21st, g21t] = request.security(s21, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g22c, g22st, g22t] = request.security(s22, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g23c, g23st, g23t] = request.security(s23, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g24c, g24st, g24t] = request.security(s24, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g25c, g25st, g25t] = request.security(s25, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g26c, g26st, g26t] = request.security(s26, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g27c, g27st, g27t] = request.security(s27, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g28c, g28st, g28t] = request.security(s28, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g29c, g29st, g29t] = request.security(s29, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g30c, g30st, g30t] = request.security(s30, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g31c, g31st, g31t] = request.security(s31, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g32c, g32st, g32t] = request.security(s32, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g33c, g33st, g33t] = request.security(s33, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g34c, g34st, g34t] = request.security(s34, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g35c, g35st, g35t] = request.security(s35, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g36c, g36st, g36t] = request.security(s36, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g37c, g37st, g37t] = request.security(s37, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g38c, g38st, g38t] = request.security(s38, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+[g39c, g39st, g39t] = request.security(s39, tf, scan(), lookahead = barmerge.lookahead_on, ignore_invalid_symbol = true)
+
+proc(0, s00, g00c, g00st, g00t)
+proc(1, s01, g01c, g01st, g01t)
+proc(2, s02, g02c, g02st, g02t)
+proc(3, s03, g03c, g03st, g03t)
+proc(4, s04, g04c, g04st, g04t)
+proc(5, s05, g05c, g05st, g05t)
+proc(6, s06, g06c, g06st, g06t)
+proc(7, s07, g07c, g07st, g07t)
+proc(8, s08, g08c, g08st, g08t)
+proc(9, s09, g09c, g09st, g09t)
+proc(10, s10, g10c, g10st, g10t)
+proc(11, s11, g11c, g11st, g11t)
+proc(12, s12, g12c, g12st, g12t)
+proc(13, s13, g13c, g13st, g13t)
+proc(14, s14, g14c, g14st, g14t)
+proc(15, s15, g15c, g15st, g15t)
+proc(16, s16, g16c, g16st, g16t)
+proc(17, s17, g17c, g17st, g17t)
+proc(18, s18, g18c, g18st, g18t)
+proc(19, s19, g19c, g19st, g19t)
+proc(20, s20, g20c, g20st, g20t)
+proc(21, s21, g21c, g21st, g21t)
+proc(22, s22, g22c, g22st, g22t)
+proc(23, s23, g23c, g23st, g23t)
+proc(24, s24, g24c, g24st, g24t)
+proc(25, s25, g25c, g25st, g25t)
+proc(26, s26, g26c, g26st, g26t)
+proc(27, s27, g27c, g27st, g27t)
+proc(28, s28, g28c, g28st, g28t)
+proc(29, s29, g29c, g29st, g29t)
+proc(30, s30, g30c, g30st, g30t)
+proc(31, s31, g31c, g31st, g31t)
+proc(32, s32, g32c, g32st, g32t)
+proc(33, s33, g33c, g33st, g33t)
+proc(34, s34, g34c, g34st, g34t)
+proc(35, s35, g35c, g35st, g35t)
+proc(36, s36, g36c, g36st, g36t)
+proc(37, s37, g37c, g37st, g37t)
+proc(38, s38, g38c, g38st, g38t)
+proc(39, s39, g39c, g39st, g39t)
+
+// ── Table
+pos = switch tPos
+    "Top left"     => position.top_left
+    "Bottom right" => position.bottom_right
+    "Bottom left"  => position.bottom_left
+    => position.top_right
+var table tb = table.new(pos, 6, 42, bgcolor = color.new(color.black, 15), border_width = 1)
+
+cell(int c, int r, string txt, color col) =>
+    table.cell(tb, c, r, txt, text_color = col, text_size = size.small, text_halign = c == 0 ? text.align_left : text.align_right)
+
+if showTable and barstate.islast
+    table.clear(tb, 0, 0, 5, 41)
+    cell(0, 0, "Market", color.silver)
+    cell(1, 0, "Signal", color.silver)
+    cell(2, 0, "Candle", color.silver)
+    cell(3, 0, "Stop", color.silver)
+    cell(4, 0, "Bars ago", color.silver)
+    cell(5, 0, "Bias now", color.silver)
+    r = 1
+    for i = 0 to N - 1
+        recent = array.get(sTime, i) > 0 and array.get(since, i) <= recentN
+        if (showAll or recent) and array.get(names, i) != "" and r < 42
+            d = array.get(sDir, i)
+            b = array.get(curB, i)
+            cell(0, r, array.get(names, i), color.white)
+            cell(1, r, recent ? (array.get(sA, i) ? "A " : "") + (d == 1 ? "LONG" : "SHORT") : "—", recent ? (array.get(sA, i) ? color.yellow : d == 1 ? color.teal : color.red) : color.gray)
+            cell(2, r, recent ? str.format_time(array.get(sTime, i), "dd MMM", "UTC") : "", color.white)
+            cell(3, r, recent ? str.tostring(array.get(sStop, i), "#.#####") : "", color.white)
+            cell(4, r, recent ? str.tostring(array.get(since, i)) : "", color.white)
+            cell(5, r, biasText(b, array.get(curMC, i)), b == 1 ? color.teal : b == -1 ? color.red : color.gray)
+            r += 1
+    if r == 1
+        cell(0, 1, "No signals in the last " + str.tostring(recentN) + " bars", color.gray)
