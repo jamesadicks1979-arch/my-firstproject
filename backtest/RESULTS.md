@@ -126,3 +126,36 @@ The per-market results are in `data/markets.csv` and the yearly running totals i
 - It is about a quarter of the size seen on gold and Brent.
 - The combined drawdown reached about 100R, so risk around 0.25% a trade.
 - At that size, expect roughly 2–3% a year with long flat periods.
+
+## Last 4 years only (signals from Nov 2022 to Oct 2026)
+
+The indicators were warmed up on the full history, and only trades signalled from 2022-11-01 onward are counted. Costs are 0.04% of price per round trip. Results are shown for both 2D bar alignments (off0 / off1).
+
+| All 18 markets | Trades | R/trade | Total R | t-stat |
+|---|---|---|---|---|
+| Improved (trend 50, longs only, 4R, no BE) | 266 / 275 | +0.06 / +0.05 | +16.5 / +14.6 | 0.5 / 0.4 |
+| Improved, both sides | 483 / 491 | −0.02 / −0.13 | −10.5 / −64.0 | −0.2 / −1.5 |
+| Original | 736 / 767 | +0.06 / −0.09 | +46.0 / −69.1 | 0.8 / −1.4 |
+| Original, longs only | 359 / 364 | +0.32 / +0.05 | +113.7 / +17.1 | 2.9 / 0.5 |
+
+**Improved rules by market group (off0):**
+
+| Group | Trades | R/trade |
+|---|---|---|
+| Metals | 47 | +0.70 |
+| Indices | 69 | +0.21 |
+| Grains | 37 | +0.19 |
+| Energy | 38 | −0.33 |
+| FX | 66 | −0.31 |
+| Rates | 9 | −0.59 |
+
+**Markets that were positive on both alignments:**
+- Gold: +1.01 / +0.82R
+- S&P 500: +0.32 / +0.57R
+- Silver: +0.46 / +0.68R
+- Copper: +0.40 / +1.46R
+
+**Takeaway:**
+- Over the last 4 years the system is roughly break-even overall.
+- The positive result comes from metals, which were in a strong bull run, and from US indices.
+- With only about 10–25 trades per market in this window, the per-market numbers are mostly noise.
