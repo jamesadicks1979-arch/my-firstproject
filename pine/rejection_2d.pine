@@ -12,16 +12,19 @@ strategy("2D Rejection Candle System", "REJ 2D", overlay = true,
 //   • trades above prev high (bear) / below prev low (bull)
 //   • closes back inside the previous range
 //   • opposite body: swept high → red candle, swept low → green candle
-// Filters (v2, from the gold/Brent backtest — see backtest/RESULTS.md):
-//   • trend: longs only above the EMA, shorts only below (default EMA 50)
-//   • direction: default Long only (shorts lost money on both markets)
+// Direction (bias):
+//   • 22 SMA above the 50 EMA → longs only; below → shorts only
+//   • when the two are close together (gap < 0.5 ATR) use market structure:
+//       lower highs (H1 > H2 > H3 …) → shorts until a high breaks the last swing high
+//       higher lows                   → longs  until a low breaks the last swing low
+// A-grade setups (taken even against the bias, BE stop once 2R is tagged):
+//   • signal candle makes the highest high / lowest low of the last 100 bars, or
+//   • signal candle is an outside bar (takes out both the previous high and low)
 // Entry : next candle open
 // Stop  : signal candle wick (or previous range high/low — toggle)
-// Target: none by default — a trailing stop does the exiting (toggle a fixed 4R target)
-// Trail : once price tags 2R, stop trails 1R behind the best price since entry
-// Scratch to breakeven: OFF by default (it cost R)
+// Exit  : 2 closes on the other side of the 22 SMA (exit at the next open)
+// Labels: every trade is numbered — entry, stop, breakeven and result carry the same #
 // Costs : commission + slippage set in strategy() — adjust to your broker
-// Built for the 2D chart — table warns if you're on another timeframe
 // ─────────────────────────────────────────────────────────────
 
 // ── Inputs
@@ -29,20 +32,31 @@ grpS = "Signal"
 reqOpenInside = input.bool(true, "Open must be inside previous range", group = grpS)
 reqOppBody    = input.bool(true, "Require opposite candle body", group = grpS)
 
-grpF = "Filters"
-sideMode = input.string("Long only", "Direction", options = ["Both", "Long only", "Short only"], group = grpF)
-trendLen = input.int(50, "Trend EMA length (0 = off)", minval = 0, group = grpF)
-showEma  = input.bool(true, "Plot trend EMA", group = grpF)
+grpB = "Direction"
+sideMode = input.string("Both", "Direction", options = ["Both", "Long only", "Short only"], group = grpB)
+fastLen  = input.int(22, "Fast SMA length", minval = 1, group = grpB)
+slowLen  = input.int(50, "Slow EMA length", minval = 1, group = grpB)
+closeATR = input.float(0.5, "MAs count as 'close' within (x ATR)", minval = 0, step = 0.1, group = grpB)
+pivLen   = input.int(3, "Swing high/low strength (bars each side)", minval = 1, group = grpB)
+showStruct = input.bool(true, "Mark lower highs / higher lows", group = grpB)
 
-grpT = "Trade"
+grpA = "A-grade setups"
+useA      = input.bool(true, "Flag A-grade setups", group = grpA)
+extLen    = input.int(100, "Extreme lookback (bars)", minval = 5, group = grpA)
+useOutside = input.bool(true, "Outside bar counts as A-grade", group = grpA)
+aIgnoreBias = input.bool(true, "A-grade can trade against the bias", group = grpA)
+aBeR      = input.float(2.0, "A-grade: stop to breakeven at (R)", minval = 0.5, step = 0.5, group = grpA)
+
+grpT = "Exits"
 stopMode   = input.string("Signal candle wick", "Stop placement", options = ["Signal candle wick", "Previous range high/low"], group = grpT)
-useTarget  = input.bool(false, "Use fixed target", group = grpT)
-targetR    = input.float(4.0, "Target (R)", minval = 0.5, step = 0.5, group = grpT)
-useTrail   = input.bool(true, "Trailing stop", group = grpT)
+useSmaExit = input.bool(true, "Exit on closes beyond the fast SMA", group = grpT)
+exitCloses = input.int(2, "Closes beyond the fast SMA to exit", minval = 1, group = grpT)
+beAll      = input.bool(false, "Breakeven at 2R on every trade (not just A-grade)", group = grpT)
+useTrail   = input.bool(false, "Trailing stop", group = grpT)
 trailStartR = input.float(2.0, "Trail starts at (R)", minval = 0.5, step = 0.5, group = grpT)
 trailDistR = input.float(1.0, "Trail distance (R)", minval = 0.25, step = 0.25, group = grpT)
-useScratch = input.bool(false, "Scratch stop to breakeven", group = grpT)
-scratchR   = input.float(2.0, "Scratch trigger (R)", minval = 0.5, step = 0.5, group = grpT)
+useTarget  = input.bool(false, "Use fixed target", group = grpT)
+targetR    = input.float(4.0, "Target (R)", minval = 0.5, step = 0.5, group = grpT)
 riskPct    = input.float(1.0, "Risk per trade (% equity)", minval = 0.1, step = 0.1, group = grpT)
 
 grpV = "Visuals"
@@ -50,50 +64,107 @@ showLevels = input.bool(true, "Draw trade levels", group = grpV)
 showTable  = input.bool(true, "Show stats table", group = grpV)
 colLong    = input.color(color.teal, "Bull colour", group = grpV)
 colShort   = input.color(color.red, "Bear colour", group = grpV)
-colTarget  = input.color(color.lime, "Target colour", group = grpV)
-colScratch = input.color(color.orange, "Scratch / trail colour", group = grpV)
+colTarget  = input.color(color.lime, "Win colour", group = grpV)
+colScratch = input.color(color.orange, "Breakeven / trail colour", group = grpV)
+colA       = input.color(color.yellow, "A-grade colour", group = grpV)
 
-// ── Trend filter
-useTrend = trendLen > 0
-ema      = ta.ema(close, math.max(trendLen, 1))
-trendUp  = not useTrend or close > ema
-trendDn  = not useTrend or close < ema
-plot(useTrend and showEma ? ema : na, "Trend EMA", color = color.new(color.gray, 30), linewidth = 2)
+// ── Moving averages
+fast = ta.sma(close, fastLen)
+slow = ta.ema(close, slowLen)
+atr  = ta.atr(14)
+plot(fast, "Fast SMA", color = color.new(color.navy, 0), linewidth = 2)
+plot(slow, "Slow EMA", color = color.new(color.gray, 30), linewidth = 2)
+
+// ── Market structure: lower highs / higher lows
+ph = ta.pivothigh(high, pivLen, pivLen)
+pl = ta.pivotlow(low, pivLen, pivLen)
+var float lastSwingH = na
+var float lastSwingL = na
+var bool  bearStruct = false
+var bool  bullStruct = false
+var int   lhCount = 0
+var int   hlCount = 0
+if not na(ph)
+    if not na(lastSwingH) and ph < lastSwingH
+        lhCount += 1
+        bearStruct := true
+        bullStruct := false
+        hlCount := 0
+        if showStruct
+            label.new(bar_index - pivLen, ph, "LH" + str.tostring(lhCount), style = label.style_label_down,
+                 color = color.new(colShort, 70), textcolor = color.white, size = size.tiny)
+    else
+        lhCount := 0
+    lastSwingH := ph
+if not na(pl)
+    if not na(lastSwingL) and pl > lastSwingL
+        hlCount += 1
+        bullStruct := true
+        bearStruct := false
+        lhCount := 0
+        if showStruct
+            label.new(bar_index - pivLen, pl, "HL" + str.tostring(hlCount), style = label.style_label_up,
+                 color = color.new(colLong, 70), textcolor = color.white, size = size.tiny)
+    else
+        hlCount := 0
+    lastSwingL := pl
+// a high through the last swing high ends the lower-high sequence (and vice versa)
+if bearStruct and not na(lastSwingH) and high > lastSwingH
+    bearStruct := false
+    lhCount := 0
+if bullStruct and not na(lastSwingL) and low < lastSwingL
+    bullStruct := false
+    hlCount := 0
+
+// ── Bias
+maClose = math.abs(fast - slow) < closeATR * atr
+bias = not maClose ? (fast > slow ? 1 : -1) : bearStruct ? -1 : bullStruct ? 1 : 0
+bgcolor(maClose ? color.new(color.gray, 92) : na, title = "MAs close: structure decides")
 
 // ── Signal logic
 prevH = high[1]
 prevL = low[1]
 openIn  = open >= prevL and open <= prevH
 closeIn = close >= prevL and close <= prevH
+isOutside = high > prevH and low < prevL
 
 bearRaw = (not reqOpenInside or openIn) and high > prevH and closeIn and (not reqOppBody or close < open)
 bullRaw = (not reqOpenInside or openIn) and low < prevL and closeIn and (not reqOppBody or close > open)
-bearSig = bearRaw and not bullRaw and trendDn and sideMode != "Long only"
-bullSig = bullRaw and not bearRaw and trendUp and sideMode != "Short only"
+// an outside bar sweeps both sides: its body colour decides the direction
+bearBase = bearRaw and (not bullRaw or close < open)
+bullBase = bullRaw and (not bearRaw or close > open)
+
+hhExt = ta.highest(high, extLen)   // computed every bar (not inside a condition)
+llExt = ta.lowest(low, extLen)
+bearA = useA and bearBase and (high >= hhExt or (useOutside and isOutside))
+bullA = useA and bullBase and (low <= llExt or (useOutside and isOutside))
+
+bearSig = bearBase and sideMode != "Long only" and (bias == -1 or (bearA and aIgnoreBias))
+bullSig = bullBase and sideMode != "Short only" and (bias == 1 or (bullA and aIgnoreBias))
 
 bearStop = stopMode == "Signal candle wick" ? high : prevH
 bullStop = stopMode == "Signal candle wick" ? low  : prevL
 
-plotshape(bearSig, "Bear rejection", shape.triangledown, location.abovebar, colShort, size = size.small, text = "REJ")
-plotshape(bullSig, "Bull rejection", shape.triangleup,   location.belowbar, colLong,  size = size.small, text = "REJ")
-
-// Swept level marker
-if bearSig
-    line.new(bar_index - 1, prevH, bar_index, prevH, color = colShort, style = line.style_dotted)
-if bullSig
-    line.new(bar_index - 1, prevL, bar_index, prevL, color = colLong, style = line.style_dotted)
+plotshape(bearSig and not bearA, "Bear rejection", shape.triangledown, location.abovebar, colShort, size = size.small, text = "REJ")
+plotshape(bullSig and not bullA, "Bull rejection", shape.triangleup,   location.belowbar, colLong,  size = size.small, text = "REJ")
+plotshape(bearSig and bearA, "Bear A-grade", shape.triangledown, location.abovebar, colA, size = size.normal, text = "A")
+plotshape(bullSig and bullA, "Bull A-grade", shape.triangleup,   location.belowbar, colA, size = size.normal, text = "A")
 
 // ── State
+var int   tradeNo = 0
 var int   pDir = 0          // order sent, waiting for fill
 var float pStop = na
+var bool  pA = false
 var int   tDir = 0          // live trade direction
 var float tEntry = na
 var float tStop = na
 var float tRisk = na
+var bool  tA = false
 var bool  tScratched = false
-var float tBest = na        // best price since entry (high for longs, low for shorts)
-var float tCurStop = na     // live stop (original → breakeven → trailing)
 var bool  tTrailing = false
+var float tBest = na
+var float tCurStop = na
+var int   tBeyond = 0       // consecutive closes on the wrong side of the fast SMA
 var line  lnE = na
 var line  lnS = na
 var line  ln2 = na
@@ -111,9 +182,9 @@ if strategy.closedtrades > nz(strategy.closedtrades[1])
     rr   = risk > 0 ? (xp - ep) * dir / risk : 0.0
     array.push(results, rr)
     resCol = rr > 0.1 ? colTarget : rr < -0.1 ? colShort : color.gray
-    label.new(bar_index, dir == 1 ? high : low, str.tostring(rr, "#.##") + "R",
+    label.new(bar_index, dir == 1 ? high : low, "#" + str.tostring(tradeNo) + "  " + (rr >= 0 ? "+" : "") + str.tostring(rr, "#.##") + "R",
          style = dir == 1 ? label.style_label_down : label.style_label_up,
-         color = color.new(resCol, 20), textcolor = color.white, size = size.small)
+         color = color.new(resCol, 15), textcolor = color.white, size = size.small)
     if showLevels and tDir != 0
         line.set_x2(lnE, bar_index)
         line.set_x2(ln2, bar_index)
@@ -124,10 +195,12 @@ if strategy.closedtrades > nz(strategy.closedtrades[1])
     pDir := 0
     tScratched := false
     tTrailing := false
+    tBeyond := 0
 
-// ── 2) Order filled at this bar's open → lock in real entry & draw levels
+// ── 2) Order filled at this bar's open → lock in real entry & draw numbered levels
 if pDir != 0 and strategy.position_size != 0 and tDir == 0
     tDir   := pDir
+    tA     := pA
     tEntry := strategy.position_avg_price
     tStop  := pStop
     tRisk  := math.abs(tEntry - tStop)
@@ -135,36 +208,56 @@ if pDir != 0 and strategy.position_size != 0 and tDir == 0
     tTrailing := false
     tBest := tEntry
     tCurStop := tStop
+    tBeyond := 0
+    ln2 := na
+    ln4 := na
     pDir := 0
     if showLevels
+        num = "#" + str.tostring(tradeNo)
         lnE := line.new(bar_index, tEntry, bar_index + 1, tEntry, color = color.gray, width = 2)
         lnS := line.new(bar_index, tStop,  bar_index + 1, tStop,  color = colShort, width = 2)
+        label.new(bar_index, tEntry, num + (tA ? " A " : " ") + (tDir == 1 ? "Long" : "Short"), style = label.style_label_right,
+             color = color.new(tA ? colA : (tDir == 1 ? colLong : colShort), 20), textcolor = tA ? color.black : color.white, size = size.small)
+        label.new(bar_index, tStop, num + " Stop", style = label.style_label_right,
+             color = color.new(colShort, 30), textcolor = color.white, size = size.tiny)
         if useTarget
-            ln4 := line.new(bar_index, tEntry + tDir * targetR  * tRisk, bar_index + 1, tEntry + tDir * targetR  * tRisk, color = colTarget, width = 2)
-        if useScratch or useTrail
-            lvl = tEntry + tDir * (useTrail ? trailStartR : scratchR) * tRisk
+            ln4 := line.new(bar_index, tEntry + tDir * targetR * tRisk, bar_index + 1, tEntry + tDir * targetR * tRisk, color = colTarget, width = 2)
+        if tA or beAll or useTrail
+            lvl = tEntry + tDir * (useTrail ? trailStartR : aBeR) * tRisk
             ln2 := line.new(bar_index, lvl, bar_index + 1, lvl, color = colScratch, style = line.style_dashed)
 
-// ── 3) Manage open trade at bar close: breakeven / trailing stop, optional target
-//       (new stop level applies from the next bar)
+// ── 3) Manage open trade at bar close (changes apply from the next bar)
 if tDir != 0 and strategy.position_size != 0
+    id  = tDir == 1 ? "Long" : "Short"
+    num = "#" + str.tostring(tradeNo)
     tgt = tEntry + tDir * targetR * tRisk
-    scr = tEntry + tDir * scratchR * tRisk
-    if useScratch and not tScratched and (tDir == 1 ? high >= scr : low <= scr)
+    beLvl = tEntry + tDir * aBeR * tRisk
+    // breakeven once 2R is tagged (A-grade, or every trade if switched on)
+    if (tA or beAll) and not tScratched and (tDir == 1 ? high >= beLvl : low <= beLvl)
         tScratched := true
         tCurStop := tDir == 1 ? math.max(tCurStop, tEntry) : math.min(tCurStop, tEntry)
         if showLevels
             line.set_style(lnS, line.style_dotted)
-            label.new(bar_index, scr, "BE", style = label.style_label_left, color = color.new(colScratch, 30), textcolor = color.white, size = size.tiny)
+            label.new(bar_index, tCurStop, num + " Stop → BE", style = label.style_label_left,
+                 color = color.new(colScratch, 20), textcolor = color.white, size = size.tiny)
+    // optional trailing stop
     tBest := tDir == 1 ? math.max(tBest, high) : math.min(tBest, low)
     if useTrail and (tBest - tEntry) * tDir >= trailStartR * tRisk
         if not tTrailing and showLevels
             line.set_style(lnS, line.style_dotted)
-            label.new(bar_index, tEntry + tDir * trailStartR * tRisk, "TRAIL", style = label.style_label_left, color = color.new(colScratch, 30), textcolor = color.white, size = size.tiny)
+            label.new(bar_index, tEntry + tDir * trailStartR * tRisk, num + " Trail", style = label.style_label_left,
+                 color = color.new(colScratch, 20), textcolor = color.white, size = size.tiny)
         tTrailing := true
         ts = tBest - tDir * trailDistR * tRisk
         tCurStop := tDir == 1 ? math.max(tCurStop, ts) : math.min(tCurStop, ts)
-    strategy.exit("X", tDir == 1 ? "Long" : "Short", stop = tCurStop, limit = useTarget ? tgt : na)
+    strategy.exit("X", id, stop = tCurStop, limit = useTarget ? tgt : na)
+    // profit exit: N closes on the other side of the fast SMA → out at next open
+    tBeyond := (tDir == 1 ? close < fast : close > fast) ? tBeyond + 1 : 0
+    if useSmaExit and tBeyond >= exitCloses
+        strategy.close(id, comment = num + " SMA exit")
+        if showLevels
+            label.new(bar_index, close, num + " Exit next open", style = tDir == 1 ? label.style_label_up : label.style_label_down,
+                 color = color.new(color.blue, 30), textcolor = color.white, size = size.tiny)
     if showLevels
         line.set_x2(lnE, bar_index + 1)
         line.set_x2(ln2, bar_index + 1)
@@ -173,7 +266,7 @@ if tDir != 0 and strategy.position_size != 0
             line.set_x2(lnS, bar_index + 1)
 
 // Live stop once it has moved (breakeven or trailing) — stepped line
-plot(tDir != 0 and (tScratched or tTrailing) ? tCurStop : na, "Trailing stop", color = colScratch, linewidth = 2, style = plot.style_linebr)
+plot(tDir != 0 and (tScratched or tTrailing) ? tCurStop : na, "Moved stop", color = colScratch, linewidth = 2, style = plot.style_linebr)
 
 // ── 4) New signal → buy/sell next open
 if strategy.position_size == 0 and pDir == 0 and tDir == 0 and (bullSig or bearSig)
@@ -181,24 +274,26 @@ if strategy.position_size == 0 and pDir == 0 and tDir == 0 and (bullSig or bearS
     stp = d == 1 ? bullStop : bearStop
     riskOk = d == 1 ? close > stp : close < stp
     if riskOk
+        tradeNo += 1
         estRisk = math.abs(close - stp)
         qty = strategy.equity * riskPct / 100 / (estRisk * syminfo.pointvalue)
         id  = d == 1 ? "Long" : "Short"
         pDir  := d
         pStop := stp
-        strategy.entry(id, d == 1 ? strategy.long : strategy.short, qty)
-        // Protective orders live from the fill bar. Target is set in ticks from
-        // the ACTUAL fill price (not the signal close); refined to exact R next bar.
+        pA    := d == 1 ? bullA : bearA
+        strategy.entry(id, d == 1 ? strategy.long : strategy.short, qty, comment = "#" + str.tostring(tradeNo))
         strategy.exit("X", id, stop = stp, profit = useTarget ? math.round(targetR * estRisk / syminfo.mintick) : na)
+        label.new(bar_index, d == 1 ? low : high, "#" + str.tostring(tradeNo), style = d == 1 ? label.style_label_up : label.style_label_down,
+             color = color.new(color.white, 100), textcolor = pA ? colA : (d == 1 ? colLong : colShort), size = size.small, yloc = d == 1 ? yloc.belowbar : yloc.abovebar)
 
-// ── Alerts (filtered signals only)
+// ── Alerts (signals that pass the filters)
 if bullSig
-    alert("BULL rejection " + syminfo.ticker + " | buy next open | stop " + str.tostring(bullStop, format.mintick), alert.freq_once_per_bar_close)
+    alert((bullA ? "A-GRADE " : "") + "BULL rejection " + syminfo.ticker + " | buy next open | stop " + str.tostring(bullStop, format.mintick), alert.freq_once_per_bar_close)
 if bearSig
-    alert("BEAR rejection " + syminfo.ticker + " | sell next open | stop " + str.tostring(bearStop, format.mintick), alert.freq_once_per_bar_close)
+    alert((bearA ? "A-GRADE " : "") + "BEAR rejection " + syminfo.ticker + " | sell next open | stop " + str.tostring(bearStop, format.mintick), alert.freq_once_per_bar_close)
 
 // ── Stats table
-var table tb = table.new(position.top_right, 2, 10, bgcolor = color.new(color.black, 15), border_width = 1)
+var table tb = table.new(position.top_right, 2, 11, bgcolor = color.new(color.black, 15), border_width = 1)
 f_row(int r, string k, string v, color c) =>
     table.cell(tb, 0, r, k, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
     table.cell(tb, 1, r, v, text_color = c, text_size = size.small, text_halign = text.align_right)
@@ -224,9 +319,11 @@ if showTable and barstate.islast
     f_row(3, "Win rate", n > 0 ? str.tostring(100.0 * w / n, "#.#") + "%" : "-", color.white)
     f_row(4, "Total R", str.tostring(tot, "#.##"), tot >= 0 ? color.lime : color.red)
     f_row(5, "Expectancy (R/trade)", n > 0 ? str.tostring(tot / n, "#.##") : "-", tot >= 0 ? color.lime : color.red)
-    curTxt = tDir == 0 ? (pDir != 0 ? "Pending next open" : "Flat") : (tDir == 1 ? "Long" : "Short") + (tTrailing ? " (trailing)" : tScratched ? " (BE)" : "")
+    curTxt = tDir == 0 ? (pDir != 0 ? "#" + str.tostring(tradeNo) + " pending next open" : "Flat") : "#" + str.tostring(tradeNo) + " " + (tDir == 1 ? "Long" : "Short") + (tA ? " A" : "") + (tTrailing ? " (trailing)" : tScratched ? " (BE)" : "")
     f_row(6, "Current", curTxt, tDir == 1 ? colLong : tDir == -1 ? colShort : color.gray)
     f_row(7, "Risk (ticks)", tDir != 0 ? str.tostring(math.round(tRisk / syminfo.mintick)) : "-", color.white)
-    f_row(8, "Target / Trail", (useTarget ? str.tostring(targetR) + "R" : "none") + " / " + (useTrail ? str.tostring(trailDistR) + "R after " + str.tostring(trailStartR) + "R" : "off"), color.white)
-    trendTxt = useTrend ? "EMA" + str.tostring(trendLen) + (close > ema ? " ↑" : " ↓") : "off"
-    f_row(9, "Filter", sideMode + " · trend " + trendTxt, useTrend ? (close > ema ? colLong : colShort) : color.gray)
+    biasTxt = bias == 1 ? "Long" : bias == -1 ? "Short" : "None"
+    biasSrc = maClose ? (bias == 0 ? " (MAs close, no structure)" : " (structure)") : " (" + str.tostring(fastLen) + " SMA vs " + str.tostring(slowLen) + " EMA)"
+    f_row(8, "Bias", biasTxt + biasSrc, bias == 1 ? colLong : bias == -1 ? colShort : color.gray)
+    f_row(9, "Exit", (useSmaExit ? str.tostring(exitCloses) + " closes beyond " + str.tostring(fastLen) + " SMA" : "SMA exit off") + (useTrail ? " · trail" : "") + (useTarget ? " · " + str.tostring(targetR) + "R target" : ""), color.white)
+    f_row(10, "Lower highs / higher lows", str.tostring(lhCount) + " / " + str.tostring(hlCount), color.white)

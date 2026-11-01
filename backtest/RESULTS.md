@@ -189,3 +189,37 @@ All tests use the improved rules (trend EMA50, longs only). Costs are 0.04% of p
 - **The last 4 years improve a lot.** Profit roughly triples and drawdown shrinks, and this holds on both alignments.
 - **Over the full history, profit per trade is unchanged.** Total R rises and drawdown falls.
 - **The Pine script default is now the 1R trail with no fixed target.** A wider trail (1.5R) did better over the full history, but I kept 1R as you asked.
+
+## v3 rules: 22 SMA bias, structure, A-grade setups, SMA exit
+
+The code is in `rejection_v3.py`. It covers 18 markets, with costs of 0.04% of price per round trip. Each cell shows both 2D alignments as off0 / off1.
+
+### Full history
+
+| Variant | R/trade | Total R | Max DD | t-stat |
+|---|---|---|---|---|
+| Previous (EMA50 long-only, 1R trail) | +0.15 / +0.11 | +304 / +227 | 74 / 113 | 3.8 / 2.9 |
+| v3 as specified | +0.18 / +0.11 | +634 / +368 | 147 / 168 | 1.8 / 1.4 |
+| v3, longs only | +0.34 / +0.27 | +736 / +568 | 128 / 104 | 2.3 / 2.3 |
+| v3, A-grade trades only | +0.02 / +0.13 | +34 / +189 | 105 / 60 | 0.3 / 1.5 |
+
+### Problems with v3
+
+- **The profit rests on a few huge trades.** The SMA exit lets winners run for months, and trades with very tight stops then produce enormous R. The biggest were corn 2007 at +256R, silver 2025 at +140R and copper 2003 at +66R.
+- **Without its top 1% of trades, v3 loses money.**
+  - v3 as specified: −514R.
+  - v3 longs only: −91R.
+  - The previous version stays positive: +156R.
+- **v3 shorts lose:** −0.05R a trade.
+- **A-grade setups are no better than ordinary ones.**
+- **Filtering out tight stops doesn't rescue it.** With a minimum stop of 0.5 ATR, v3 falls to +0.06R a trade.
+- **The structure rule does help.** Using it when the MAs are close beats skipping those trades: +634R vs +429R.
+
+### Last 4 years
+
+| Variant | Total R |
+|---|---|
+| v3 longs only | +201 / +252 |
+| Previous | +46 / +52 |
+
+The 4-year result has the same weakness: one silver trade is worth +140R, and without the top 1% of trades v3 longs only is about flat (+9 / −11R).
