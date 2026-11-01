@@ -74,6 +74,7 @@ DEFAULT = dict(
     minRiskATR=None, maxRiskATR=None,
     maxBars=None,          # time stop (bars after fill)
     cost=0.0,              # round-trip cost in price units
+    costPct=0.0,           # round-trip cost as a fraction of entry price
 )
 
 
@@ -132,7 +133,7 @@ def run(b, **kw):
         if (entry - stp) * d <= 0:
             # Opened through the stop: Pine fills the entry and the stop at the
             # same open price → 0 R (but you paid costs).
-            trades.append(dict(date=b.index[i], dir=d, R=-p["cost"] / est,
+            trades.append(dict(date=b.index[i], dir=d, R=-(p["cost"] + p["costPct"] * entry) / est,
                                exit="gap-stop", bars=1, risk=est))
             i = j
             continue
@@ -173,7 +174,7 @@ def run(b, **kw):
             k += 1
         if exit_px is None:
             break   # still open at end of data
-        R = ((exit_px - entry) * d - p["cost"]) / risk
+        R = ((exit_px - entry) * d - p["cost"] - p["costPct"] * entry) / risk
         if why == "stop" and scratched:
             why = "scratch"
         trades.append(dict(date=b.index[i], dir=d, R=R, exit=why, bars=k - j + 1, risk=risk))

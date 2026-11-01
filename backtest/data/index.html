@@ -12,6 +12,7 @@
   .rj .card { background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: var(--cds-radius); padding: var(--cds-pad-lg); display: flex; flex-direction: column; gap: var(--cds-gap-sm); min-width: 0; }
   .rj .chart { position: relative; min-height: 240px; }
   .rj .bars { position: relative; min-height: 200px; }
+  .rj .bars svg { display: block; }
   .rj .legend { display: flex; gap: var(--cds-gap-md); flex-wrap: wrap; font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
   .rj .sw { display: inline-block; width: 0.75rem; height: 2px; vertical-align: middle; margin-right: 0.375rem; }
   .rj .sw.orig { background: var(--cds-chart-muted); }
@@ -76,10 +77,29 @@
     </section>
   </div>
 
+  <section id="markets" style="display:flex;flex-direction:column;gap:var(--cds-gap-md)">
+    <h2>The same rules on 18 markets</h2>
+    <p class="lede">I ran the improved rules unchanged on 16 more futures markets. All 18 together ended at <b class="num" data-draw="pfTotal" data-source="portfolio" data-field="cumR" data-where="year=2026&amp;system=Improved">—</b>R since 2001, against <b class="num" data-draw="pfTotal" data-source="portfolio" data-field="cumR" data-where="year=2026&amp;system=Original">—</b>R for the original rules. The edge is smaller than on gold and Brent and comes in bursts, with a long flat-to-losing stretch from 2011 to 2018.</p>
+    <p class="note">Every trade risks 1R. Costs are 0.04% of price per round trip on all markets.</p>
+    <div class="grid">
+      <div class="card">
+        <h2>All 18 markets combined</h2>
+        <p class="note">Running total of R at each year end</p>
+        <div class="chart" data-draw="pf" data-source="portfolio"></div>
+      </div>
+      <div class="card">
+        <h2>Improved rules, market by market</h2>
+        <p class="note">Bar: R per trade after costs. Dot: same rules with 2D bars starting a day later.</p>
+        <div class="bars" data-draw="mkt" data-source="markets"></div>
+      </div>
+    </div>
+  </section>
+
   <section class="card" id="caveats">
     <h2>Before you trade it</h2>
     <ul class="note">
-      <li>Only about 10 trades a year per market. Even the best versions are only moderately convincing statistically (t-stats around 1 to 2.5).</li>
+      <li>On gold and Brent alone the improved version takes only about 4 trades a year. Across all 18 markets it takes about 65 a year, which gives a more reliable read: +0.15R a trade, or +0.12R on the 16 markets the rules were not tuned on.</li>
+      <li>Combined drawdown reached about 100R. At 1% risk per trade that is far too deep, so size each trade at around 0.25%.</li>
       <li>Gold has been in a long bull market. Buying any random 2D open and holding for 5 bars made about +0.39R a trade, close to what the rejection longs made.</li>
       <li>The results change a lot depending on which day 2D bars start on. TradingView's GC1! and UKOIL data will also differ from Yahoo's.</li>
       <li>Forward-test the improved version, or add more markets, before trading it with real money.</li>
@@ -123,20 +143,14 @@
     }
   });
 
-  dash.draw('eq', (el) => {
-    const e = dash.data('equity');
-    el.replaceChildren();
-    if (e.status === 'error') { failLine(el); return; }
-    if (e.status !== 'ok') { el.textContent = '—'; return; }
-    const market = el.dataset.market;
-    const rows = e.data.filter((r) => r.market === market).map((r) => ({ system: r.system, year: num(r.year), cum: num(r.cumR), yr: num(r.yearR), n: num(r.trades) }));
+  const lineChart = (el, rows, market) => {
     const series = ['Original', 'Improved'].map((s) => ({ s, pts: rows.filter((r) => r.system === s).sort((a, b) => a.year - b.year) }));
     const W = Math.max(280, el.clientWidth), H = 240;
     const accent = dash.colors[0];
     const color = { Original: 'var(--cds-chart-muted)', Improved: accent };
     const years = d3.extent(rows, (r) => r.year);
     const yExt = d3.extent([0, ...rows.map((r) => r.cum)]);
-    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', `${market} running total of R by year`);
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', `${market}: running total of R by year`);
     const y = d3.scaleLinear(yExt, [H - 24, 8]).nice();
     // measure widest tick label for left margin
     const probe = svg.append('text').attr('font-size', 11).text(d3.format('+d')(y.domain()[0]));
@@ -193,6 +207,73 @@
         tip.style.top = '4px';
       })
       .on('pointerleave', () => { rule.style('opacity', 0); dots.style('opacity', 0); tip.hidden = true; });
+  };
+
+  const toPts = (r) => ({ system: r.system, year: num(r.year), cum: num(r.cumR), yr: num(r.yearR), n: num(r.trades) });
+
+  dash.draw('eq', (el) => {
+    const e = dash.data('equity');
+    el.replaceChildren();
+    if (e.status === 'error') { failLine(el); return; }
+    if (e.status !== 'ok') { el.textContent = '—'; return; }
+    const market = el.dataset.market;
+    lineChart(el, e.data.filter((r) => r.market === market).map(toPts), market);
+  });
+
+  dash.draw('pf', (el) => {
+    const e = dash.data('portfolio');
+    el.replaceChildren();
+    if (e.status === 'error') { failLine(el); return; }
+    if (e.status !== 'ok') { el.textContent = '—'; return; }
+    lineChart(el, e.data.map(toPts), 'All 18 markets');
+  });
+
+  dash.draw('pfTotal', (el) => {
+    const p = dash.data('portfolio');
+    if (p.status !== 'ok') { el.textContent = '—'; return; }
+    const w = new URLSearchParams(el.dataset.where);
+    const r = p.data.find((x) => String(x.year) === w.get('year') && x.system === w.get('system'));
+    el.textContent = r ? d3.format('+.0f')(num(r.cumR)) : '—';
+  });
+
+  dash.draw('mkt', (el) => {
+    const m = dash.data('markets');
+    el.replaceChildren();
+    if (m.status === 'error') { failLine(el); return; }
+    if (m.status !== 'ok') { el.textContent = '—'; return; }
+    const rows = m.data.map((r) => ({ label: r.market, v: num(r.imp_exp_R), alt: num(r.imp_exp_R_alt_anchor), n: num(r.imp_trades) })).sort((a, b) => b.v - a.v);
+    const W = Math.max(260, el.clientWidth), rowH = 22, H = rows.length * rowH + 28;
+    const svg = d3.select(el).append('svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`).attr('role', 'img').attr('aria-label', 'R per trade by market, improved rules');
+    const probe = svg.append('text').attr('font-size', 12).text(rows.reduce((a, r) => r.label.length > a.length ? r.label : a, ''));
+    const left = probe.node().getComputedTextLength() + 10; probe.remove();
+    const lo = Math.min(-0.3, d3.min(rows, (r) => Math.min(r.v, r.alt))), hi = Math.max(0.3, d3.max(rows, (r) => Math.max(r.v, r.alt)));
+    const x = d3.scaleLinear([lo, hi], [left + 4, W - 40]).nice();
+    const y = d3.scaleBand(rows.map((r) => r.label), [4, H - 22]).padding(0.25);
+    const ticks = x.ticks(Math.max(2, Math.floor((W - left) / 70)));
+    svg.selectAll('line.g').data(ticks).join('line').attr('x1', (d) => x(d)).attr('x2', (d) => x(d)).attr('y1', 4).attr('y2', H - 22)
+      .attr('stroke', (d) => d === 0 ? 'var(--cds-chart-reference)' : 'var(--cds-chart-grid)').attr('stroke-width', 1);
+    svg.selectAll('text.t').data(ticks).join('text').attr('x', (d) => x(d)).attr('y', H - 6).attr('text-anchor', 'middle')
+      .attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text((d) => d === 0 ? '0' : d3.format('+.1f')(d));
+    svg.selectAll('text.lb').data(rows).join('text').attr('x', 0).attr('y', (d) => y(d.label) + y.bandwidth() / 2).attr('dy', '0.32em')
+      .attr('font-size', 12).attr('fill', 'var(--color-fg)').text((d) => d.label);
+    svg.selectAll('rect').data(rows).join('rect').attr('x', (d) => Math.min(x(0), x(d.v))).attr('width', (d) => Math.max(1, Math.abs(x(d.v) - x(0))))
+      .attr('y', (d) => y(d.label)).attr('height', y.bandwidth()).attr('rx', 2)
+      .attr('fill', (d) => d.v >= 0 ? 'var(--color-ok)' : 'var(--cds-chart-status-critical)');
+    svg.selectAll('circle').data(rows).join('circle').attr('cx', (d) => x(d.alt)).attr('cy', (d) => y(d.label) + y.bandwidth() / 2).attr('r', 3)
+      .attr('fill', 'var(--color-bg)').attr('stroke', 'var(--color-fg)').attr('stroke-width', 1.5);
+    const tip = document.createElement('div'); tip.className = 'tip'; tip.hidden = true; el.appendChild(tip);
+    svg.selectAll('rect.hit').data(rows).join('rect').attr('class', 'hit').attr('x', 0).attr('width', W).attr('y', (d) => y(d.label) - 2).attr('height', y.bandwidth() + 4).attr('fill', 'transparent')
+      .on('pointerenter', (ev, d) => {
+        tip.replaceChildren();
+        const hd = document.createElement('div'); hd.className = 'd'; hd.textContent = d.label; tip.appendChild(hd);
+        const a = document.createElement('div'); a.textContent = `${fmtR(d.v)}R a trade over ${d.n} trades`; tip.appendChild(a);
+        const b = document.createElement('div'); b.textContent = `${fmtR(d.alt)}R with the other bar start`; tip.appendChild(b);
+        tip.hidden = false;
+        const sc = el.clientWidth / W;
+        tip.style.left = Math.min(left * sc, el.clientWidth - tip.offsetWidth) + 'px';
+        tip.style.top = ((y(d.label) + y.bandwidth() + 6) * sc) + 'px';
+      })
+      .on('pointerleave', () => { tip.hidden = true; });
   });
 
   dash.draw('sides', (el) => {

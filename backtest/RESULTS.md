@@ -91,3 +91,38 @@ A dumb benchmark buys any 2D open and holds it for 5 bars. With risk sized at 0.
 - These are Yahoo continuous futures, which carry contract-roll gaps. TradingView's `GC1!` / `UKOIL` data will differ somewhat.
 - TradingView's 2D session anchoring decides which of the two anchors you get. Results differ a lot between them, which is itself a warning sign about robustness.
 - Sample size is small, about 10 trades a year.
+
+## Out-of-sample check: improved rules on 18 markets
+
+I took the improved rules (trend EMA50, longs only, no breakeven move, 4R target) and ran them unchanged on 16 more Yahoo futures markets. Every market was charged a round-trip cost of 0.04% of price.
+
+The per-market results are in `data/markets.csv` and the yearly running totals in `data/portfolio.csv`.
+
+| | Trades | R/trade | Total R | t-stat | Max DD (R) |
+|---|---|---|---|---|---|
+| All 18, improved | 1,633 | +0.148 | +242 | 2.77 | 100 |
+| 16 new markets only | 1,469 | +0.115 | +169 | 2.07 | 85 |
+| All 18, original rules | 4,657 | +0.014 | +66 | 0.50 | 169 |
+
+**How many markets were positive:** 15 of 18, or 12 of 18 when the 2D bars start a day later.
+
+**Strongest markets:**
+- Platinum: +0.68R a trade
+- Gold: +0.51R
+- S&P 500: +0.46R
+- Corn: +0.44R
+- Brent: +0.36R
+- Soybeans: +0.33R
+
+**Losing markets:**
+- Yen: −0.21R a trade
+- Pound: −0.17R
+- 10y T-note: −0.09R
+
+**How the returns arrive:** in bursts. The strong runs were 2002–03, 2006–10, 2019–20 and 2025. The portfolio was flat-to-losing from 2011 to 2018, and 14 of the 26 years were losing years.
+
+**Takeaway:**
+- The edge survives on markets the rules weren't tuned on. That makes it more likely to be real.
+- It is about a quarter of the size seen on gold and Brent.
+- The combined drawdown reached about 100R, so risk around 0.25% a trade.
+- At that size, expect roughly 2–3% a year with long flat periods.
