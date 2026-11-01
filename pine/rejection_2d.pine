@@ -17,7 +17,9 @@ strategy("2D Rejection Candle System", "REJ 2D", overlay = true,
 //   • direction: default Long only (shorts lost money on both markets)
 // Entry : next candle open
 // Stop  : signal candle wick (or previous range high/low — toggle)
-// Target: 4R   |   Scratch to breakeven: now OFF by default (it cost R)
+// Target: none by default — a trailing stop does the exiting (toggle a fixed 4R target)
+// Trail : once price tags 2R, stop trails 1R behind the best price since entry
+// Scratch to breakeven: OFF by default (it cost R)
 // Costs : commission + slippage set in strategy() — adjust to your broker
 // Built for the 2D chart — table warns if you're on another timeframe
 // ─────────────────────────────────────────────────────────────
@@ -34,7 +36,11 @@ showEma  = input.bool(true, "Plot trend EMA", group = grpF)
 
 grpT = "Trade"
 stopMode   = input.string("Signal candle wick", "Stop placement", options = ["Signal candle wick", "Previous range high/low"], group = grpT)
+useTarget  = input.bool(false, "Use fixed target", group = grpT)
 targetR    = input.float(4.0, "Target (R)", minval = 0.5, step = 0.5, group = grpT)
+useTrail   = input.bool(true, "Trailing stop", group = grpT)
+trailStartR = input.float(2.0, "Trail starts at (R)", minval = 0.5, step = 0.5, group = grpT)
+trailDistR = input.float(1.0, "Trail distance (R)", minval = 0.25, step = 0.25, group = grpT)
 useScratch = input.bool(false, "Scratch stop to breakeven", group = grpT)
 scratchR   = input.float(2.0, "Scratch trigger (R)", minval = 0.5, step = 0.5, group = grpT)
 riskPct    = input.float(1.0, "Risk per trade (% equity)", minval = 0.1, step = 0.1, group = grpT)
@@ -45,7 +51,7 @@ showTable  = input.bool(true, "Show stats table", group = grpV)
 colLong    = input.color(color.teal, "Bull colour", group = grpV)
 colShort   = input.color(color.red, "Bear colour", group = grpV)
 colTarget  = input.color(color.lime, "Target colour", group = grpV)
-colScratch = input.color(color.orange, "Scratch colour", group = grpV)
+colScratch = input.color(color.orange, "Scratch / trail colour", group = grpV)
 
 // ── Trend filter
 useTrend = trendLen > 0
@@ -85,6 +91,9 @@ var float tEntry = na
 var float tStop = na
 var float tRisk = na
 var bool  tScratched = false
+var float tBest = na        // best price since entry (high for longs, low for shorts)
+var float tCurStop = na     // live stop (original → breakeven → trailing)
+var bool  tTrailing = false
 var line  lnE = na
 var line  lnS = na
 var line  ln2 = na
@@ -109,11 +118,12 @@ if strategy.closedtrades > nz(strategy.closedtrades[1])
         line.set_x2(lnE, bar_index)
         line.set_x2(ln2, bar_index)
         line.set_x2(ln4, bar_index)
-        if not tScratched
+        if not (tScratched or tTrailing)
             line.set_x2(lnS, bar_index)
     tDir := 0
     pDir := 0
     tScratched := false
+    tTrailing := false
 
 // ── 2) Order filled at this bar's open → lock in real entry & draw levels
 if pDir != 0 and strategy.position_size != 0 and tDir == 0
@@ -122,32 +132,48 @@ if pDir != 0 and strategy.position_size != 0 and tDir == 0
     tStop  := pStop
     tRisk  := math.abs(tEntry - tStop)
     tScratched := false
+    tTrailing := false
+    tBest := tEntry
+    tCurStop := tStop
     pDir := 0
     if showLevels
         lnE := line.new(bar_index, tEntry, bar_index + 1, tEntry, color = color.gray, width = 2)
         lnS := line.new(bar_index, tStop,  bar_index + 1, tStop,  color = colShort, width = 2)
-        ln4 := line.new(bar_index, tEntry + tDir * targetR  * tRisk, bar_index + 1, tEntry + tDir * targetR  * tRisk, color = colTarget, width = 2)
-        if useScratch
-            ln2 := line.new(bar_index, tEntry + tDir * scratchR * tRisk, bar_index + 1, tEntry + tDir * scratchR * tRisk, color = colScratch, style = line.style_dashed)
+        if useTarget
+            ln4 := line.new(bar_index, tEntry + tDir * targetR  * tRisk, bar_index + 1, tEntry + tDir * targetR  * tRisk, color = colTarget, width = 2)
+        if useScratch or useTrail
+            lvl = tEntry + tDir * (useTrail ? trailStartR : scratchR) * tRisk
+            ln2 := line.new(bar_index, lvl, bar_index + 1, lvl, color = colScratch, style = line.style_dashed)
 
-// ── 3) Manage open trade: optional scratch, target at targetR
+// ── 3) Manage open trade at bar close: breakeven / trailing stop, optional target
+//       (new stop level applies from the next bar)
 if tDir != 0 and strategy.position_size != 0
     tgt = tEntry + tDir * targetR * tRisk
     scr = tEntry + tDir * scratchR * tRisk
     if useScratch and not tScratched and (tDir == 1 ? high >= scr : low <= scr)
         tScratched := true
+        tCurStop := tDir == 1 ? math.max(tCurStop, tEntry) : math.min(tCurStop, tEntry)
         if showLevels
-            line.set_x2(lnS, bar_index)
             line.set_style(lnS, line.style_dotted)
             label.new(bar_index, scr, "BE", style = label.style_label_left, color = color.new(colScratch, 30), textcolor = color.white, size = size.tiny)
-    curStop = tScratched ? tEntry : tStop
-    strategy.exit("X", tDir == 1 ? "Long" : "Short", stop = curStop, limit = tgt)
+    tBest := tDir == 1 ? math.max(tBest, high) : math.min(tBest, low)
+    if useTrail and (tBest - tEntry) * tDir >= trailStartR * tRisk
+        if not tTrailing and showLevels
+            line.set_style(lnS, line.style_dotted)
+            label.new(bar_index, tEntry + tDir * trailStartR * tRisk, "TRAIL", style = label.style_label_left, color = color.new(colScratch, 30), textcolor = color.white, size = size.tiny)
+        tTrailing := true
+        ts = tBest - tDir * trailDistR * tRisk
+        tCurStop := tDir == 1 ? math.max(tCurStop, ts) : math.min(tCurStop, ts)
+    strategy.exit("X", tDir == 1 ? "Long" : "Short", stop = tCurStop, limit = useTarget ? tgt : na)
     if showLevels
         line.set_x2(lnE, bar_index + 1)
         line.set_x2(ln2, bar_index + 1)
         line.set_x2(ln4, bar_index + 1)
-        if not tScratched
+        if not (tScratched or tTrailing)
             line.set_x2(lnS, bar_index + 1)
+
+// Live stop once it has moved (breakeven or trailing) — stepped line
+plot(tDir != 0 and (tScratched or tTrailing) ? tCurStop : na, "Trailing stop", color = colScratch, linewidth = 2, style = plot.style_linebr)
 
 // ── 4) New signal → buy/sell next open
 if strategy.position_size == 0 and pDir == 0 and tDir == 0 and (bullSig or bearSig)
@@ -163,7 +189,7 @@ if strategy.position_size == 0 and pDir == 0 and tDir == 0 and (bullSig or bearS
         strategy.entry(id, d == 1 ? strategy.long : strategy.short, qty)
         // Protective orders live from the fill bar. Target is set in ticks from
         // the ACTUAL fill price (not the signal close); refined to exact R next bar.
-        strategy.exit("X", id, stop = stp, profit = math.round(targetR * estRisk / syminfo.mintick))
+        strategy.exit("X", id, stop = stp, profit = useTarget ? math.round(targetR * estRisk / syminfo.mintick) : na)
 
 // ── Alerts (filtered signals only)
 if bullSig
@@ -198,9 +224,9 @@ if showTable and barstate.islast
     f_row(3, "Win rate", n > 0 ? str.tostring(100.0 * w / n, "#.#") + "%" : "-", color.white)
     f_row(4, "Total R", str.tostring(tot, "#.##"), tot >= 0 ? color.lime : color.red)
     f_row(5, "Expectancy (R/trade)", n > 0 ? str.tostring(tot / n, "#.##") : "-", tot >= 0 ? color.lime : color.red)
-    curTxt = tDir == 0 ? (pDir != 0 ? "Pending next open" : "Flat") : (tDir == 1 ? "Long" : "Short") + (tScratched ? " (BE)" : "")
+    curTxt = tDir == 0 ? (pDir != 0 ? "Pending next open" : "Flat") : (tDir == 1 ? "Long" : "Short") + (tTrailing ? " (trailing)" : tScratched ? " (BE)" : "")
     f_row(6, "Current", curTxt, tDir == 1 ? colLong : tDir == -1 ? colShort : color.gray)
     f_row(7, "Risk (ticks)", tDir != 0 ? str.tostring(math.round(tRisk / syminfo.mintick)) : "-", color.white)
-    f_row(8, "Target / Scratch", str.tostring(targetR) + "R / " + (useScratch ? str.tostring(scratchR) + "R" : "off"), color.white)
+    f_row(8, "Target / Trail", (useTarget ? str.tostring(targetR) + "R" : "none") + " / " + (useTrail ? str.tostring(trailDistR) + "R after " + str.tostring(trailStartR) + "R" : "off"), color.white)
     trendTxt = useTrend ? "EMA" + str.tostring(trendLen) + (close > ema ? " ↑" : " ↓") : "off"
     f_row(9, "Filter", sideMode + " · trend " + trendTxt, useTrend ? (close > ema ? colLong : colShort) : color.gray)

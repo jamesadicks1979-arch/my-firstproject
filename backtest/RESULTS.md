@@ -159,3 +159,33 @@ The indicators were warmed up on the full history, and only trades signalled fro
 - Over the last 4 years the system is roughly break-even overall.
 - The positive result comes from metals, which were in a strong bull run, and from US indices.
 - With only about 10–25 trades per market in this window, the per-market numbers are mostly noise.
+
+## Trailing stop: 1R behind the best price once 2R is reached
+
+All tests use the improved rules (trend EMA50, longs only). Costs are 0.04% of price per round trip. Each cell shows both 2D alignments as off0 / off1.
+
+**What I tested:** the trail starts once price has gone 2R in your favour. From then on, the stop sits 1R behind the best price since entry. It is updated at the bar close, so the new level applies from the next bar.
+
+### All 18 markets, full history
+
+| Exit | R/trade | Total R | Win % | Max DD | t-stat |
+|---|---|---|---|---|---|
+| Fixed 4R (previous) | +0.148 / +0.142 | +242 / +233 | 24 | 100 / 111 | 2.8 |
+| Trail 1R after 2R, plus 4R target | +0.133 / +0.133 | +259 / +262 | 36 | 88 / 95 | 3.4 |
+| **Trail 1R after 2R, no target** | +0.147 / +0.119 | **+287** / +233 | 36 | **88** / 104 | **3.6** |
+| Trail 1.5R after 2R, no target | +0.197 / +0.153 | +367 / +288 | 37 | 95 / 99 | 4.1 |
+
+### All 18 markets, last 4 years
+
+| Exit | R/trade | Total R | Max DD |
+|---|---|---|---|
+| Fixed 4R (previous) | +0.06 / +0.05 | +16 / +15 | 27 / 41 |
+| **Trail 1R after 2R, no target** | **+0.15 / +0.15** | **+45 / +49** | **21 / 23** |
+
+### What the trail changes
+
+- **Win rate rises from 24% to 36%.** Many trades that used to reach 2R and then fall back to −1R now bank about +1R instead.
+- **Trade count goes up.** Trades end sooner, which frees the system to take the next signal.
+- **The last 4 years improve a lot.** Profit roughly triples and drawdown shrinks, and this holds on both alignments.
+- **Over the full history, profit per trade is unchanged.** Total R rises and drawdown falls.
+- **The Pine script default is now the 1R trail with no fixed target.** A wider trail (1.5R) did better over the full history, but I kept 1R as you asked.

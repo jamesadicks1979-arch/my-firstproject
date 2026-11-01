@@ -75,6 +75,8 @@ DEFAULT = dict(
     maxBars=None,          # time stop (bars after fill)
     cost=0.0,              # round-trip cost in price units
     costPct=0.0,           # round-trip cost as a fraction of entry price
+    trailStartR=None,      # once price tags this many R, trail the stop...
+    trailDistR=1.0,        # ...this many R behind the best price since entry
 )
 
 
@@ -144,6 +146,8 @@ def run(b, **kw):
         scratched = False
         exit_px, why = None, None
         k = j
+        best = entry
+        trailing = False
         while k < n:
             t = tgt_fill if k == j else tgt
             o, h, l = O[k], H[k], L[k]
@@ -167,6 +171,11 @@ def run(b, **kw):
             if p["useScratch"] and not scratched and ((h >= scr) if d == 1 else (l <= scr)):
                 scratched = True
                 cur_stop = entry
+            best = max(best, h) if d == 1 else min(best, l)
+            if p["trailStartR"] is not None and (best - entry) * d >= p["trailStartR"] * risk:
+                trailing = True
+                ts = best - d * p["trailDistR"] * risk
+                cur_stop = max(cur_stop, ts) if d == 1 else min(cur_stop, ts)
             if p["maxBars"] and k - j + 1 >= p["maxBars"]:
                 if k + 1 < n:
                     exit_px, why = O[k + 1], "time"; k += 1
@@ -175,7 +184,9 @@ def run(b, **kw):
         if exit_px is None:
             break   # still open at end of data
         R = ((exit_px - entry) * d - p["cost"] - p["costPct"] * entry) / risk
-        if why == "stop" and scratched:
+        if why == "stop" and trailing:
+            why = "trail"
+        elif why == "stop" and scratched:
             why = "scratch"
         trades.append(dict(date=b.index[i], dir=d, R=R, exit=why, bars=k - j + 1, risk=risk))
         i = k   # Pine allows a new signal on the exit bar
